@@ -1,5 +1,7 @@
 # VRCNext Mobile 0.1.0
 
+> Устаревшая тестовая версия. Для исправления входа с кодом из письма используйте [0.1.1](../v0.1.1/README.md).
+
 [Скачать APK](https://github.com/DiskREid/vrcnext-mobile/raw/refs/heads/main/releases/v0.1.0/VRCNext-Mobile-0.1.0.apk) ·
 [Скачать исходники](https://github.com/DiskREid/vrcnext-mobile/raw/refs/heads/main/releases/v0.1.0/VRCNext-Mobile-0.1.0-source.zip)
 

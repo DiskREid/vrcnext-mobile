@@ -585,13 +585,6 @@ export function WorldDetails({ target, onClose }: { target: World | string; onCl
                       </button>
                       <button
                         className="icon-button"
-                        aria-label="Открыть в VRChat"
-                        onClick={() => void ctx.act(() => native.openVrchat({ location: loc }))}
-                      >
-                        <ExternalLink size={17} />
-                      </button>
-                      <button
-                        className="icon-button"
                         aria-label="Пригласить друзей"
                         onClick={() => setInviteTo(loc)}
                       >

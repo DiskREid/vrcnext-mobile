@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
+  AuthError,
   basicAuthorization,
   checked,
   createApi,
@@ -11,6 +12,7 @@ import type { NativeBridge, NativeResponse } from './native';
 
 function fixture(responses: NativeResponse[] = []) {
   const bridge = {
+    sessionState: vi.fn(async () => ({ hasAuth: false })),
     request: vi.fn(async () => responses.shift() ?? { status: 200, data: {} }),
     clearSession: vi.fn(async () => {}),
     disconnectPipeline: vi.fn(async () => {}),
@@ -20,6 +22,26 @@ function fixture(responses: NativeResponse[] = []) {
 const success = (data: unknown): NativeResponse => ({ status: 200, data });
 
 describe('native VRChat authentication', () => {
+  it('shows a fresh-install login without any anonymous network request or cookie clearing', async () => {
+    const { client, bridge } = fixture();
+    expect(await client.resumeOnLaunch()).toBeNull();
+    expect(bridge.request).not.toHaveBeenCalled();
+    expect(bridge.clearSession).not.toHaveBeenCalled();
+  });
+  it('restores a pending email challenge only when native session metadata says auth exists', async () => {
+    const { client, bridge } = fixture([success({ requiresTwoFactorAuth: ['emailOtp'] })]);
+    vi.mocked(bridge.sessionState).mockResolvedValue({ hasAuth: true });
+    expect(await client.resumeOnLaunch()).toEqual({ requiresTwoFactorAuth: ['emailotp'] });
+    expect(bridge.request).toHaveBeenCalledOnce();
+    expect(bridge.clearSession).not.toHaveBeenCalled();
+  });
+  it('does not turn local session inspection failure into anonymous API requests', async () => {
+    const { client, bridge } = fixture();
+    vi.mocked(bridge.sessionState).mockRejectedValue(new Error('unavailable'));
+    await expect(client.resumeOnLaunch()).rejects.toMatchObject({ stage: 'restore' });
+    expect(bridge.request).not.toHaveBeenCalled();
+  });
+
   it('percent-encodes unicode and punctuation before basic auth without storing credentials', async () => {
     const { bridge, client } = fixture([success({ id: 'usr_me', displayName: 'Me' })]);
     await client.login('имя:用户', 'p!a:ss/é');
@@ -68,6 +90,144 @@ describe('native VRChat authentication', () => {
     const { bridge } = fixture();
     const browserClient = createApi(bridge, () => false);
     await expect(browserClient.login('private', 'secret')).rejects.toThrow('Android APK');
+    expect(bridge.request).not.toHaveBeenCalled();
+  });
+});
+
+describe('complete and resumable two-factor login', () => {
+  it('keeps one pending session for credentials, email code and final profile', async () => {
+    const { bridge, client } = fixture([
+      success({ requiresTwoFactorAuth: ['emailOtp'] }),
+      success({ verified: true }),
+      success({ id: 'usr_me', displayName: 'Me' }),
+    ]);
+    expect(await client.login('account', 'password')).toEqual({
+      requiresTwoFactorAuth: ['emailotp'],
+    });
+    expect(await client.verify2fa(' 012 345 ', 'emailOtp')).toMatchObject({ id: 'usr_me' });
+    expect(bridge.clearSession).toHaveBeenCalledTimes(1);
+    const requests = vi.mocked(bridge.request).mock.calls.map(([request]) => request);
+    expect(requests.map((request) => [request.path, request.method])).toEqual([
+      ['/auth/user', 'GET'],
+      ['/auth/twofactorauth/emailotp/verify', 'POST'],
+      ['/auth/user', 'GET'],
+    ]);
+    expect(requests[1].body).toBe('{"code":"012345"}');
+    expect(requests[1].authorization).toBeUndefined();
+    expect(requests[2].authorization).toBeUndefined();
+  });
+
+  it('restores a pending email challenge without discarding native cookies', async () => {
+    const { bridge, client } = fixture([
+      success({ requiresTwoFactorAuth: ['EmailOTP', 'TOTP', 'emailOtp'] }),
+      success({ requiresTwoFactorAuth: ['emailOtp'] }),
+    ]);
+    expect(await client.authState()).toEqual({ requiresTwoFactorAuth: ['emailotp', 'totp'] });
+    await expect(client.resume()).rejects.toMatchObject({ stage: 'restore', status: 401 });
+    expect(bridge.clearSession).not.toHaveBeenCalled();
+    expect(bridge.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a rejected code in the same pending login without resubmitting credentials', async () => {
+    const { bridge, client } = fixture([
+      success({ requiresTwoFactorAuth: ['emailOtp'] }),
+      { status: 401, data: { error: { message: 'Invalid code' } } },
+      success({ verified: true }),
+      success({ id: 'usr_me', displayName: 'Me' }),
+    ]);
+    await client.login('account', 'password');
+    await expect(client.verify2fa('111111', 'emailotp')).rejects.toMatchObject({
+      stage: 'twoFactor',
+      status: 401,
+    });
+    expect(bridge.clearSession).toHaveBeenCalledTimes(1);
+    await expect(client.verify2fa('222222', 'emailotp')).resolves.toMatchObject({ id: 'usr_me' });
+    expect(bridge.clearSession).toHaveBeenCalledTimes(1);
+    expect(
+      vi.mocked(bridge.request).mock.calls.filter(([request]) => !!request.authorization),
+    ).toHaveLength(1);
+  });
+
+  it('distinguishes credential rejection from post-code session failure', async () => {
+    const credentials = fixture([{ status: 401, data: {} }]);
+    await expect(credentials.client.login('u', 'p')).rejects.toMatchObject({
+      stage: 'credentials',
+      status: 401,
+    });
+    const profile = fixture([success({ verified: true }), { status: 401, data: {} }]);
+    await expect(profile.client.verify2fa('123456', 'emailotp')).rejects.toMatchObject({
+      stage: 'profile',
+      status: 401,
+    });
+    expect(profile.bridge.clearSession).not.toHaveBeenCalled();
+    expect(profile.bridge.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not silently retry a code submission or clear cookies after a rate limit', async () => {
+    const { bridge, client } = fixture([{ status: 429, data: {}, retryAfter: 45 }]);
+    await expect(client.verify2fa('123456', 'totp')).rejects.toMatchObject({
+      stage: 'twoFactor',
+      status: 429,
+      retryAfter: 45,
+    });
+    expect(bridge.request).toHaveBeenCalledTimes(1);
+    expect(bridge.clearSession).not.toHaveBeenCalled();
+  });
+
+  it('validates six-digit codes locally while preserving recovery-code punctuation', async () => {
+    const invalid = fixture();
+    await expect(invalid.client.verify2fa('12a456', 'emailotp')).rejects.toThrow('6 цифр');
+    expect(invalid.bridge.request).not.toHaveBeenCalled();
+    const backup = fixture([
+      success({ verified: true }),
+      success({ id: 'usr_me', displayName: 'Me' }),
+    ]);
+    await backup.client.verify2fa('  AbCd-1234  ', 'otp');
+    expect(backup.bridge.request).toHaveBeenNthCalledWith(1, {
+      path: '/auth/twofactorauth/otp/verify',
+      method: 'POST',
+      body: '{"code":"AbCd-1234"}',
+    });
+  });
+
+  it.each([
+    null,
+    {},
+    { id: 'usr_me' },
+    { requiresTwoFactorAuth: [] },
+    { requiresTwoFactorAuth: ['unsupported'] },
+  ])(
+    'rejects an incomplete login response %j instead of entering an invalid account',
+    async (response) => {
+      const { client } = fixture([success(response)]);
+      await expect(client.login('account', 'password')).rejects.toBeInstanceOf(AuthError);
+    },
+  );
+
+  it('does not accept a second challenge as a loaded post-verification profile', async () => {
+    const { client } = fixture([
+      success({ verified: true }),
+      success({ requiresTwoFactorAuth: ['emailOtp'] }),
+    ]);
+    await expect(client.verify2fa('123456', 'emailotp')).rejects.toMatchObject({
+      stage: 'profile',
+      status: 401,
+    });
+  });
+
+  it('distinguishes malformed verification data from an invalid code and never fetches a profile', async () => {
+    const { bridge, client } = fixture([success({})]);
+    await expect(client.verify2fa('123456', 'emailotp')).rejects.toThrow(
+      'некорректный ответ подтверждения',
+    );
+    expect(bridge.request).toHaveBeenCalledTimes(1);
+    expect(bridge.clearSession).not.toHaveBeenCalled();
+  });
+
+  it('cancels only the local pending login without a server logout request', async () => {
+    const { bridge, client } = fixture();
+    await client.cancelLogin();
+    expect(bridge.clearSession).toHaveBeenCalledOnce();
     expect(bridge.request).not.toHaveBeenCalled();
   });
 });

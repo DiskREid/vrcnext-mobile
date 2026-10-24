@@ -1,21 +1,7 @@
+import DiagnosticsPanel from '../components/DiagnosticsPanel';
 import { useState } from 'react';
-import {
-  Settings,
-  Radio,
-  LockKeyhole,
-  LogOut,
-  Info,
-  Palette,
-  Shield,
-  Clock,
-  Send,
-  Globe2,
-  ExternalLink,
-  Smartphone,
-  Check,
-  RefreshCw,
-} from 'lucide-react';
-import { api, native } from '../api';
+import { LockKeyhole, LogOut, Info, Palette, Clock, ExternalLink, Check } from 'lucide-react';
+import { api } from '../api';
 import type { User } from '../api';
 import { useApp, useLoad } from '../state';
 import {
@@ -161,6 +147,7 @@ export function SettingsPage() {
         <section className="card settings-section">
           <LockKeyhole />
           <h2>Конфиденциальность</h2>
+          <DiagnosticsPanel />
           <p className="muted">
             Пароль не сохраняется. Cookie сессии шифруются ключом Android Keystore. Резервное
             копирование и снимки экрана отключены. Нет аналитики и промежуточного сервера.
@@ -190,7 +177,7 @@ export function SettingsPage() {
         <section className="card settings-section">
           <Info />
           <h2>
-            VRCNext Mobile <Badge>0.1.0</Badge>
+            VRCNext Mobile <Badge>0.1.1</Badge>
           </h2>
           <p className="muted">
             Неофициальная Android-адаптация VRCNext от shinyflvre и участников VRCNext. Не связана с
@@ -242,147 +229,8 @@ function License() {
     <Loading />
   );
 }
-export function ToolsPage() {
-  const { act } = useApp();
-  const [host, setHost] = useState(localStorage.getItem('osc-host') || ''),
-    [port, setPort] = useState('9000'),
-    [text, setText] = useState(''),
-    [address, setAddress] = useState('/avatar/parameters/'),
-    [type, setType] = useState<'s' | 'f' | 'i' | 'T' | 'F'>('f'),
-    [value, setValue] = useState('0');
-  const send = (chat: boolean) =>
-    void act(async () => {
-      if (chat)
-        await native.sendChatbox({ host: host.trim(), port: Number(port), text, sound: false });
-      else
-        await native.sendOsc({
-          host: host.trim(),
-          port: Number(port),
-          address,
-          type,
-          ...(type === 's'
-            ? { value }
-            : type === 'T' || type === 'F'
-              ? {}
-              : { value: Number(value) }),
-        });
-      localStorage.setItem('osc-host', host.trim());
-    }, 'OSC-пакет отправлен');
-  return (
-    <>
-      <PageHeader
-        eyebrow="МОБИЛЬНЫЕ ИНСТРУМЕНТЫ"
-        title="OSC-пульт"
-        subtitle="Управление VRChat на компьютере в локальной сети"
-      />
-      <div className="inset-panel">
-        <Radio size={22} />
-        <p>
-          Телефон и ПК должны находиться в одной Wi-Fi сети. Включите OSC в VRChat и разрешите
-          входящий UDP-порт в брандмауэре ПК.
-        </p>
-      </div>
-      <div className="form-stack narrow">
-        <div className="field-grid">
-          <label className="field">
-            Локальный IPv4 компьютера
-            <input
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              inputMode="decimal"
-              placeholder="192.168.1.10"
-            />
-          </label>
-          <label className="field">
-            UDP-порт
-            <input
-              type="number"
-              min="1024"
-              max="65535"
-              value={port}
-              onChange={(e) => setPort(e.target.value)}
-            />
-          </label>
-        </div>
-        <section className="card settings-section">
-          <h2>Chatbox</h2>
-          <label className="field">
-            Сообщение
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={144}
-              placeholder="Текст над аватаром…"
-            />
-          </label>
-          <button className="button primary" disabled={!host || !text} onClick={() => send(true)}>
-            <Send size={17} />
-            Отправить в Chatbox
-          </button>
-          <p className="muted small">
-            Отправка по нажатию, без фоновой ротации и доступа к музыке ПК.
-          </p>
-        </section>
-        <section className="card settings-section">
-          <h2>Параметр аватара</h2>
-          <label className="field">
-            OSC-адрес
-            <input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="/avatar/parameters/YourParameter"
-            />
-          </label>
-          <div className="field-grid">
-            <label className="field">
-              Тип
-              <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
-                <option value="f">Float</option>
-                <option value="i">Int</option>
-                <option value="T">Bool: true</option>
-                <option value="F">Bool: false</option>
-                <option value="s">String</option>
-              </select>
-            </label>
-            {!['T', 'F'].includes(type) && (
-              <label className="field">
-                Значение
-                <input
-                  type={type === 's' ? 'text' : 'number'}
-                  step="any"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                />
-              </label>
-            )}
-          </div>
-          <button
-            className="button secondary"
-            disabled={!host || !address}
-            onClick={() => send(false)}
-          >
-            Отправить параметр
-          </button>
-        </section>
-        <section className="card settings-section">
-          <Smartphone />
-          <h2>Функции, которым нужен ПК</h2>
-          <p className="muted">
-            SteamVR Overlay, Space Flight / Turn, запуск VRChat и программ Windows, Voice Fight,
-            VRCVideoCacher, Frame Shot и чтение логов не работают на Android. Подключение companion
-            в этой версии не реализовано.
-          </p>
-          <p className="muted">
-            Автоопределение OSC-параметров через OSCQuery также пока не перенесено. Параметры можно
-            отправлять по известному адресу.
-          </p>
-        </section>
-      </div>
-    </>
-  );
-}
 export function TimelinePage() {
-  const { activity, demo } = useApp();
+  const { activity } = useApp();
   return (
     <>
       <PageHeader
@@ -393,8 +241,8 @@ export function TimelinePage() {
       <div className="inset-panel">
         <Clock size={21} />
         <p>
-          Это журнал мобильного клиента. Встречи, время в мирах и состав игроков из ПК-версии
-          требуют доступа к логам VRChat и здесь не собираются.
+          Действия в приложении и события друзей за текущую мобильную сессию. Журнал очищается после
+          выхода из аккаунта.
         </p>
       </div>
       {!activity.length ? (

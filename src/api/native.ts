@@ -18,6 +18,7 @@ export interface PipelineEvent {
   content: Record<string, unknown>;
 }
 export interface NativeBridge {
+  sessionState(): Promise<{ hasAuth: boolean }>;
   loadImage(options: { url: string }): Promise<{ dataUrl: string }>;
   request(options: NativeRequest): Promise<NativeResponse>;
   searchPublicAvatars(options: { query: string; page: number }): Promise<NativeResponse>;
@@ -30,20 +31,6 @@ export interface NativeBridge {
     mimeType: string;
     fileName: string;
   }): Promise<NativeResponse>;
-  sendChatbox(options: {
-    host: string;
-    port: number;
-    text: string;
-    sound?: boolean;
-  }): Promise<void>;
-  sendOsc(options: {
-    host: string;
-    port: number;
-    address: string;
-    type: 's' | 'f' | 'i' | 'T' | 'F';
-    value?: string | number;
-  }): Promise<void>;
-  openVrchat(options: { location: string }): Promise<void>;
   openLink(options: { url: string }): Promise<void>;
   addListener(
     eventName: 'pipeline',

@@ -37,6 +37,18 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
+/** Authentication errors identify the failed phase without exposing request data. */
+export class AuthError extends ApiError {
+  constructor(
+    message: string,
+    public stage: 'credentials' | 'restore' | 'twoFactor' | 'profile',
+    status = 0,
+    retryAfter?: number,
+  ) {
+    super(message, status, retryAfter);
+    this.name = 'AuthError';
+  }
+}
 const segment = (s: string) => encodeURIComponent(s);
 const escapeCredential = (s: string) =>
   encodeURIComponent(s).replace(
@@ -176,8 +188,57 @@ export function normalizePublicAvatar(value: unknown): Avatar | undefined {
         : [],
   };
 }
-export function isTwoFactorChallenge(data: User | TwoFactorChallenge): data is TwoFactorChallenge {
-  return 'requiresTwoFactorAuth' in data && Array.isArray(data.requiresTwoFactorAuth);
+export function isTwoFactorChallenge(data: unknown): data is TwoFactorChallenge {
+  const response = record(data);
+  return Array.isArray(response?.requiresTwoFactorAuth);
+}
+function authResponse(data: unknown, stage: AuthError['stage']): User | TwoFactorChallenge {
+  const response = record(data);
+  if (!response) throw new AuthError('VRChat вернул некорректный ответ входа.', stage);
+  if ('requiresTwoFactorAuth' in response) {
+    if (!Array.isArray(response.requiresTwoFactorAuth))
+      throw new AuthError('VRChat вернул некорректный способ подтверждения.', stage);
+    const methods = [
+      ...new Set(
+        response.requiresTwoFactorAuth
+          .filter((method): method is string => typeof method === 'string')
+          .map((method) => method.toLowerCase())
+          .filter((method) => ['totp', 'emailotp', 'otp'].includes(method)),
+      ),
+    ];
+    if (!methods.length)
+      throw new AuthError(
+        'VRChat запросил способ подтверждения, который пока не поддерживается.',
+        stage,
+      );
+    return { requiresTwoFactorAuth: methods };
+  }
+  if (
+    typeof response.id !== 'string' ||
+    !response.id ||
+    typeof response.displayName !== 'string' ||
+    !response.displayName
+  )
+    throw new AuthError('VRChat не вернул полный профиль пользователя.', stage);
+  return response as unknown as User;
+}
+function phasedAuthError(
+  error: unknown,
+  stage: AuthError['stage'],
+  unauthorized: string,
+): AuthError {
+  if (error instanceof AuthError && error.stage === stage) return error;
+  if (error instanceof ApiError)
+    return new AuthError(
+      error.status === 401 ? unauthorized : error.message,
+      stage,
+      error.status,
+      error.retryAfter,
+    );
+  return new AuthError(
+    'Не удалось завершить вход. Проверьте подключение и повторите попытку.',
+    stage,
+  );
 }
 function requireLocation(location: string) {
   if (!/^wrld_[a-zA-Z0-9-]+:[a-zA-Z0-9~_().+\-]+$/.test(location))
@@ -261,46 +322,134 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
   }
   const client = {
     request,
-    async resume(): Promise<User> {
-      const result = await request<User | TwoFactorChallenge>('/auth/user');
-      if (isTwoFactorChallenge(result))
-        throw new ApiError(
-          'Для продолжения войдите и подтвердите двухфакторную аутентификацию.',
-          401,
+    async resumeOnLaunch(): Promise<User | TwoFactorChallenge | null> {
+      ensureNative();
+      let state: { hasAuth: boolean };
+      try {
+        state = await transport.sessionState();
+      } catch {
+        throw new AuthError(
+          'Не удалось проверить локальную сессию. Начните новый вход.',
+          'restore',
         );
-      if (!result.id) throw new ApiError('VRChat не вернул профиль пользователя.');
-      authenticatedUserId = result.id;
+      }
+      // A fresh install must show the login form immediately, even without internet.
+      if (!state.hasAuth) return null;
+      return client.authState();
+    },
+    async authState(): Promise<User | TwoFactorChallenge> {
+      try {
+        const result = authResponse(await request<unknown>('/auth/user'), 'restore');
+        authenticatedUserId = isTwoFactorChallenge(result) ? undefined : result.id;
+        return result;
+      } catch (error) {
+        throw phasedAuthError(
+          error,
+          'restore',
+          'Сохранённая сессия недействительна. Введите данные для нового входа.',
+        );
+      }
+    },
+    async resume(): Promise<User> {
+      const result = await client.authState();
+      if (isTwoFactorChallenge(result))
+        throw new AuthError('Для продолжения подтвердите вход кодом VRChat.', 'restore', 401);
       return result;
     },
     async login(username: string, password: string): Promise<User | TwoFactorChallenge> {
       ensureNative();
-      if (!username.trim() || !password) throw new ApiError('Введите имя пользователя и пароль.');
-      // Isolate new-account login from any expired or partial previous session.
-      await transport.clearSession();
+      if (!username.trim() || !password)
+        throw new AuthError('Введите имя пользователя и пароль.', 'credentials');
+      // A new credentials submission starts one isolated login. Code retries never clear it.
+      try {
+        await transport.clearSession();
+      } catch {
+        throw new AuthError(
+          'Не удалось подготовить локальную сессию. Повторите вход.',
+          'credentials',
+        );
+      }
       v2Supported = true;
       authenticatedUserId = undefined;
-      // Do not retain either credential beyond this request.
-      const result = await request<User | TwoFactorChallenge>(
-        '/auth/user',
-        'GET',
-        undefined,
-        basicAuthorization(username.trim(), password),
-      );
-      if (!isTwoFactorChallenge(result)) authenticatedUserId = result.id;
-      return result;
+      try {
+        // Do not retain either credential beyond this request.
+        const result = authResponse(
+          await request<unknown>(
+            '/auth/user',
+            'GET',
+            undefined,
+            basicAuthorization(username.trim(), password),
+          ),
+          'credentials',
+        );
+        if (!isTwoFactorChallenge(result)) authenticatedUserId = result.id;
+        return result;
+      } catch (error) {
+        throw phasedAuthError(
+          error,
+          'credentials',
+          'VRChat не принял имя пользователя или пароль. Используйте данные аккаунта VRChat, а не отображаемое имя.',
+        );
+      }
+    },
+    async cancelLogin(): Promise<void> {
+      ensureNative();
+      try {
+        await transport.clearSession();
+      } catch {
+        throw new AuthError('Не удалось очистить временную сессию. Повторите попытку.', 'restore');
+      }
+      authenticatedUserId = undefined;
     },
     async verify2fa(code: string, type: TwoFactorType | string): Promise<User> {
-      const method = type.toLowerCase();
+      const method = type.trim().toLowerCase();
       if (!['totp', 'emailotp', 'otp'].includes(method))
-        throw new ApiError('Этот способ подтверждения не поддерживается.');
-      if (!code.trim()) throw new ApiError('Введите код подтверждения.');
-      const result = await request<{ verified: boolean }>(
-        `/auth/twofactorauth/${method}/verify`,
-        'POST',
-        { code: code.trim() },
-      );
-      if (!result.verified) throw new ApiError('Неверный или просроченный код.');
-      return client.resume();
+        throw new AuthError('Этот способ подтверждения не поддерживается.', 'twoFactor');
+      // Email/TOTP codes are six digits. Pasted whitespace is not part of the code.
+      // Recovery codes retain punctuation/case; their exact format is owned by VRChat.
+      const entered = method === 'otp' ? code.trim() : code.replace(/\s+/g, '');
+      if (!entered) throw new AuthError('Введите код подтверждения.', 'twoFactor');
+      if (method !== 'otp' && !/^\d{6}$/.test(entered))
+        throw new AuthError('Введите 6 цифр кода подтверждения.', 'twoFactor');
+      try {
+        const result = await request<unknown>(`/auth/twofactorauth/${method}/verify`, 'POST', {
+          code: entered,
+        });
+        const verified = record(result)?.verified;
+        if (verified === false)
+          throw new AuthError(
+            'Неверный или просроченный код. Проверьте новый код и повторите попытку.',
+            'twoFactor',
+            400,
+          );
+        if (verified !== true)
+          throw new AuthError(
+            'VRChat вернул некорректный ответ подтверждения. Повторите попытку.',
+            'twoFactor',
+          );
+      } catch (error) {
+        throw phasedAuthError(
+          error,
+          'twoFactor',
+          'VRChat не принял код или временная сессия входа закончилась. Проверьте свежий код; при повторной ошибке начните вход заново.',
+        );
+      }
+      try {
+        const user = await client.authState();
+        if (isTwoFactorChallenge(user))
+          throw new AuthError(
+            'Код принят, но VRChat всё ещё требует подтверждение входа. Начните вход заново.',
+            'profile',
+            401,
+          );
+        return user;
+      } catch (error) {
+        throw phasedAuthError(
+          error,
+          'profile',
+          'Код принят, но VRChat не восстановил сессию для загрузки профиля. Начните вход заново.',
+        );
+      }
     },
     async logout(): Promise<{ serverLoggedOut: boolean }> {
       let serverLoggedOut = false;

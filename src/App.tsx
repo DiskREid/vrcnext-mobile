@@ -57,13 +57,7 @@ import {
 import Auth from './pages/Auth';
 import Explore from './pages/Explore';
 import { CalendarPage, InventoryPage, MessengerPage } from './pages/Collections';
-import {
-  ProfilePage,
-  SettingsPage,
-  ToolsPage,
-  TimelinePage,
-  ModerationPage,
-} from './pages/Personal';
+import { ProfilePage, SettingsPage, TimelinePage, ModerationPage } from './pages/Personal';
 import { UserDetails, WorldDetails, statusName, rankOf } from './pages/Details';
 type Screen =
   | 'home'
@@ -76,7 +70,6 @@ type Screen =
   | 'inventory'
   | 'messenger'
   | 'timeline'
-  | 'tools'
   | 'settings'
   | 'moderation';
 const tabs: { id: Screen; label: string; icon: ComponentType<{ size?: number }> }[] = [
@@ -401,7 +394,6 @@ export default function App() {
                       inventory: 'Медиатека',
                       messenger: 'Сообщения',
                       timeline: 'Активность',
-                      tools: 'OSC',
                       settings: 'Настройки',
                       moderation: 'Модерация',
                     }[screen as string as 'profile']}
@@ -471,8 +463,6 @@ export default function App() {
               <MessengerPage />
             ) : screen === 'timeline' ? (
               <TimelinePage />
-            ) : screen === 'tools' ? (
-              <ToolsPage />
             ) : screen === 'moderation' ? (
               <ModerationPage />
             ) : (
@@ -966,10 +956,10 @@ function NotificationsPage() {
                     <button
                       className="button primary compact"
                       onClick={() =>
-                        void ctx.act(() => native.openVrchat({ location: locationOf(n) }))
+                        action(() => api.acceptNotification(n), 'Приглашение принято', n.id)
                       }
                     >
-                      Открыть в VRChat
+                      Принять приглашение
                     </button>
                   )}
                   {(n.type === 'invite' || n.type === 'requestInvite') && (
@@ -1095,13 +1085,6 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
       color: 'purple',
     },
     {
-      id: 'tools',
-      title: 'OSC-пульт',
-      text: 'Chatbox и параметры аватара',
-      icon: Radio,
-      color: 'green',
-    },
-    {
       id: 'moderation',
       title: 'Блокировки',
       text: 'Списки block и mute',
@@ -1121,7 +1104,7 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
       <PageHeader
         eyebrow="ВСЁ ПОД РУКОЙ"
         title="Ваш VRCNext"
-        subtitle="Небольшие инструменты для больших миров"
+        subtitle="Аккаунт, события и ваши коллекции"
       />
       <button className="card more-profile" onClick={() => navigate('profile')}>
         <AvatarImage name={user.displayName} src={imageOf(user)} size={60} status={user.status} />
@@ -1142,13 +1125,6 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
             <ChevronRight size={18} />
           </button>
         ))}
-      </div>
-      <div className="inset-panel">
-        <Radio size={22} />
-        <p>
-          Инструменты SteamVR и функции, читающие логи ПК, требуют отдельного companion. Их
-          ограничения описаны в разделе OSC и документации проекта.
-        </p>
       </div>
     </>
   );

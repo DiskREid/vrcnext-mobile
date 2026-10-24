@@ -8,11 +8,12 @@ VRCNext Mobile — самостоятельная неофициальная м�
 C#-слой VRChat API. Android не запускает этот исполняемый файл: мобильный интерфейс
 и нативный сетевой слой создаются отдельно по результатам изучения исходников.
 
-Матрица ниже обновлена по исходникам мобильной версии 0.1.0: `src/App.tsx`,
+Матрица ниже обновлена по исходникам готовящейся мобильной версии 0.1.1: `src/App.tsx`,
 `src/pages/`, `src/api/` и `android/app/src/main/java/com/diskreid/vrcnextmobile/`.
 Это **проверка наличия реализации**, а не подтверждение работы с реальным аккаунтом.
-Вход, ответы серверов, изменения аккаунта и взаимодействие с Android/VRChat на
-физическом устройстве пока требуют проверки по [плану испытаний](DEVICE_TEST_PLAN.md).
+Пользователь сообщил о вылете первого запуска 0.1.0 и об отказе после Email OTP.
+Вход, ответы серверов, изменения аккаунта и взаимодействие с Android/VRChat требуют
+повторной проверки исправлений по [плану испытаний](DEVICE_TEST_PLAN.md).
 Автоматические проверки с подставленным транспортом не заменяют такую проверку.
 
 Статусы:
@@ -22,11 +23,22 @@ C#-слой VRChat API. Android не запускает этот исполня�
 - **Частично** — перенесена только указанная часть функции.
 - **Только API** — метод есть в библиотеке, но законченного сценария интерфейса нет.
 - **Не реализовано** — текущая версия не предоставляет функцию.
-- **Нужен ПК** — помимо отсутствующей мобильной реализации нужен доступ к ПК или
-  перенос платформенной подсистемы. Companion в версии 0.1.0 отсутствует.
+- **Вне мобильного объёма** — функции запуска ПК-клиента, VR/SteamVR и OSC исключены
+  по уточнению пользователя. Они не являются требованием готовности Android-клиента.
+- **Нужны игровые данные** — функция зависит от журналов/локальных данных игрового
+  клиента, которых обычный VRChat API не предоставляет.
 
 Демонстрационный режим показывает пример интерфейса и блокирует действия,
 изменяющие аккаунт. Его данные не являются доказательством работы VRChat API.
+
+## Объём мобильной версии
+
+По уточнению пользователя приложение сосредоточено на друзьях, аккаунте, мирах,
+группах, аватарах, уведомлениях, событиях и медиатеке. Запуск ПК-версии VRChat,
+VR-режим, SteamVR-инструменты и управление OSC убраны из мобильного интерфейса.
+PC companion не является планируемым обязательным компонентом. Остальные
+доступные через API функции остаются целью переноса; таблица ниже явно сохраняет
+их реальные ограничения и незавершённые части.
 
 ## Функции, доступные через VRChat API
 
@@ -66,7 +78,7 @@ C#-слой VRChat API. Android не запускает этот исполня�
 | Создание обычного инстанса, регион, видимость | `Services/VRChatAPI/InstancesAPI.cs` | Реализовано в коде через POST /instances: Public, Friends+, Friends, Invite/Invite+, EU/US/USE/JP и приглашение себе. Отличается от локального построения location оригинала; нужны живые проверки. | `src/pages/Details.tsx`, `src/api/index.ts` |
 | Создание group/group+/group public инстанса | `Services/VRChatAPI/InstancesAPI.cs` | Частично: выбор группы, доступа и региона. Именование, queue, age gate и minimum avatar performance в UI отсутствуют; права проверяет сервер. | `src/pages/Details.tsx`, `src/api/index.ts` |
 | Пригласить себя, закрыть инстанс, короткая ссылка | `Services/VRChatAPI/InstancesAPI.cs` | Частично: приглашение себе. Закрытие и получение shortName отсутствуют. | `src/pages/Details.tsx`, `src/api/index.ts` |
-| Переход в мир через установленный VRChat | `VRChatApiService.BuildLaunchUri`, `Services/DeepLinkService.cs` | Реализовано в коде: Android ACTION_VIEW с URI vrchat://launch и обработка отсутствующего приложения. Совместимость самого URI с установленным клиентом не проверена. | `VrcNativePlugin.java`, `src/pages/Details.tsx` |
+| Запуск игрового клиента из карточки мира | `VRChatApiService.BuildLaunchUri`, `Services/DeepLinkService.cs` | Вне мобильного объёма. Непроверенная кнопка vrchat://launch удалена; серверное приглашение себе в выбранный инстанс сохранено. | `src/pages/Details.tsx` |
 | Мои группы, поиск, вступление, выход | `Services/VRChatAPI/GroupsAPI.cs`, `frontend/modules/groups/groups.js` | Реализовано в коде: мои группы, поиск с пагинацией, вступление и подтверждаемый выход. | `src/pages/Explore.tsx`, `src/api/index.ts` |
 | Профиль группы, правила, роли, изображения, представляемая группа | `Services/VRChatAPI/GroupsAPI.cs` | Частично: чтение описания, правил, языков, иконки и баннера. Редактирование, управление ролями и представление группы отсутствуют. | `src/pages/Explore.tsx` |
 | Объявления группы и публикации с изображениями | `Services/VRChatAPI/GroupsAPI.cs` | Частично: просмотр и создание публикации с видимостью, флагом уведомления и изображением. Редактирование/удаление в UI отсутствуют; deleteGroupPost есть только в API. | `src/pages/Explore.tsx`, `src/api/index.ts` |
@@ -87,36 +99,31 @@ C#-слой VRChat API. Android не запускает этот исполня�
 | Action Flow / автоматизация | `main/ActionFlowController.cs`, `Services/ActionFlow/ActionFlowSettings.cs` | Не реализовано. | — |
 | Event Snipe | `main/SnipeController.cs`, `frontend/modules/tools/event-snipe/event-snipe.js` | Не реализовано. | — |
 | Permini / расширенные проверки | `frontend/modules/tools/permini/permini.js` | Не реализовано. | — |
-| Темы, цвет акцента, язык, настройки и локальный кэш | `frontend/modules/settings/`, `frontend/core/i18n/`, `Services/Helpers/ModalCacheHelper.cs` | Частично: пять цветов акцента, русский интерфейс, локальное сохранение цвета и адреса OSC. Редактора тем, выбора языка, произвольного фона и Fast Fetch/SQLite-кэша оригинала нет. | `src/pages/Personal.tsx`, `src/styles.css`, `src/App.tsx` |
+| Темы, цвет акцента, язык, настройки и локальный кэш | `frontend/modules/settings/`, `frontend/core/i18n/`, `Services/Helpers/ModalCacheHelper.cs` | Частично: пять цветов акцента, русский интерфейс, локальное сохранение цвета. Редактора тем, выбора языка, произвольного фона и Fast Fetch/SQLite-кэша оригинала нет. | `src/pages/Personal.tsx`, `src/styles.css`, `src/App.tsx` |
 
-## Функции, зависящие от ПК или локальных данных VRChat
+## Функции ПК и ограничения локальных игровых данных
 
-Полное поведение этих функций невозможно перенести на телефон простым изменением интерфейса. Для сохранения
-того же поведения необходим отдельный доверенный компонент на ПК, работающий с
-локальным VRChat/SteamVR, либо самостоятельная Android-реализация там, где это
-технически возможно. Такой компонент в версии 0.1.0 не реализован. Исключение по объёму переноса — ручная отправка OSC-пакетов в локальной сети, описанная ниже.
+Запуск ПК-программ, VR-режим и OSC намеренно исключены из Android-версии по
+уточнению пользователя. Они не показываются как неготовые действия или требование
+подключить ПК. Ниже отдельно перечислены сведения, которым требуются локальные
+данные игрового клиента: их отсутствие не маскируется демонстрационными данными.
 
 | Функция оригинала | Источник | Ограничение / статус |
 | --- | --- | --- |
-| Полный список игроков текущего инстанса | `Services/VRChatAPI/VRChatLogWatcher.cs`, `main/InstanceController.cs` | Не реализовано / нужен ПК. Требуется доступ к журналу игрового клиента на ПК; API не раскрывает полный список произвольного приватного инстанса. |
-| История встреч, посещений, фото и сессий | `Services/TimelineService.cs`, `VRChatLogWatcher.cs` | Не реализовано. Вместо ПК-истории есть только журнал текущей мобильной сессии (до 200 записей в памяти, без сохранения), включающий действия клиента и часть событий друзей API. Источник Mobile: `src/App.tsx`, `TimelinePage`. Импорт/синхронизация отсутствуют. |
-| Время с людьми / в мирах, Meet Network | `Services/VrcSessionTracker.cs`, `Services/TimelineService.cs` | Не реализовано / нужен ПК. ПК-логи и локальная SQLite; нужны импорт или защищённый companion. |
-| Mutual Network | `frontend/modules/tools/mutual-network/` | Не реализовано. Просмотр общих друзей в профиле не является графом Mutual Network; локальная история и закрытые связи недоступны. |
-| Media Library: папки VRChat/OBS, метаданные, избранное, рейтинг, теги | `Services/SQLite/MediaLibraryStore.cs`, `main/PhotosController.cs`, `frontend/modules/media-library/` | Не реализовано как локальная медиатека. Раздел «Медиатека» Mobile работает с серверными файлами VRChat и загрузкой выбранного изображения; не сканирует Android/PC папки, не хранит локальные рейтинги/теги/избранное и не импортирует библиотеку ПК. |
-| Media Relay: наблюдение за папками и Discord webhooks | `main/RelayController.cs`, `frontend/modules/tools/media-relay/` | Не реализовано / нужен ПК. Windows-only в навигации оригинала. Автоматический перенос фото с ПК требует companion; webhook нельзя публиковать или хранить в открытом виде. |
-| Запуск VRChat и приложений SlimeVR/FaceTracking/Standable | `main/MessageRouter.cs`, `Services/Helpers/VrcLaunchPipe.cs` | Запуск Windows `.exe` на Android невозможен. Может быть реализовано удалённое действие через companion. |
-| SteamVR Overlay | `Services/SteamAPI/VROverlayService.cs`, `main/VROverlayController.cs` | Не реализовано / нужен ПК. Требует OpenVR/SteamVR на ПК. |
-| Space Flight / Space Turn | `main/SpaceFlightController.cs`, `main/SpaceTurnController.cs`, `Services/SteamAPI/` | Не реализовано / нужен ПК. Изменение пространства SteamVR выполняется на ПК, не в Android UI. |
-| FrameShot / запись / захват VR | `Services/SteamAPI/FrameShot.cs`, `main/FrameShotController.cs` | Не реализовано / нужен ПК. Требует доступа к VR-композитору/захвату ПК. |
-| OSC Tool и управление параметрами аватара | `Services/OscService.cs`, `frontend/modules/tools/osc-tool/` | **Частично реализовано в коде:** ручная отправка Bool/Int/Float/String по известному адресу на LAN IPv4 и UDP-порт. Автообнаружение/OSCQuery, чтение текущих значений и управление набором всех параметров отсутствуют. Источник Mobile: `ToolsPage`, `VrcNativePlugin.java`, `OscPacket.java`. Получение пакета и поведение аватара на ПК ещё не проверены. |
-| Custom Chatbox / Chatbox Relay | `Services/ChatboxService.cs`, `main/ChatboxController.cs` | **Частично реализовано в коде:** ручной текст по кнопке на указанный адрес ПК. Ротация, Spotify/iTunes, AFK по фокусу окна, CPU/RAM и время сессии ПК отсутствуют. Источник Mobile: `ToolsPage`, `VrcNativePlugin.java`, `OscPacket.java`; нужны сетевые испытания. |
-| Avatar Scaling | `main/AvatarScalingController.cs` | Не реализовано / нужен ПК. Зависит от локального VR/OSC состояния; не является сменой аватара через API. |
-| Voice Fight | `Services/VoiceFightService.cs` | Не реализовано / нужен ПК. Оригинал использует Windows VOSK/NAudio; на Android нужны движок распознавания, аудиовывод и разрешение микрофона. |
-| Kikitan XD / перевод / озвучка | `Services/KikitanXD/`, `main/KikitanXDController.cs` | Не реализовано / нужен ПК. Windows-зависимые захват звука/локальные модели; удалённые AI-сервисы потребуют собственных пользовательских настроек и отдельной реализации. |
-| Discord Rich Presence | `Services/DiscordPresenceService.cs`, `main/DiscordController.cs` | Не реализовано / нужен ПК. Настольный Discord IPC недоступен из Android так же, как на ПК. |
-| YouTube Fix / VRCVideoCacher | `frontend/modules/tools/youtube-fix/`, `main/MessageRouter.cs` | Не реализовано / нужен ПК. Требует установки/запуска локального прокси рядом с ПК-клиентом VRChat. |
-| Проверка/очистка кэша и конфигурации VRChat на ПК | `Services/Tools/CacheHandler.cs`, `Services/Helpers/VrcConfigHelper.cs` | Не реализовано / нужен ПК. Телефон не имеет доступа к файлам игрового клиента на ПК. |
-| Windows autostart, system tray, hotkeys, screen picker | `Services/SystemTrayService.cs`, `Services/Helpers/AutoStartShortcutHelper.cs`, `Services/ScreenColorPickerService.cs` | Не реализовано / нужен ПК. Требуют платформенных аналогов; для мобильного интерфейса нужны Android-механизмы. |
+| Полный список игроков текущего инстанса | `Services/VRChatAPI/VRChatLogWatcher.cs`, `main/InstanceController.cs` | Нужны игровые данные. API не раскрывает полный состав произвольного приватного инстанса. В Mobile доступны присутствие друзей и серверные сведения об инстансе. |
+| История встреч, посещений, фото и сессий | `Services/TimelineService.cs`, `VRChatLogWatcher.cs` | История игрового клиента не импортируется. Есть только журнал текущей мобильной сессии (до 200 записей в памяти), включая действия приложения и часть событий друзей API. |
+| Время с людьми / в мирах, Meet Network | `Services/VrcSessionTracker.cs`, `Services/TimelineService.cs` | Нужны игровые данные. Статистика локальной SQLite и логов ПК не восстанавливается обычным API. |
+| Mutual Network | `frontend/modules/tools/mutual-network/` | Не реализовано. Просмотр общих друзей сохранён; полноценный граф связей и локальная история встреч отсутствуют. |
+| Media Library: папки VRChat/OBS, метаданные, избранное, рейтинг, теги | `Services/SQLite/MediaLibraryStore.cs`, `main/PhotosController.cs`, `frontend/modules/media-library/` | Серверная медиатека и выбор изображений на телефоне реализованы частично. Импорт библиотеки ПК и сканирование OBS-папок не входят в Android-сценарий; локальные рейтинги/теги/избранное пока не реализованы. |
+| Media Relay: наблюдение за папками и Discord webhooks | `main/RelayController.cs`, `frontend/modules/tools/media-relay/` | Наблюдение за папками Windows вне мобильного объёма. Мобильный сценарий отправки изображений в Discord пока не реализован. |
+| Запуск VRChat и SlimeVR/FaceTracking/Standable | `main/MessageRouter.cs`, `Services/Helpers/VrcLaunchPipe.cs` | Вне мобильного объёма по запросу пользователя. Нет кнопок запуска ПК-программ или зависимости от PC companion. |
+| SteamVR Overlay, Space Flight / Space Turn, FrameShot | `Services/SteamAPI/`, `main/VROverlayController.cs`, `main/SpaceFlightController.cs`, `main/FrameShotController.cs` | Вне мобильного объёма. Это инструменты локального VR/SteamVR на ПК. |
+| OSC Tool, параметры аватара, Chatbox Relay | `Services/OscService.cs`, `Services/ChatboxService.cs`, `frontend/modules/tools/osc-tool/` | Вне мобильного объёма по запросу пользователя. Раздел OSC-пульта удалён; ручная отправка OSC/Chatbox из интерфейса больше не предлагается. |
+| Avatar Scaling | `main/AvatarScalingController.cs` | Вне мобильного объёма: зависит от локального VR/OSC. Серверная смена аватара через API сохранена. |
+| Voice Fight и Kikitan XD | `Services/VoiceFightService.cs`, `Services/KikitanXD/` | ПК-движки VOSK/NAudio и локальный захват звука не перенесены. Эти ПК-инструменты не предлагаются в Android-интерфейсе. |
+| Discord Rich Presence | `Services/DiscordPresenceService.cs`, `main/DiscordController.cs` | Вне мобильного объёма: настольный Discord IPC недоступен Android-клиенту. |
+| YouTube Fix / VRCVideoCacher | `frontend/modules/tools/youtube-fix/`, `main/MessageRouter.cs` | Вне мобильного объёма: локальный прокси ПК-игрового клиента. |
+| Кэш и конфигурация ПК, Windows autostart, tray, hotkeys, screen picker | `Services/Tools/CacheHandler.cs`, `Services/Helpers/VrcConfigHelper.cs`, `Services/SystemTrayService.cs`, `Services/ScreenColorPickerService.cs` | Вне мобильного объёма. Android-приложение не управляет файлами, окнами и автозапуском Windows. |
 
 ## Контракты API, проверенные по исходникам
 

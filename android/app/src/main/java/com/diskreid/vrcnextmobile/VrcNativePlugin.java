@@ -13,9 +13,6 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -24,6 +21,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -45,15 +43,15 @@ import org.json.JSONTokener;
 /** Native-only VRChat transport: no cookies or pipeline tokens cross the WebView boundary. */
 @CapacitorPlugin(name = "VrcNative")
 public class VrcNativePlugin extends Plugin {
-    private static final String USER_AGENT = "Mobile-VRCNext/0.1.0 (https://github.com/DiskREid/vrcnext-mobile/issues)";
+    private static final String USER_AGENT = "Mobile-VRCNext/0.1.1 (https://github.com/DiskREid/vrcnext-mobile/issues)";
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final Set<String> METHODS = new HashSet<>(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"));
     private static final Set<String> IMAGE_TAGS = new HashSet<>(Arrays.asList("gallery", "icon", "emoji", "sticker"));
     private static final Set<String> IMAGE_TYPES = new HashSet<>(Arrays.asList("image/png", "image/jpeg", "image/gif", "image/webp"));
+    private final LifecycleTasks tasks = new LifecycleTasks();
     private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final ExecutorService oscIo = Executors.newSingleThreadExecutor();
     private final ExecutorService imageIo = Executors.newFixedThreadPool(2);
     private final Object imageTimingLock = new Object();
     private long nextImageRequestAt;
@@ -117,8 +115,35 @@ public class VrcNativePlugin extends Plugin {
             }
             execute(call, builder.build());
         } catch (Exception failure) {
-            call.reject("Invalid API request", "INVALID_ARGUMENT");
+            reject(call, "Invalid API request", "INVALID_ARGUMENT");
         }
+    }
+
+    private void release(PluginCall call) {
+        try { if (getBridge() != null) call.release(getBridge()); }
+        catch (RuntimeException retiredBridge) { /* No WebView remains to receive this call. */ }
+    }
+
+    private void reply(PluginCall call, Runnable response) {
+        if (tasks.isClosed()) { release(call); return; }
+        try { response.run(); }
+        catch (RuntimeException retiredBridge) { release(call); }
+    }
+
+    private void resolve(PluginCall call) { reply(call, call::resolve); }
+    private void resolve(PluginCall call, JSObject data) { reply(call, () -> call.resolve(data)); }
+    private void reject(PluginCall call, String message, String code) { reply(call, () -> call.reject(message, code)); }
+
+    private void submit(Executor executor, PluginCall call, Runnable work) {
+        tasks.execute(executor, work, () -> {
+            if (tasks.isClosed()) release(call);
+            else reject(call, "This screen is no longer available", "PLUGIN_CANCELLED");
+        });
+    }
+
+    @PluginMethod public void sessionState(PluginCall call) {
+        if (tasks.isClosed()) { release(call); return; }
+        resolve(call, new JSObject().put("hasAuth", cookies != null && cookies.token("auth") != null));
     }
 
     private HttpUrl apiUrl(String path) { return ApiEndpoint.resolve(path); }
@@ -128,9 +153,9 @@ public class VrcNativePlugin extends Plugin {
     private void execute(PluginCall call, Request request, OkHttpClient client) {
         final boolean publicDatabase = client == publicDbHttp;
         final int generation = sessionGeneration.get();
-        io.execute(() -> {
+        submit(io, call, () -> {
             if (generation != sessionGeneration.get() || destroyed) {
-                call.reject("Session changed", "SESSION_CHANGED");
+                reject(call, "Session changed", "SESSION_CHANGED");
                 return;
             }
             try {
@@ -139,13 +164,13 @@ public class VrcNativePlugin extends Plugin {
                 if (remaining > 0) {
                     JSObject result = new JSObject().put("status", 429).put("retryAfter", (int) Math.ceil(remaining / 1000.0))
                             .put("data", new JSObject().put("error", new JSObject().put("message", "VRChat rate limit; try again later")));
-                    call.resolve(result);
+                    resolve(call, result);
                     return;
                 }
                 long wait = nextRequestAt - System.currentTimeMillis();
                 if (wait > 0) Thread.sleep(wait);
                 if (generation != sessionGeneration.get() || destroyed) {
-                    call.reject("Session changed", "SESSION_CHANGED");
+                    reject(call, "Session changed", "SESSION_CHANGED");
                     return;
                 }
                 nextRequestAt = System.currentTimeMillis() + 350;
@@ -173,15 +198,15 @@ public class VrcNativePlugin extends Plugin {
                         }
                     }
                     result.put("data", data);
-                    if (generation != sessionGeneration.get()) call.reject("Session changed", "SESSION_CHANGED");
-                    else call.resolve(result);
+                    if (generation != sessionGeneration.get()) reject(call, "Session changed", "SESSION_CHANGED");
+                    else resolve(call, result);
                 }
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
-                call.reject("Request cancelled", "REQUEST_CANCELLED");
+                reject(call, "Request cancelled", "REQUEST_CANCELLED");
             } catch (Exception failure) {
                 // Do not expose exception messages: request URLs/headers can contain credentials.
-                call.reject("Could not reach VRChat securely; check your connection and try again", "NETWORK_ERROR");
+                reject(call, "Could not reach VRChat securely; check your connection and try again", "NETWORK_ERROR");
             }
         });
     }
@@ -205,7 +230,7 @@ public class VrcNativePlugin extends Plugin {
         String query = call.getString("query", "").trim();
         int page = call.getInt("page", 0);
         if (query.isEmpty() || query.length() > 100 || page < 0 || page > 10000) {
-            call.reject("Enter an avatar name up to 100 characters", "INVALID_ARGUMENT");
+            reject(call, "Enter an avatar name up to 100 characters", "INVALID_ARGUMENT");
             return;
         }
         HttpUrl url = new HttpUrl.Builder().scheme("https").host("api.avtrdb.com")
@@ -231,19 +256,19 @@ public class VrcNativePlugin extends Plugin {
             execute(call, new Request.Builder().url(apiUrl("/file/image")).header("User-Agent", USER_AGENT)
                     .header("Accept", "application/json").post(upload).build());
         } catch (Exception failure) {
-            call.reject("Choose a PNG, JPEG, GIF or WebP image up to 12 MB", "INVALID_IMAGE");
+            reject(call, "Choose a PNG, JPEG, GIF or WebP image up to 12 MB", "INVALID_IMAGE");
         }
     }
 
     @PluginMethod public void loadImage(PluginCall call) {
         final HttpUrl source;
         try { source = ImageEndpoint.resolve(call.getString("url", "")); }
-        catch (Exception invalid) { call.reject("This image source is not supported", "INVALID_IMAGE_URL"); return; }
+        catch (Exception invalid) { reject(call, "This image source is not supported", "INVALID_IMAGE_URL"); return; }
         final int generation = sessionGeneration.get();
         final String cacheKey = generation + ":" + source;
         String cached = imageCache.get(cacheKey);
-        if (cached != null) { call.resolve(new JSObject().put("dataUrl", cached)); return; }
-        imageIo.execute(() -> {
+        if (cached != null) { resolve(call, new JSObject().put("dataUrl", cached)); return; }
+        submit(imageIo, call, () -> {
             try {
                 HttpUrl target = source;
                 for (int redirect = 0; redirect <= 5; redirect++) {
@@ -324,16 +349,16 @@ public class VrcNativePlugin extends Plugin {
                         String dataUrl = "data:" + mime + ";base64," + Base64.encodeToString(bytes, Base64.NO_WRAP);
                         if (destroyed || generation != sessionGeneration.get()) throw new IOException();
                         imageCache.put(cacheKey, dataUrl);
-                        call.resolve(new JSObject().put("dataUrl", dataUrl));
+                        resolve(call, new JSObject().put("dataUrl", dataUrl));
                         return;
                     }
                 }
                 throw new IOException();
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
-                call.reject("Image request cancelled", "REQUEST_CANCELLED");
+                reject(call, "Image request cancelled", "REQUEST_CANCELLED");
             } catch (Exception failure) {
-                call.reject("Could not load this image securely", "IMAGE_DOWNLOAD_FAILED");
+                reject(call, "Could not load this image securely", "IMAGE_DOWNLOAD_FAILED");
             }
         });
     }
@@ -343,34 +368,34 @@ public class VrcNativePlugin extends Plugin {
         imageCache.evictAll();
         disconnectSocket(true);
         http.dispatcher().cancelAll();
-        io.execute(() -> {
-            try { cookies.clear(); call.resolve(); }
-            catch (Exception failure) { call.reject("Could not clear encrypted session", "SESSION_STORAGE_ERROR"); }
+        submit(io, call, () -> {
+            try { cookies.clear(); resolve(call); }
+            catch (Exception failure) { reject(call, "Could not clear encrypted session", "SESSION_STORAGE_ERROR"); }
         });
     }
 
     @PluginMethod public void connectPipeline(PluginCall call) {
         final int session = sessionGeneration.get();
         final int intent = pipelineRequests.incrementAndGet();
-        io.execute(() -> {
+        submit(io, call, () -> {
             synchronized (socketLock) {
                 // Logout/disconnect can arrive while this call is queued behind an API request.
                 if (session != sessionGeneration.get() || intent != pipelineRequests.get() || destroyed) {
-                    call.resolve();
+                    resolve(call);
                     return;
                 }
-                if (cookies.token("auth") == null) { call.reject("Sign in first", "NO_SESSION"); return; }
+                if (cookies.token("auth") == null) { reject(call, "Sign in first", "NO_SESSION"); return; }
                 pipelineWanted = true;
                 reconnectAttempts = 0;
                 if (socket == null && !paused) startSocket();
             }
-            call.resolve();
+            resolve(call);
         });
     }
 
     @PluginMethod public void disconnectPipeline(PluginCall call) {
         disconnectSocket(true);
-        call.resolve();
+        resolve(call);
     }
 
     private void startSocket() {
@@ -407,7 +432,7 @@ public class VrcNativePlugin extends Plugin {
                         catch (Exception invalid) { content = JSONObject.NULL; }
                     }
                     synchronized (socketLock) {
-                        if (generation == socketGeneration)
+                        if (generation == socketGeneration && !tasks.isClosed())
                             notifyListeners("pipeline", new JSObject().put("type", type).put("content", content == null ? JSONObject.NULL : content));
                     }
                 } catch (Exception ignored) { }
@@ -433,7 +458,7 @@ public class VrcNativePlugin extends Plugin {
             if (expired) { pipelineWanted = false; return; }
             if (!pipelineWanted || paused || destroyed) return;
             long delay = Math.min(60L, 1L << Math.min(++reconnectAttempts, 6));
-            socketScheduler.schedule(() -> {
+            tasks.schedule(socketScheduler, () -> {
                 synchronized (socketLock) {
                     if (generation == socketGeneration && pipelineWanted && !paused && !destroyed && socket == null) startSocket();
                 }
@@ -453,7 +478,9 @@ public class VrcNativePlugin extends Plugin {
         }
     }
 
-    private void connection(String state) { notifyListeners("connection", new JSObject().put("state", state)); }
+    private void connection(String state) {
+        if (!tasks.isClosed()) notifyListeners("connection", new JSObject().put("state", state));
+    }
 
     @Override protected void handleOnPause() {
         synchronized (socketLock) { paused = true; }
@@ -469,66 +496,17 @@ public class VrcNativePlugin extends Plugin {
 
     @Override protected void handleOnDestroy() {
         destroyed = true;
+        tasks.close();
         disconnectSocket(true);
         if (http != null) { http.dispatcher().cancelAll(); http.connectionPool().evictAll(); }
         io.shutdownNow();
-        oscIo.shutdownNow();
         imageIo.shutdownNow();
         imageCache.evictAll();
         socketScheduler.shutdownNow();
     }
 
-    private InetAddress oscTarget(PluginCall call) throws Exception {
-        String host = call.getString("host", "");
-        int port = call.getInt("port", 9000);
-        if (!host.matches("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}") || port < 1024 || port > 65535)
-            throw new IllegalArgumentException();
-        InetAddress target = InetAddress.getByName(host);
-        if (!target.isSiteLocalAddress() || target.isLoopbackAddress() || target.isAnyLocalAddress()
-                || target.isMulticastAddress() || (target.getAddress()[3] & 0xff) == 255)
-            throw new IllegalArgumentException();
-        return target;
-    }
-
-    private void sendOscPacket(PluginCall call, byte[] packet) throws Exception {
-        InetAddress target = oscTarget(call);
-        int port = call.getInt("port", 9000);
-        oscIo.execute(() -> {
-            try (DatagramSocket udp = new DatagramSocket()) {
-                udp.send(new DatagramPacket(packet, packet.length, target, port));
-                call.resolve();
-            } catch (Exception failure) { call.reject("Could not send OSC packet to this local address", "OSC_NETWORK_ERROR"); }
-        });
-    }
-
-    @PluginMethod public void sendOsc(PluginCall call) {
-        try {
-            byte[] packet = OscPacket.encode(call.getString("address"), call.getString("type"), call.getData().opt("value"));
-            sendOscPacket(call, packet);
-        } catch (Exception failure) { call.reject("Use a private LAN IPv4 address, port 1024–65535 and a valid OSC value", "INVALID_OSC"); }
-    }
-
-    @PluginMethod public void sendChatbox(PluginCall call) {
-        try {
-            byte[] packet = OscPacket.chatbox(call.getString("text", ""), call.getBoolean("sound", false));
-            sendOscPacket(call, packet);
-        } catch (Exception failure) { call.reject("Use a private LAN IPv4 address, port 1024–65535 and up to 144 characters", "INVALID_OSC"); }
-    }
-
-    @PluginMethod public void openVrchat(PluginCall call) {
-        String location = call.getString("location", "");
-        if (location.length() > 2048 || !location.matches("wrld_[A-Za-z0-9-]+:[A-Za-z0-9_~().+%-]+")) {
-            call.reject("This instance cannot be opened", "INVALID_LOCATION"); return;
-        }
-        Uri uri = new Uri.Builder().scheme("vrchat").authority("launch").appendQueryParameter("ref", "vrchat.com")
-                .appendQueryParameter("id", location).build();
-        getActivity().runOnUiThread(() -> {
-            try { getActivity().startActivity(new Intent(Intent.ACTION_VIEW, uri)); call.resolve(); }
-            catch (ActivityNotFoundException failure) { call.reject("Install VRChat for Android to open an instance", "VRCHAT_NOT_INSTALLED"); }
-        });
-    }
-
     @PluginMethod public void openLink(PluginCall call) {
+        if (tasks.isClosed()) { release(call); return; }
         try {
             Uri uri = Uri.parse(call.getString("url", ""));
             String host = uri.getHost();
@@ -536,9 +514,10 @@ public class VrcNativePlugin extends Plugin {
                     || (uri.getPort() != -1 && uri.getPort() != 443) || host.equals("localhost") || host.endsWith(".localhost"))
                 throw new IllegalArgumentException();
             getActivity().runOnUiThread(() -> {
-                try { getActivity().startActivity(new Intent(Intent.ACTION_VIEW, uri)); call.resolve(); }
-                catch (ActivityNotFoundException failure) { call.reject("No browser is available", "BROWSER_NOT_INSTALLED"); }
+                if (tasks.isClosed()) { release(call); return; }
+                try { getActivity().startActivity(new Intent(Intent.ACTION_VIEW, uri)); resolve(call); }
+                catch (ActivityNotFoundException failure) { reject(call, "No browser is available", "BROWSER_NOT_INSTALLED"); }
             });
-        } catch (Exception failure) { call.reject("Only HTTPS web links can be opened", "INVALID_URL"); }
+        } catch (Exception failure) { reject(call, "Only HTTPS web links can be opened", "INVALID_URL"); }
     }
 }

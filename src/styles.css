@@ -2811,3 +2811,51 @@ img {
     min-height: 44px;
   }
 }
+.diagnostics-panel {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.diagnostics-panel summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  cursor: pointer;
+  color: var(--accent);
+  min-height: 44px;
+}
+.diagnostics-panel p {
+  font-size: 12px;
+}
+.diagnostics-panel pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #0e121b;
+  border-radius: 10px;
+  padding: 14px;
+  max-height: 240px;
+  overflow-y: auto;
+  font-size: 10px;
+  line-height: 1.65;
+  user-select: text;
+}
+.auth-help {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.auth-help summary {
+  cursor: pointer;
+  color: var(--accent);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.auth-help p {
+  font-size: 12px;
+}
+.auth-help .detail-actions {
+  gap: 8px;
+}

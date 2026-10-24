@@ -1,0 +1,32 @@
+{
+  "version": "0.1.1",
+  "apk_sha256": "2800410ae48c3e9d9156703a5d60a36353077c8f8a78f181058d49a29e586298",
+  "device": "Stock Android13/API33 x86_64 software emulator; no KVM; WebView109.0.5414.123",
+  "real_account_used": false,
+  "upgrade_install_passed": true,
+  "installed_apk_hash_matched": true,
+  "activity_process_observed": true,
+  "native_login_ui_verified": false,
+  "native_rotation_verified": false,
+  "instrumentation": {
+    "executed": 1,
+    "failed": 1,
+    "skipped": 0,
+    "failure": "WebView callback did not complete"
+  },
+  "local_failure_record": "WebView renderer stopped. didCrash=true",
+  "independent_control": {
+    "contains_vrc_code": false,
+    "javascript_enabled": true,
+    "in_memory_simple_html": true,
+    "same_flag_secure": true,
+    "observed_markers": [
+      "CONTROL_PAGE_TIMEOUT",
+      "CONTROL_RENDERER_GONE"
+    ],
+    "conclusion": "WebView renderer failure also occurs independently of VRC code in this emulator."
+  },
+  "physical_tecno_cause_confirmed": false,
+  "emulator_and_owned_adb_stopped": true,
+  "limitations": "Stock emulator does not reproduce HiOS hardware; no successful account login or complete native UI claim."
+}

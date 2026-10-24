@@ -79,6 +79,16 @@ test.describe('VRCNext Mobile browser demo', () => {
     await expect(page.getByLabel('Имя пользователя VRChat')).toBeDisabled();
     await expect(page.getByLabel('Пароль', { exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Войти в VRChat', exact: true })).toBeDisabled();
+    await page
+      .getByRole('button', { name: 'Аккаунт Google или другой способ входа', exact: true })
+      .click();
+    await expect(
+      page.getByText('Вход в браузере не переносит сессию в это приложение автоматически.'),
+    ).toBeVisible();
+    await noHorizontalOverflow(page);
+    await page
+      .getByRole('button', { name: 'Аккаунт Google или другой способ входа', exact: true })
+      .click();
     await screenshot(page, testInfo, 'auth');
     await page.getByRole('button', { name: 'Открыть деморежим' }).click();
     await expect(
@@ -185,6 +195,7 @@ test.describe('VRCNext Mobile browser demo', () => {
   test('calendar, inventory, messenger and settings are navigable', async ({ page }, testInfo) => {
     await demo(page);
     await navigate(page, 'Ещё');
+    await expect(page.getByRole('button', { name: /OSC|SteamVR|Запуск ПК/ })).toHaveCount(0);
     await page.getByRole('button', { name: /^Календарь События и встречи/ }).click();
     await expect(page.getByRole('heading', { name: 'Календарь', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Вечер новых миров/ })).toBeVisible();
