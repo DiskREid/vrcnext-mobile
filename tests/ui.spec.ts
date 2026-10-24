@@ -111,6 +111,15 @@ test.describe('VRCNext Mobile browser demo', () => {
     ).toBeVisible();
     await noHorizontalOverflow(page);
     await screenshot(page, testInfo, 'friend-detail');
+    for (const tab of ['Mutual Friends', 'Группы', 'Миры', 'Избранные миры', 'Аватары', 'Activity', 'JSON']) {
+      await dialog.getByRole('button', { name: tab, exact: true }).click();
+      await noHorizontalOverflow(page);
+    }
+    await expect(dialog.getByLabel('JSON пользователя')).toBeVisible();
+    const downloading = page.waitForEvent('download');
+    await dialog.getByRole('button', { name: 'Экспорт JSON', exact: true }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(/^VRCNext-usr_.*\.json$/);
     await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
     await navigate(page, 'События');
     await expect(page.getByRole('heading', { name: 'Уведомления', exact: true })).toBeVisible();
@@ -236,4 +245,40 @@ test.describe('VRCNext Mobile browser demo', () => {
     await noHorizontalOverflow(page);
     await screenshot(page, testInfo, 'settings');
   });
+});
+
+test('new feed, locations, favorites and Social use real empty states or explicit demo data', async ({ page }) => {
+  const errors: string[] = [];
+  const network: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
+  await demo(page);
+  await navigate(page, 'Ещё');
+  await page.getByRole('button', { name: /^Лента История наблюдаемых/ }).click();
+  await expect(page.getByRole('heading', { name: 'Лента', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Новая история', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'GPS', exact: true }).click();
+  await noHorizontalOverflow(page);
+  await navigate(page, 'Ещё');
+  await page.getByRole('button', { name: /^Friends Locations Друзья по мирам/ }).click();
+  await expect(page.getByRole('heading', { name: 'Friends Locations', exact: true })).toBeVisible();
+  await noHorizontalOverflow(page);
+  await navigate(page, 'Ещё');
+  await page.getByRole('button', { name: /^Избранное Друзья, миры/ }).click();
+  await expect(page.getByRole('heading', { name: 'Избранное', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Миры', exact: true }).click();
+  await expect(page.getByLabel('Коллекция избранного')).toBeVisible();
+  await page.getByLabel('Коллекция избранного').selectOption('worlds2');
+  await expect(page.getByLabel('Коллекция избранного')).toHaveValue('worlds2');
+  await noHorizontalOverflow(page);
+  await navigate(page, 'Ещё');
+  await page.getByRole('button', { name: /^Social Друзья, журнал/ }).click();
+  await expect(page.getByRole('heading', { name: 'Social', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Friends List', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Поиск друзей по имени или ID' }).fill('Luna');
+  await expect(page.getByRole('button', { name: 'Подробности Luna', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Подробности Luna', exact: true }).click();
+  await noHorizontalOverflow(page);
+  expect(errors).toEqual([]);
+  expect(network).toEqual([]);
 });

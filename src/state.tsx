@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { FriendState } from './data/friends';
+import type { HistoryState } from './data/history';
 import type { ReactNode } from 'react';
-import type { User, World } from './api';
+import type { User, World, Group } from './api';
 export type Activity = { id: string; title: string; detail: string; time: string };
 export type AppState = {
   user: User;
@@ -10,11 +11,13 @@ export type AppState = {
   online: boolean;
   refresh: number;
   friends: FriendState;
+  history: HistoryState;
   notificationsRefresh: number;
   notify: (text: string) => void;
   act: <T>(operation: () => Promise<T>, success?: string) => Promise<T | undefined>;
   openUser: (user: User | string) => void;
   openWorld: (world: World | string) => void;
+  openGroup: (group: Group) => void;
   onRefresh: () => void;
   logout: () => void;
   activity: Activity[];

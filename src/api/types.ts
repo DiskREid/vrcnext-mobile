@@ -143,7 +143,7 @@ export interface Instance {
   displayName?: string;
   world?: World;
 }
-export type FavoriteType = 'friend' | 'world' | 'avatar';
+export type FavoriteType = 'friend' | 'world' | 'avatar' | 'vrcPlusWorld';
 export interface Favorite {
   id: string;
   favoriteId: string;

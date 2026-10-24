@@ -11,6 +11,8 @@ import {
   ArrowUpRight,
   ChevronRight,
 } from 'lucide-react';
+const modalStack: HTMLElement[] = [];
+let previousOverflow = '';
 export function PageHeader({
   eyebrow,
   title,
@@ -150,12 +152,21 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDivElement>(null),
     titleId = useId();
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const before = document.activeElement as HTMLElement;
     const root = ref.current;
+    if (!root) return;
+    if (!modalStack.length) {
+      previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    modalStack.push(root);
     root?.focus();
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (modalStack.at(-1) !== root) return;
+      if (e.key === 'Escape') { e.preventDefault(); close.current(); }
       if (e.key === 'Tab' && root) {
         const nodes = Array.from(
           root.querySelectorAll<HTMLElement>(
@@ -178,12 +189,13 @@ export function Modal({
       }
     };
     document.addEventListener('keydown', handler);
-    const old = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handler);
-      document.body.style.overflow = old;
-      before?.focus();
+      const index = modalStack.indexOf(root);
+      if (index !== -1) modalStack.splice(index, 1);
+      if (!modalStack.length) document.body.style.overflow = previousOverflow;
+      if (before?.isConnected) before.focus();
+      else modalStack.at(-1)?.focus();
     };
   }, []);
   return (

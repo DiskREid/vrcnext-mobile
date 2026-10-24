@@ -32,6 +32,8 @@ export interface NativeBridge {
     fileName: string;
   }): Promise<NativeResponse>;
   openLink(options: { url: string }): Promise<void>;
+  copyText(options: { text: string }): Promise<void>;
+  exportJson(options: { fileName: string; json: string }): Promise<{ saved: boolean }>;
   addListener(
     eventName: 'pipeline',
     listener: (event: PipelineEvent) => void,

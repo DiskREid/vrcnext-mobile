@@ -1,0 +1,12 @@
+.history-list { display:grid; gap:10px; }
+.history-row { display:flex; align-items:flex-start; gap:12px; padding:16px; min-width:0; }
+.history-person { padding:0; border:0; background:transparent; flex:none; cursor:pointer; }
+.history-body { flex:1; min-width:0; }
+.history-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+.history-heading .text-button { padding:0; overflow-wrap:anywhere; text-align:left; }
+.history-heading time { color:var(--muted); font-size:11px; white-space:nowrap; flex:none; }
+.history-body p { margin:8px 0; overflow-wrap:anywhere; }
+.history-body details { margin:10px 0; padding:10px; background:var(--bg); border-radius:12px; }
+.history-body summary { cursor:pointer; font-size:12px; color:var(--accent); }
+.history-note { line-height:1.6; margin:14px 0 20px; }
+@media(max-width:450px) { .history-row { padding:12px;gap:9px; } .history-heading { flex-direction:column; gap:3px; } }

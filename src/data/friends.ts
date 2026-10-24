@@ -36,6 +36,7 @@ export function patchFriends(users: User[], event: PipelineEvent): User[] {
     if (next.status === 'offline') next.status = undefined;
   } else if (event.type === 'friend-active') {
     next.state = 'active';
+    if (next.status === 'offline') next.status = undefined;
     if (!next.location?.startsWith('wrld_')) next.location = '';
   }
   if (event.type === 'friend-add') next.isFriend = true;

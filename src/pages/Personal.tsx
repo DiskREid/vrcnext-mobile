@@ -1,8 +1,9 @@
 import DiagnosticsPanel from '../components/DiagnosticsPanel';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LockKeyhole, LogOut, Info, Palette, Clock, ExternalLink, Check } from 'lucide-react';
 import { api } from '../api';
-import type { User } from '../api';
+import { mergePublicProfile, readPublicProfile } from '../api/profile';
+import type { User, ProfileUpdate } from '../api';
 import { useApp, useLoad } from '../state';
 import {
   PageHeader,
@@ -24,26 +25,52 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
     [languages, setLanguages] = useState(user.languages?.join(', ') || ''),
     [links, setLinks] = useState(user.bioLinks?.join('\n') || ''),
     [busy, setBusy] = useState(false);
+  const edited = useRef(new Set<'bio' | 'languages' | 'links'>());
+  const profile = useLoad(
+    () =>
+      demo
+        ? Promise.resolve({ ...user, bio: user.bio || '' })
+        : api.userProfile(user.id).then((value) => readPublicProfile(value, user.id)),
+    [user.id, demo],
+  );
+  useEffect(() => {
+    if (!profile.data) return;
+    const complete = mergePublicProfile(user, profile.data);
+    // Loading a public profile must not overwrite edits made while the response was in flight.
+    if (!edited.current.has('bio')) setBio(complete.bio || '');
+    if (!edited.current.has('languages')) setLanguages(complete.languages?.join(', ') || '');
+    if (!edited.current.has('links')) setLinks(complete.bioLinks?.join('\n') || '');
+  }, [profile.data, user.id]);
   const save = (e: React.FormEvent) => {
     e.preventDefault();
     void act(async () => {
       setBusy(true);
       try {
-        const next = await api.updateProfile(user.id, {
+        const update: ProfileUpdate = {
           status,
           statusDescription: text,
-          bio,
           pronouns,
-          languages: languages
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
-          bioLinks: links
-            .split('\n')
-            .map((s) => s.trim())
-            .filter(Boolean),
-        });
-        onUpdated(next);
+          ...(typeof profile.data?.bio === 'string' || edited.current.has('bio') ? { bio } : {}),
+          ...(Array.isArray(profile.data?.languages) || edited.current.has('languages')
+            ? {
+                languages: languages
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              }
+            : {}),
+          ...(Array.isArray(profile.data?.bioLinks) || edited.current.has('links')
+            ? {
+                bioLinks: links
+                  .split('\n')
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              }
+            : {}),
+        };
+        const next = await api.updateProfile(user.id, update);
+        // The /auth/user response may omit the split public profile fields.
+        onUpdated(mergePublicProfile({ ...user, ...next }, update as Record<string, unknown>));
       } finally {
         setBusy(false);
       }
@@ -60,6 +87,8 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
         </div>
       </div>
       <form className="form-stack narrow" onSubmit={save}>
+        {profile.loading && !profile.data && <Loading />}
+        {profile.error && <ErrorState error={profile.error} retry={profile.reload} />}
         <div className="field-grid">
           <label className="field">
             Статус
@@ -82,13 +111,24 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
         </label>
         <label className="field">
           О себе
-          <textarea value={bio} onChange={(e) => setBio(e.target.value)} maxLength={512} rows={6} />
+          <textarea
+            value={bio}
+            onChange={(e) => {
+              edited.current.add('bio');
+              setBio(e.target.value);
+            }}
+            maxLength={512}
+            rows={6}
+          />
         </label>
         <label className="field">
           Языки
           <input
             value={languages}
-            onChange={(e) => setLanguages(e.target.value)}
+            onChange={(e) => {
+              edited.current.add('languages');
+              setLanguages(e.target.value);
+            }}
             placeholder="rus, eng, jpn"
           />
           <span className="muted small">Коды языков VRChat через запятую.</span>
@@ -97,12 +137,19 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
           Социальные ссылки
           <textarea
             value={links}
-            onChange={(e) => setLinks(e.target.value)}
+            onChange={(e) => {
+              edited.current.add('links');
+              setLinks(e.target.value);
+            }}
             rows={3}
             placeholder="https://… — каждая ссылка с новой строки"
           />
         </label>
-        <button className="button primary" disabled={busy} type="submit">
+        <button
+          className="button primary"
+          disabled={busy || profile.loading || !!profile.error || !profile.data}
+          type="submit"
+        >
           {busy ? 'Сохраняем…' : 'Сохранить изменения'}
         </button>
       </form>

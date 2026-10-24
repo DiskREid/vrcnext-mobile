@@ -1,6 +1,10 @@
 package com.diskreid.vrcnextmobile;
 
 import android.content.ActivityNotFoundException;
+import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.util.Base64;
@@ -11,6 +15,9 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.ActivityCallback;
+import androidx.activity.result.ActivityResult;
+import java.io.OutputStream;
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -519,5 +526,58 @@ public class VrcNativePlugin extends Plugin {
                 catch (ActivityNotFoundException failure) { reject(call, "No browser is available", "BROWSER_NOT_INSTALLED"); }
             });
         } catch (Exception failure) { reject(call, "Only HTTPS web links can be opened", "INVALID_URL"); }
+    }
+
+    @PluginMethod public void copyText(PluginCall call) {
+        if (tasks.isClosed()) { release(call); return; }
+        String text = call.getString("text", "");
+        if (text.length() > 128 * 1024) { reject(call, "Text too large; export a file instead", "TOO_LARGE"); return; }
+        getActivity().runOnUiThread(() -> {
+            if (tasks.isClosed()) { release(call); return; }
+            try {
+                ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard == null) throw new IllegalStateException();
+                clipboard.setPrimaryClip(ClipData.newPlainText("VRCNext Mobile", text));
+                resolve(call);
+            } catch (RuntimeException failure) { reject(call, "Could not copy text", "CLIPBOARD_ERROR"); }
+        });
+    }
+
+    @PluginMethod public void exportJson(PluginCall call) {
+        if (tasks.isClosed()) { release(call); return; }
+        String json = call.getString("json", "");
+        try {
+            if (json.length() > 2 * 1024 * 1024) throw new IllegalArgumentException();
+            Object value = new JSONTokener(json).nextValue();
+            if (!(value instanceof JSONObject) && !(value instanceof org.json.JSONArray)) throw new IllegalArgumentException();
+            String fileName = call.getString("fileName", "VRCNext-data.json").replaceAll("[^a-zA-Z0-9_.-]", "_");
+            if (fileName.length() > 120) fileName = fileName.substring(0, 120);
+            if (!fileName.endsWith(".json")) fileName += ".json";
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("application/json").putExtra(Intent.EXTRA_TITLE, fileName);
+            getActivity().runOnUiThread(() -> {
+                if (tasks.isClosed()) { release(call); return; }
+                try { startActivityForResult(call, intent, "jsonDestination"); }
+                catch (ActivityNotFoundException failure) { reject(call, "No document picker is available", "PICKER_UNAVAILABLE"); }
+                catch (RuntimeException failure) { reject(call, "Could not open document picker", "EXPORT_FAILED"); }
+            });
+        } catch (ActivityNotFoundException failure) { reject(call, "No document picker is available", "PICKER_UNAVAILABLE"); }
+        catch (Exception failure) { reject(call, "Invalid JSON export", "INVALID_ARGUMENT"); }
+    }
+
+    @ActivityCallback private void jsonDestination(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+            resolve(call, new JSObject().put("saved", false)); return;
+        }
+        Uri uri = result.getData().getData();
+        if (!"content".equals(uri.getScheme())) { reject(call, "Invalid document destination", "INVALID_DESTINATION"); return; }
+        submit(io, call, () -> {
+            try (OutputStream output = getContext().getContentResolver().openOutputStream(uri, "wt")) {
+                if (output == null) throw new IOException();
+                output.write(call.getString("json", "{}").getBytes(StandardCharsets.UTF_8));
+                resolve(call, new JSObject().put("saved", true));
+            } catch (Exception failure) { reject(call, "Could not save JSON document", "EXPORT_FAILED"); }
+        });
     }
 }

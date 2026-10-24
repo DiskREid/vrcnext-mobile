@@ -33,7 +33,7 @@ import {
   MapPin,
   Plus,
 } from 'lucide-react';
-import type { User, World, Notification } from './api';
+import type { User, World, Notification, Group } from './api';
 import { App as AndroidApp } from '@capacitor/app';
 import { api, native, ApiError, isNative } from './api';
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -41,6 +41,13 @@ import { AppProvider, useApp, useLoad } from './state';
 import type { Activity as ActivityItem } from './state';
 import { demoUser, demoWorlds, demoEvents } from './demo';
 import { useFriends } from './data/friends';
+import { useHistory } from './data/history';
+import { presenceLabel } from './data/locations';
+import Feed from './pages/Feed';
+import FavoritesPage from './pages/Favorites';
+import Locations from './pages/Locations';
+import Social from './pages/Social';
+import { clearFavoriteEntityCache } from './api/favorites';
 import PullRefresh from './components/PullRefresh';
 import {
   PageHeader,
@@ -57,7 +64,7 @@ import {
   Modal,
 } from './components/ui';
 import Auth from './pages/Auth';
-import Explore from './pages/Explore';
+import Explore, { GroupDetail } from './pages/Explore';
 import { CalendarPage, InventoryPage, MessengerPage } from './pages/Collections';
 import { ProfilePage, SettingsPage, TimelinePage, ModerationPage } from './pages/Personal';
 import { UserDetails, WorldDetails, statusName, rankOf } from './pages/Details';
@@ -73,7 +80,13 @@ type Screen =
   | 'messenger'
   | 'timeline'
   | 'settings'
-  | 'moderation';
+  | 'moderation'
+  | 'feed'
+  | 'locations'
+  | 'favorites'
+  | 'social'
+  | 'gameLog'
+  | 'charts';
 const tabs: { id: Screen; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { id: 'home', label: 'Главная', icon: Home },
   { id: 'friends', label: 'Друзья', icon: Users },
@@ -88,6 +101,7 @@ export default function App() {
     [previous, setPrevious] = useState<Screen>('home'),
     [selectedUser, setSelectedUser] = useState<User | string | null>(null),
     [selectedWorld, setSelectedWorld] = useState<World | string | null>(null),
+    [selectedGroup, setSelectedGroup] = useState<Group | null>(null),
     [toast, setToast] = useState(''),
     [revision, setRevision] = useState(0),
     [notificationsRefresh, setNotificationsRefresh] = useState(0),
@@ -101,6 +115,10 @@ export default function App() {
     toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     pipelineConnected = useRef(false);
   const friends = useFriends(user?.id, demo, revision);
+  const history = useHistory(user?.id, demo);
+  const pipelineSnapshot = useRef({friends, user, history});
+  pipelineSnapshot.current = {friends, user, history};
+  useEffect(() => { history.seedUsers(friends.data); }, [friends.data, history.seedUsers]);
   const notify = (text: string) => {
     clearTimeout(toastTimer.current);
     setToast(text);
@@ -113,9 +131,10 @@ export default function App() {
         200,
       ),
     );
-  const refresh = () => setRevision((v) => v + 1);
+  const refresh = () => { clearFavoriteEntityCache(); setRevision((v) => v + 1); };
   const login = (u: User) => {
     clearImageCache();
+    clearFavoriteEntityCache();
     setDemo(false);
     setUser(u);
     setScreen('home');
@@ -133,12 +152,14 @@ export default function App() {
       }
     }
     clearImageCache();
+    clearFavoriteEntityCache();
     setUser(null);
     setDemo(false);
     setActivity([]);
     setScreen('home');
     setSelectedUser(null);
     setSelectedWorld(null);
+    setSelectedGroup(null);
   };
   const act = async <T,>(operation: () => Promise<T>, success?: string): Promise<T | undefined> => {
     if (demo) {
@@ -210,7 +231,9 @@ export default function App() {
               (event.content.user as Record<string, unknown> | undefined)?.displayName || userId,
             ),
           );
-        friends.apply(event);
+        const latest = pipelineSnapshot.current;
+        if (latest.user) latest.history.observePipeline(event, latest.friends.data, latest.user);
+        latest.friends.apply(event);
         if (event.type.startsWith('notification')) setNotificationsRefresh((v) => v + 1);
       });
       if (!live) {
@@ -219,7 +242,7 @@ export default function App() {
       }
       handles.push(h);
       const c = await native.addListener('connection', (event) => {
-        if (live) setPipeline(event.state);
+        if (live) { setPipeline(event.state); if (event.state !== 'connected') pipelineSnapshot.current.history.pause(); }
       });
       if (!live) {
         await c.remove();
@@ -233,6 +256,7 @@ export default function App() {
       if (live) setPipeline('disconnected');
     });
     const onVisible = () => {
+      if (document.visibilityState !== 'visible') pipelineSnapshot.current.history.pause();
       if (document.visibilityState === 'visible') {
         if (!pipelineConnected.current) void native.connectPipeline().catch(() => {});
       }
@@ -300,17 +324,21 @@ export default function App() {
         online,
         refresh: revision,
         friends,
+        history,
         notificationsRefresh,
         notify,
         act,
         openUser: (target) => {
           setSelectedWorld(null);
+          setSelectedGroup(null);
           setSelectedUser(target);
         },
         openWorld: (target) => {
           setSelectedUser(null);
+          setSelectedGroup(null);
           setSelectedWorld(target);
         },
+        openGroup: (target) => { setSelectedUser(null); setSelectedWorld(null); setSelectedGroup(target); },
         onRefresh: refresh,
         logout,
         activity,
@@ -397,6 +425,7 @@ export default function App() {
                       inventory: 'Медиатека',
                       messenger: 'Сообщения',
                       timeline: 'Активность',
+                      feed: 'Лента', locations: 'Friends Locations', favorites: 'Избранное', social: 'Social', gameLog: 'Журнал игры', charts: 'Диаграммы',
                       settings: 'Настройки',
                       moderation: 'Модерация',
                     }[screen as string as 'profile']}
@@ -464,6 +493,14 @@ export default function App() {
               <InventoryPage />
             ) : screen === 'messenger' ? (
               <MessengerPage />
+            ) : screen === 'social' ? (
+              <Social />
+            ) : screen === 'favorites' ? (
+              <FavoritesPage />
+            ) : screen === 'locations' ? (
+              <Locations />
+            ) : screen === 'feed' ? (
+              <Feed />
             ) : screen === 'timeline' ? (
               <TimelinePage />
             ) : screen === 'moderation' ? (
@@ -493,6 +530,7 @@ export default function App() {
           </nav>
         </div>
       </div>
+      {selectedGroup && <GroupDetail initial={selectedGroup} onClose={() => setSelectedGroup(null)} onChanged={refresh} />}
       {selectedUser && <UserDetails target={selectedUser} onClose={() => setSelectedUser(null)} />}
       {selectedWorld && (
         <WorldDetails target={selectedWorld} onClose={() => setSelectedWorld(null)} />
@@ -629,7 +667,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
       <Section
         title="Где сейчас друзья"
         action={
-          <MoreButton onClick={() => navigate('explore')}>
+          <MoreButton onClick={() => navigate('locations')}>
             Миры
             <ChevronRight size={16} />
           </MoreButton>
@@ -735,8 +773,8 @@ function FriendsPage() {
     (f) =>
       f.displayName.toLowerCase().includes(query.toLowerCase()) &&
       (filter === 'all' ||
-        (filter === 'online' && f.location?.startsWith('wrld_')) ||
-        (filter === 'web' && f.state === 'online' && !f.location?.startsWith('wrld_')) ||
+        (filter === 'online' && (f.location === 'private' || f.location?.startsWith('wrld_'))) ||
+        (filter === 'web' && (f.state === 'online' || f.state === 'active') && f.location !== 'private' && !f.location?.startsWith('wrld_')) ||
         (filter === 'offline' && (f.status === 'offline' || f.state === 'offline'))),
   );
   return (
@@ -793,13 +831,7 @@ function FriendsPage() {
                 <p>{f.statusDescription || statusName(f.status)}</p>
                 <span className="friend-location">
                   <i className={`status-dot status-${f.status}`} />
-                  {f.location?.startsWith('wrld_')
-                    ? 'В VRChat'
-                    : f.location === 'private'
-                      ? 'В приватном мире'
-                      : f.state === 'online'
-                        ? 'На сайте'
-                        : statusName(f.status)}
+                  {presenceLabel(f)}
                 </span>
               </div>
               <span className="friend-rank">{rankOf(f.tags)}</span>
@@ -1044,6 +1076,10 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
     icon: ComponentType<{ size?: number }>;
     color: string;
   }[] = [
+    { id: 'feed', title: 'Лента', text: 'История наблюдаемых событий', icon: Activity, color: 'purple' },
+    { id: 'locations', title: 'Friends Locations', text: 'Друзья по мирам и инстансам', icon: MapPin, color: 'green' },
+    { id: 'favorites', title: 'Избранное', text: 'Друзья, миры и аватары', icon: Star, color: 'peach' },
+    { id: 'social', title: 'Social', text: 'Друзья, журнал и модерация', icon: Users, color: 'blue' },
     {
       id: 'profile',
       title: 'Мой профиль',
@@ -1074,8 +1110,8 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
     },
     {
       id: 'timeline',
-      title: 'Активность',
-      text: 'События мобильной сессии',
+      title: 'Действия',
+      text: 'Действия текущей сессии',
       icon: Activity,
       color: 'purple',
     },

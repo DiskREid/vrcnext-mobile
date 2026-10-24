@@ -23,6 +23,8 @@ import type { Avatar, Group, World, FavoriteType, GroupPost, VrcFile } from '../
 import { demoAvatars, demoGroups, demoWorlds } from '../demo';
 import { useApp, useLoad } from '../state';
 import { usePaged } from '../hooks/usePaged';
+import { clearFavoriteEntityCache, loadFavoriteGroups, loadFavoriteWorlds } from '../api/favorites';
+import { FavoriteCategoryPicker, demoFavoriteGroups } from './Favorites';
 import {
   AvatarImage,
   Badge,
@@ -140,21 +142,27 @@ export default function Explore({ initialTab = 'worlds' }: { initialTab?: Explor
 }
 
 function Worlds() {
-  const { demo, openWorld, refresh } = useApp();
+  const { demo, user, openWorld, refresh } = useApp();
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<'popular' | 'active' | 'mine' | 'favorites'>('popular');
   const [collections, setCollections] = useState(false);
+  const [category, setCategory] = useState('');
+  const categories = useLoad(() => mode !== 'favorites' ? Promise.resolve([]) : demo ? Promise.resolve(demoFavoriteGroups('world')) : loadFavoriteGroups(user.id, 'world'), [mode, demo, user.id, refresh]);
   const search = useDebounced(query);
   const page = usePaged<World>(
     async (offset) => {
       if (demo)
         return offset
           ? []
-          : demoWorlds.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()));
+          : demoWorlds.filter((w, i) => w.name.toLowerCase().includes(search.toLowerCase()) && (mode !== 'favorites' || !category || demoFavoriteGroups('world')[i % 2].name === category));
+      if (mode === 'favorites') {
+        const all = await loadFavoriteWorlds(user.id);
+        return all.filter((w) => (!category || w.favoriteGroupNames.includes(category)) && `${w.name} ${w.authorName || ''} ${w.id}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())).slice(offset, offset + 50);
+      }
       if (/^wrld_[0-9a-f-]{36}$/i.test(search)) return offset ? [] : [await api.world(search)];
       return api.worlds(search, offset, mode);
     },
-    [demo, search, mode],
+    [demo, user.id, search, mode, category],
     50,
     refresh,
   );
@@ -166,7 +174,7 @@ function Worlds() {
           className="icon-button"
           title="Обновить миры"
           aria-label="Обновить миры"
-          onClick={page.reload}
+          onClick={() => { clearFavoriteEntityCache(); categories.reload(); page.reload(); }}
           disabled={page.loading || page.refreshing || page.moreLoading}
           aria-busy={page.refreshing}
         >
@@ -191,6 +199,10 @@ function Worlds() {
           </button>
         )}
       </div>
+      {mode === 'favorites' && <>
+        <FavoriteCategoryPicker groups={categories.data || []} value={category} onChange={setCategory} />
+        {categories.error && <ErrorState error={categories.error} retry={categories.reload} />}
+      </>}
       {page.loading ? (
         <Loading />
       ) : (
@@ -358,7 +370,7 @@ function Groups() {
   );
 }
 
-function GroupDetail({
+export function GroupDetail({
   initial,
   onClose,
   onChanged,
@@ -902,7 +914,7 @@ function Avatars() {
   );
 }
 
-function AvatarDetail({ initial, onClose }: { initial: Avatar; onClose: () => void }) {
+export function AvatarDetail({ initial, onClose }: { initial: Avatar; onClose: () => void }) {
   const { demo, user, act, openUser, onRefresh } = useApp();
   const detail = useLoad(async () => (demo ? initial : api.avatar(initial.id)), [initial.id, demo]);
   const avatar = detail.data || initial;
@@ -993,19 +1005,19 @@ export function FavoritePicker({
   type: 'avatar' | 'world' | 'friend';
   onComplete: () => void;
 }) {
-  const { demo, act } = useApp();
+  const { demo, user, act } = useApp();
   const groups = useLoad(
     async () =>
       demo
         ? [{ id: 'fav_demo', type, name: 'avatars1', displayName: 'Любимое' }]
-        : api.favoriteGroups(),
+        : loadFavoriteGroups(user.id, type),
     [demo, type],
   );
   const [selected, setSelected] = useState(''),
     [busy, setBusy] = useState(false);
   const relevant = (groups.data || [])
     .map(record)
-    .filter((group) => text(group.type).startsWith(type));
+    .filter((group) => text(group.type) === type || type === 'world' && text(group.type) === 'vrcPlusWorld');
   return (
     <form
       className="card form-stack favorite-picker"
@@ -1014,7 +1026,9 @@ export function FavoritePicker({
         if (!selected || busy) return;
         setBusy(true);
         await act(async () => {
-          const result = await api.addFavorite(entityId, type, selected);
+          const selectedGroup = relevant.find((g) => g.name === selected);
+          if (!selectedGroup) throw new Error('Выберите доступную коллекцию.');
+          const result = await api.addFavorite(entityId, text(selectedGroup.type) as FavoriteType, selected);
           onComplete();
           return result;
         }, 'Добавлено в избранное');
@@ -1067,7 +1081,7 @@ function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () 
               displayName: 'Любимое',
             },
           ]
-        : api.favoriteGroups(),
+        : loadFavoriteGroups(user.id, type),
     [demo, type],
   );
   const [editing, setEditing] = useState(''),
@@ -1075,7 +1089,7 @@ function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () 
     [busy, setBusy] = useState(false);
   const relevant = (groups.data || [])
     .map(record)
-    .filter((group) => text(group.type).startsWith(type));
+    .filter((group) => text(group.type) === type || type === 'world' && text(group.type) === 'vrcPlusWorld');
   return (
     <Modal title={type === 'world' ? 'Коллекции миров' : 'Коллекции аватаров'} onClose={onClose}>
       <p className="muted">

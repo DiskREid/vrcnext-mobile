@@ -18,9 +18,15 @@ import {
 } from 'lucide-react';
 import { api, native } from '../api';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
-import type { User, World, Group, CreateInstanceOptions } from '../api';
+import { loadFavoriteGroups } from '../api/favorites';
+import type { User, World, Group, CreateInstanceOptions, FavoriteGroup } from '../api';
 import { useApp, useLoad } from '../state';
 import { demoFriends, demoWorlds, demoGroups } from '../demo';
+import {
+  ProfileInformation,
+  UserProfileTabs,
+  userProfileTabs,
+} from '../components/UserProfileTabs';
 import {
   Modal,
   AvatarImage,
@@ -39,7 +45,8 @@ export const statusName = (s?: string) =>
     busy: 'Не беспокоить',
     offline: 'Не в сети',
   })[s || ''] || 'В сети';
-export function rankOf(tags: string[] = []) {
+export function rankOf(tags?: string[]) {
+  if (!tags) return 'Неизвестен';
   return tags.includes('system_trust_veteran')
     ? 'Trusted'
     : tags.includes('system_trust_trusted')
@@ -59,15 +66,15 @@ function FavoritePicker({
   type: 'friend' | 'world';
   onClose: () => void;
 }) {
-  const { demo, act } = useApp();
-  const groups = useLoad(
+  const { user, demo, act } = useApp();
+  const groups = useLoad<FavoriteGroup[]>(
     () =>
       demo
         ? Promise.resolve([
             { name: type === 'friend' ? 'group_0' : 'worlds1', displayName: 'Избранное', type },
           ])
-        : api.favoriteGroups().then((g) => g.filter((x) => x.type === type)),
-    [id],
+        : loadFavoriteGroups(user.id, type),
+    [id, type, demo, user.id],
   );
   return (
     <div className="inset-panel">
@@ -80,10 +87,10 @@ function FavoritePicker({
         groups.data.map((g) => (
           <button
             className="list-row"
-            key={g.name}
+            key={`${g.type}:${g.name}`}
             onClick={() =>
               void act(async () => {
-                await api.addFavorite(id, type, g.name);
+                await api.addFavorite(id, g.type, g.name);
                 onClose();
               }, 'Добавлено в избранное')
             }
@@ -102,11 +109,22 @@ function FavoritePicker({
   );
 }
 export function UserDetails({ target, onClose }: { target: User | string; onClose: () => void }) {
+  const id = typeof target === 'string' ? target : target.id;
+  // A different target gets a different loader and form, never retained data from the last profile.
+  return <UserDetailsContent key={id} id={id} onClose={onClose} />;
+}
+function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }) {
   const ctx = useApp(),
-    id = typeof target === 'string' ? target : target.id;
+    isSelf = ctx.user.id === id;
   const load = useLoad(
     () =>
-      ctx.demo ? Promise.resolve(demoFriends.find((x) => x.id === id) || ctx.user) : api.user(id),
+      (ctx.demo
+        ? Promise.resolve(demoFriends.find((x) => x.id === id) || ctx.user)
+        : api.user(id)
+      ).then((user) => {
+        if (user.id !== id) throw new Error('VRChat не вернул запрошенного пользователя.');
+        return user;
+      }),
     [id, ctx.refresh],
   );
   const profile = useLoad(
@@ -126,18 +144,11 @@ export function UserDetails({ target, onClose }: { target: User | string; onClos
     [note, setNote] = useState(''),
     [fav, setFav] = useState(false),
     [confirm, setConfirm] = useState(''),
-    [selected, setSelected] = useState<string[]>([]),
     [booping, setBooping] = useState(false);
-  const groups = useLoad(() => (ctx.demo ? Promise.resolve(demoGroups) : api.userGroups(id)), [id]);
-  const mutual = useLoad(
-    () =>
-      tab === 'mutual'
-        ? ctx.demo
-          ? Promise.resolve(demoFriends.slice(0, 2))
-          : api.mutualFriends(id)
-        : Promise.resolve([]),
-    [id, tab],
-  );
+  useEffect(() => {
+    if (!ctx.demo && load.data && profile.data && !load.error && !profile.error)
+      ctx.history.observeProfile(mergePublicProfile(load.data, profile.data));
+  }, [load.data, profile.data, load.error, profile.error, ctx.demo, ctx.history.observeProfile]);
   useEffect(() => {
     setNote(u?.note || '');
   }, [u?.id, u?.note]);
@@ -187,7 +198,7 @@ export function UserDetails({ target, onClose }: { target: User | string; onClos
                 <MessageSquare size={16} />
                 Попросить инвайт
               </button>
-              {!u.isFriend && (
+              {!u.isFriend && !isSelf && (
                 <button
                   className="button secondary"
                   onClick={() =>
@@ -218,130 +229,66 @@ export function UserDetails({ target, onClose }: { target: User | string; onClos
               </button>
             </div>
             {fav && <FavoritePicker id={id} type="friend" onClose={() => setFav(false)} />}
-            <Segmented
-              value={tab}
-              onChange={setTab}
-              items={[
-                { id: 'profile', label: 'О человеке' },
-                { id: 'groups', label: 'Группы' },
-                { id: 'mutual', label: 'Общие друзья' },
-              ]}
-            />
-            {tab === 'profile' && (
-              <div className="form-stack">
-                {profile.loading && typeof u.bio !== 'string' ? (
-                  <Loading />
-                ) : (
-                  <>
-                    {profile.error && <ErrorState error={profile.error} retry={profile.reload} />}
-                    {typeof u.bio === 'string' ? (
-                      <p className="preserve-lines">
-                        {u.bio.trim() ? u.bio : 'Описание пока не добавлено.'}
-                      </p>
-                    ) : !profile.error ? (
-                      <p className="muted">VRChat не передал биографию в публичном профиле.</p>
-                    ) : null}
-                  </>
-                )}
-                {u.bioLinks?.map((link) => (
-                  <button
-                    key={link}
-                    className="link-row"
-                    onClick={() => void ctx.act(() => native.openLink({ url: link }))}
-                  >
-                    <ExternalLink size={15} />
-                    {link}
-                  </button>
-                ))}
-                <div className="chips">{u.languages?.map((l) => <Badge key={l}>{l}</Badge>)}</div>
-                {u.location?.startsWith('wrld_') && (
-                  <button
-                    className="list-row"
-                    onClick={() => ctx.openWorld(u.location!.split(':')[0])}
-                  >
-                    <Globe2 size={20} />
-                    <span>Мир пользователя</span>
-                    <ExternalLink size={16} />
-                  </button>
-                )}
-                <label className="field">
-                  Личная заметка
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    maxLength={256}
-                    placeholder="Видна только вам"
-                  />
-                </label>
+            <Segmented value={tab} onChange={setTab} items={userProfileTabs} />
+            <div className="form-stack user-profile-panel" hidden={tab !== 'profile'}>
+              {profile.loading && typeof u.bio !== 'string' ? (
+                <Loading />
+              ) : (
+                <>
+                  {profile.error && <ErrorState error={profile.error} retry={profile.reload} />}
+                  {typeof u.bio === 'string' ? (
+                    <p className="preserve-lines">
+                      {u.bio.trim() ? u.bio : 'Описание пока не добавлено.'}
+                    </p>
+                  ) : !profile.error ? (
+                    <p className="muted">VRChat не передал биографию в публичном профиле.</p>
+                  ) : null}
+                </>
+              )}
+              {u.bioLinks?.map((link) => (
                 <button
-                  className="button secondary"
-                  onClick={() => void ctx.act(() => api.note(id, note), 'Заметка сохранена')}
+                  key={link}
+                  className="link-row"
+                  onClick={() => void ctx.act(() => native.openLink({ url: link }))}
                 >
-                  Сохранить заметку
+                  <ExternalLink size={15} />
+                  {link}
                 </button>
-                <div className="divider" />
-                <h3>Управление</h3>
-                <div className="detail-actions">
-                  <button className="button secondary" onClick={() => setConfirm('mute')}>
-                    Заглушить
+              ))}
+              <div className="chips">{u.languages?.map((l) => <Badge key={l}>{l}</Badge>)}</div>
+              <ProfileInformation user={u} profile={profile.data} />
+              <label className="field">
+                Личная заметка
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  maxLength={256}
+                  placeholder="Видна только вам"
+                />
+              </label>
+              <button
+                className="button secondary"
+                onClick={() => void ctx.act(() => api.note(id, note), 'Заметка сохранена')}
+              >
+                Сохранить заметку
+              </button>
+              <div className="divider" />
+              <h3>Управление</h3>
+              <div className="detail-actions">
+                <button className="button secondary" onClick={() => setConfirm('mute')}>
+                  Заглушить
+                </button>
+                <button className="button danger" onClick={() => setConfirm('block')}>
+                  Заблокировать
+                </button>
+                {u.isFriend && (
+                  <button className="button danger" onClick={() => setConfirm('unfriend')}>
+                    Удалить из друзей
                   </button>
-                  <button className="button danger" onClick={() => setConfirm('block')}>
-                    Заблокировать
-                  </button>
-                  {u.isFriend && (
-                    <button className="button danger" onClick={() => setConfirm('unfriend')}>
-                      Удалить из друзей
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
-            )}
-            {tab === 'groups' &&
-              (groups.loading ? (
-                <Loading />
-              ) : groups.error ? (
-                <ErrorState error={groups.error} retry={groups.reload} />
-              ) : groups.data?.length ? (
-                groups.data.map((g) => (
-                  <div className="list-row" key={g.id}>
-                    <AvatarImage src={g.iconUrl} name={g.name} />
-                    <div>
-                      <strong>{g.name}</strong>
-                      <p className="muted small">
-                        {g.memberCount?.toLocaleString('ru')} участников
-                      </p>
-                    </div>
-                    <button
-                      className="button secondary compact"
-                      onClick={() =>
-                        void ctx.act(
-                          () => api.joinGroup(g.groupId || g.id),
-                          'Запрос на вступление отправлен',
-                        )
-                      }
-                    >
-                      Вступить
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <Empty />
-              ))}
-            {tab === 'mutual' &&
-              (mutual.loading ? (
-                <Loading />
-              ) : mutual.error ? (
-                <ErrorState error={mutual.error} retry={mutual.reload} />
-              ) : mutual.data?.length ? (
-                mutual.data.map((f) => (
-                  <button className="list-row" key={f.id} onClick={() => ctx.openUser(f)}>
-                    <AvatarImage name={f.displayName} src={imageOf(f)} />
-                    {f.displayName}
-                  </button>
-                ))
-              ) : (
-                <Empty title="Нет общих друзей" />
-              ))}
+            </div>
+            <UserProfileTabs tab={tab} user={u} profile={profile.data} />
             {confirm && (
               <div className="confirm-panel" role="alert">
                 <Shield size={22} />
@@ -361,8 +308,13 @@ export function UserDetails({ target, onClose }: { target: User | string; onClos
                     className="button danger"
                     onClick={() =>
                       void ctx.act(async () => {
-                        if (confirm === 'unfriend') await api.unfriend(id);
-                        else await api.moderate(id, confirm as 'block' | 'mute');
+                        if (confirm === 'unfriend') {
+                          await api.unfriend(id);
+                          ctx.history.recordFriendAction(id, u.displayName, 'friend-remove');
+                        } else {
+                          await api.moderate(id, confirm as 'block' | 'mute');
+                          ctx.history.recordModeration(id, u.displayName, confirm);
+                        }
                         setConfirm('');
                         load.reload();
                       }, 'Готово')
