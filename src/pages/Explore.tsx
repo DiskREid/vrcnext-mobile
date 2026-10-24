@@ -1,0 +1,1210 @@
+import SecureImage from '../components/SecureImage';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ArrowRight,
+  Check,
+  ChevronRight,
+  Compass,
+  Globe2,
+  Heart,
+  Image,
+  Layers3,
+  Monitor,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  Smartphone,
+  Sparkles,
+  Users,
+} from 'lucide-react';
+import { api } from '../api';
+import type { Avatar, Group, World, FavoriteType, GroupPost, VrcFile } from '../api';
+import { demoAvatars, demoGroups, demoWorlds } from '../demo';
+import { useApp, useLoad } from '../state';
+import {
+  AvatarImage,
+  Badge,
+  Empty,
+  ErrorState,
+  imageOf,
+  Loading,
+  Modal,
+  PageHeader,
+  SearchField,
+  Segmented,
+} from '../components/ui';
+import './Explore.css';
+
+type ExploreTab = 'worlds' | 'groups' | 'avatars';
+type RecordData = Record<string, unknown>;
+function record(value: unknown): RecordData {
+  return value && typeof value === 'object' ? (value as RecordData) : {};
+}
+function text(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+function numeric(value: unknown): number {
+  return typeof value === 'number' ? value : 0;
+}
+function list(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+function shortNumber(n: number) {
+  return new Intl.NumberFormat('ru', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+}
+function useDebounced(value: string) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value.trim()), 500);
+    return () => clearTimeout(timer);
+  }, [value]);
+  return debounced;
+}
+
+function usePaged<T extends { id: string }>(
+  loader: (offset: number) => Promise<T[]>,
+  deps: unknown[],
+  pageSize = 50,
+) {
+  const [items, setItems] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [moreLoading, setMoreLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  const generation = useRef(0);
+  const offsetRef = useRef(0);
+  const busyRef = useRef(false);
+  useEffect(() => {
+    const current = ++generation.current;
+    setLoading(true);
+    setItems([]);
+    setError('');
+    setMoreLoading(false);
+    offsetRef.current = 0;
+    busyRef.current = false;
+    loader(0)
+      .then((result) => {
+        if (current !== generation.current) return;
+        setItems(result);
+        offsetRef.current = result.length;
+        setHasMore(result.length >= pageSize);
+      })
+      .catch((e) => {
+        if (current === generation.current) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (current === generation.current) setLoading(false);
+      });
+    return () => {
+      generation.current++;
+    };
+  }, [...deps, revision]);
+  async function loadMore() {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setMoreLoading(true);
+    setError('');
+    const current = generation.current;
+    try {
+      const result = await loader(offsetRef.current);
+      if (current !== generation.current) return;
+      offsetRef.current += result.length;
+      const seen = new Set(items.map((i) => i.id));
+      const additions = result.filter((i) => !seen.has(i.id));
+      setHasMore(result.length >= pageSize && additions.length > 0);
+      setItems((previous) => [...previous, ...additions]);
+    } catch (e) {
+      if (current === generation.current) setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (current === generation.current) {
+        busyRef.current = false;
+        setMoreLoading(false);
+      }
+    }
+  }
+  return {
+    items,
+    loading,
+    moreLoading,
+    hasMore,
+    error,
+    loadMore,
+    reload: () => setRevision((v) => v + 1),
+  };
+}
+
+export function PlatformBadges({ packages }: { packages: unknown }) {
+  const platforms = list(packages).map((item) => text(record(item).platform));
+  return (
+    <span className="platform-badges">
+      {platforms.includes('android') && (
+        <Badge className="quest">
+          <Smartphone size={12} />
+          Android
+        </Badge>
+      )}
+      {platforms.includes('standalonewindows') && (
+        <Badge>
+          <Monitor size={12} />
+          PC
+        </Badge>
+      )}
+    </span>
+  );
+}
+
+function MoreResults({
+  hasMore,
+  loading,
+  onClick,
+}: {
+  hasMore: boolean;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  if (!hasMore) return null;
+  return (
+    <div className="explore-more">
+      <button className="button secondary" onClick={onClick} disabled={loading}>
+        {loading ? <RefreshCw size={16} className="spin" /> : <Plus size={16} />}{' '}
+        {loading ? 'Загрузка…' : 'Загрузить ещё'}
+      </button>
+    </div>
+  );
+}
+
+export default function Explore({ initialTab = 'worlds' }: { initialTab?: ExploreTab }) {
+  const [tab, setTab] = useState<ExploreTab>(initialTab);
+  useEffect(() => setTab(initialTab), [initialTab]);
+  return (
+    <div className="explore-page">
+      <PageHeader
+        eyebrow="ОТКРЫВАЙТЕ НОВОЕ"
+        title="Исследовать"
+        subtitle="Следующий любимый мир уже где-то рядом."
+      />
+      <div className="explore-main-tabs" role="group" aria-label="Разделы поиска">
+        {(
+          [
+            { id: 'worlds', label: 'Миры', Icon: Globe2 },
+            { id: 'groups', label: 'Группы', Icon: Users },
+            { id: 'avatars', label: 'Аватары', Icon: Sparkles },
+          ] as const
+        ).map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            aria-pressed={tab === id}
+            className={tab === id ? 'active' : ''}
+            onClick={() => setTab(id)}
+          >
+            <Icon size={18} />
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'worlds' && <Worlds />}
+      {tab === 'groups' && <Groups />}
+      {tab === 'avatars' && <Avatars />}
+    </div>
+  );
+}
+
+function Worlds() {
+  const { demo, openWorld, refresh } = useApp();
+  const [query, setQuery] = useState('');
+  const [mode, setMode] = useState<'popular' | 'active' | 'mine' | 'favorites'>('popular');
+  const [collections, setCollections] = useState(false);
+  const search = useDebounced(query);
+  const page = usePaged<World>(
+    async (offset) => {
+      if (demo)
+        return offset
+          ? []
+          : demoWorlds.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()));
+      if (/^wrld_[0-9a-f-]{36}$/i.test(search)) return offset ? [] : [await api.world(search)];
+      return api.worlds(search, offset, mode);
+    },
+    [demo, search, mode, refresh],
+  );
+  return (
+    <>
+      <div className="toolbar">
+        <SearchField value={query} onChange={setQuery} placeholder="Название мира или wrld_…" />
+        <button
+          className="icon-button"
+          title="Обновить миры"
+          aria-label="Обновить миры"
+          onClick={page.reload}
+        >
+          <RefreshCw size={18} />
+        </button>
+      </div>
+      <div className="explore-filters">
+        <Segmented
+          items={[
+            { id: 'popular', label: 'Популярные' },
+            { id: 'active', label: 'Сейчас играют' },
+            { id: 'favorites', label: 'Избранное' },
+            { id: 'mine', label: 'Мои миры' },
+          ]}
+          value={mode}
+          onChange={(v) => setMode(v as typeof mode)}
+        />
+        {mode === 'favorites' && (
+          <button className="text-button" onClick={() => setCollections(true)}>
+            <Layers3 size={16} />
+            Коллекции
+          </button>
+        )}
+      </div>
+      {page.loading ? (
+        <Loading />
+      ) : (
+        <>
+          {page.error && <ErrorState error={page.error} retry={page.reload} />}
+          {!page.items.length && !page.error && (
+            <Empty
+              title={
+                search
+                  ? 'Миры не найдены'
+                  : mode === 'mine'
+                    ? 'Ваши миры появятся здесь'
+                    : 'Здесь пока пусто'
+              }
+              text={
+                search
+                  ? 'Попробуйте другое название.'
+                  : 'Сохраняйте понравившиеся миры, чтобы вернуться к ним позже.'
+              }
+              icon={<Globe2 size={32} />}
+            />
+          )}
+          <div className="grid explore-world-grid">
+            {page.items.map((world) => (
+              <button
+                className="media-card world-card"
+                key={world.id}
+                onClick={() => openWorld(world)}
+              >
+                <div className="media-cover">
+                  <SecureImage src={imageOf(world)} alt="" loading="lazy" />
+                  <div className="world-occupants">
+                    <Users size={13} />
+                    {shortNumber(numeric(world.occupants))}
+                  </div>
+                  <div className="cover-cta">
+                    <ArrowRight size={18} />
+                  </div>
+                </div>
+                <div className="card-body">
+                  <h3>{world.name}</h3>
+                  <p className="muted">{text(world.authorName, 'Неизвестный автор')}</p>
+                  <div className="world-card-bottom">
+                    <PlatformBadges packages={world.unityPackages} />
+                    <span className="muted">
+                      <Heart size={13} />
+                      {shortNumber(numeric(world.favorites))}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          {!demo && (
+            <MoreResults
+              hasMore={page.hasMore}
+              loading={page.moreLoading}
+              onClick={page.loadMore}
+            />
+          )}
+        </>
+      )}
+      {collections && <Collections type="world" onClose={() => setCollections(false)} />}
+    </>
+  );
+}
+
+function normalizeGroup(group: Group): Group {
+  const raw = record(group);
+  return { ...group, id: text(raw.groupId, group.id) };
+}
+function Groups() {
+  const { user, demo, refresh } = useApp();
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<Group>();
+  const search = useDebounced(query);
+  const page = usePaged<Group>(
+    async (offset) => {
+      if (demo)
+        return offset
+          ? []
+          : demoGroups.filter((g) => g.name.toLowerCase().includes(search.toLowerCase()));
+      if (search) return api.searchGroups(search, offset);
+      return offset ? [] : (await api.groups(user.id)).map(normalizeGroup);
+    },
+    [demo, user.id, search, refresh],
+  );
+  return (
+    <>
+      <div className="toolbar">
+        <SearchField value={query} onChange={setQuery} placeholder="Найти группу по названию" />
+        <button className="icon-button" aria-label="Обновить группы" onClick={page.reload}>
+          <RefreshCw size={18} />
+        </button>
+      </div>
+      <p className="explore-list-label">{search ? 'РЕЗУЛЬТАТЫ ПОИСКА' : 'ВАШИ СООБЩЕСТВА'}</p>
+      {page.loading ? (
+        <Loading />
+      ) : (
+        <>
+          {page.error && <ErrorState error={page.error} retry={page.reload} />}
+          {!page.items.length && !page.error && (
+            <Empty
+              title={search ? 'Группы не найдены' : 'Найдите свою компанию'}
+              text={
+                search
+                  ? 'Попробуйте другое название или код группы.'
+                  : 'Введите название, чтобы найти сообщество и вступить в него.'
+              }
+              icon={<Users size={32} />}
+            />
+          )}
+          <div className="grid explore-group-grid">
+            {page.items.map((group) => (
+              <button className="card group-card" key={group.id} onClick={() => setSelected(group)}>
+                <div className="group-banner">
+                  {group.bannerUrl && <SecureImage src={group.bannerUrl} alt="" loading="lazy" />}
+                  <AvatarImage src={group.iconUrl} name={group.name} size={60} />
+                </div>
+                <div className="card-body">
+                  <h3>{group.name}</h3>
+                  <p className="group-code muted">
+                    {text(group.shortCode)}
+                    {group.discriminator ? `.${group.discriminator}` : ''}
+                  </p>
+                  <p className="group-description">
+                    {text(group.description, 'Откройте группу, чтобы узнать больше.')}
+                  </p>
+                  <div className="world-card-bottom">
+                    <span>
+                      <Users size={14} />
+                      {shortNumber(numeric(group.memberCount))} участников
+                    </span>
+                    <ChevronRight size={18} />
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          {!demo && search && (
+            <MoreResults
+              hasMore={page.hasMore}
+              loading={page.moreLoading}
+              onClick={page.loadMore}
+            />
+          )}
+        </>
+      )}
+      {selected && (
+        <GroupDetail
+          initial={selected}
+          onClose={() => setSelected(undefined)}
+          onChanged={page.reload}
+        />
+      )}
+    </>
+  );
+}
+
+function GroupDetail({
+  initial,
+  onClose,
+  onChanged,
+}: {
+  initial: Group;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const { user, demo, act, openWorld } = useApp();
+  const [tab, setTab] = useState('about');
+  const [leave, setLeave] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const detail = useLoad(async () => (demo ? initial : api.group(initial.id)), [initial.id, demo]);
+  const group = detail.data || initial;
+  const raw = record(group),
+    member = record(raw.myMember);
+  const joined =
+    text(
+      member.membershipStatus,
+      text(raw.membershipStatus, text(record(initial).membershipStatus)),
+    ) === 'member' || Boolean(raw.isMember);
+  const posts = usePaged<GroupPost>(
+    async (offset) =>
+      tab !== 'posts'
+        ? []
+        : demo
+          ? offset
+            ? []
+            : [
+                {
+                  id: 'post_demo',
+                  title: 'Добро пожаловать, исследователь!',
+                  text: 'Впереди новые миры и встречи. Это демонстрационная публикация.',
+                  createdAt: new Date().toISOString(),
+                },
+              ]
+          : api.groupPosts(initial.id, offset),
+    [initial.id, tab, demo],
+  );
+  const instances = useLoad(
+    async () => (tab !== 'instances' ? [] : demo ? [] : api.groupInstances(initial.id, user.id)),
+    [initial.id, tab, demo],
+  );
+  const [gallery, setGallery] = useState('');
+  const galleryList = list(raw.galleries).map(record);
+  const galleryImages = usePaged<VrcFile>(
+    async (offset) =>
+      tab !== 'gallery' || !gallery
+        ? []
+        : demo
+          ? []
+          : api.groupGallery(initial.id, gallery, offset),
+    [initial.id, tab, gallery, demo],
+  );
+  useEffect(() => {
+    if (galleryList.length && !gallery) setGallery(text(galleryList[0].id));
+  }, [group]);
+  async function changeMembership(remove: boolean) {
+    if (busy) return;
+    setBusy(true);
+    await act(
+      async () => {
+        const result = await (remove ? api.leaveGroup(initial.id) : api.joinGroup(initial.id));
+        detail.reload();
+        onChanged();
+        setLeave(false);
+        return result;
+      },
+      remove ? 'Вы вышли из группы' : 'Запрос на вступление отправлен',
+    );
+    setBusy(false);
+  }
+  return (
+    <Modal title={group.name} onClose={onClose} wide>
+      {group.bannerUrl && (
+        <SecureImage className="detail-cover group-detail-cover" src={group.bannerUrl} alt="" />
+      )}
+      <div className="group-detail-title">
+        <AvatarImage src={group.iconUrl} name={group.name} size={64} />
+        <div>
+          <h3>{group.name}</h3>
+          <p className="muted">
+            {shortNumber(numeric(group.memberCount))} участников · {text(group.shortCode)}
+            {group.discriminator ? `.${group.discriminator}` : ''}
+          </p>
+        </div>
+      </div>
+      {detail.error && <ErrorState error={detail.error} retry={detail.reload} />}
+      <div className="detail-actions">
+        <button
+          className={`button ${joined ? 'secondary' : ''}`}
+          disabled={busy}
+          onClick={() => (joined ? setLeave(true) : void changeMembership(false))}
+        >
+          {joined ? <Check size={17} /> : <Plus size={17} />}
+          {joined ? 'Вы участник · выйти' : 'Вступить в группу'}
+        </button>
+      </div>
+      {leave && (
+        <div className="confirm-inline">
+          <p>Выйти из группы «{group.name}»?</p>
+          <div className="row">
+            <button
+              className="button danger"
+              disabled={busy}
+              onClick={() => void changeMembership(true)}
+            >
+              Выйти
+            </button>
+            <button className="button secondary" onClick={() => setLeave(false)}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+      <Segmented
+        items={[
+          { id: 'about', label: 'О группе' },
+          { id: 'posts', label: 'Публикации' },
+          { id: 'instances', label: 'Инстансы' },
+          { id: 'gallery', label: 'Галерея' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+      <div className="group-tab-content">
+        {tab === 'about' && (
+          <>
+            <p className="preserve-text">{text(group.description, 'Описание не указано.')}</p>
+            {text(raw.rules) && (
+              <section>
+                <h3>Правила</h3>
+                <p className="preserve-text muted">{text(raw.rules)}</p>
+              </section>
+            )}
+            <div className="chips">
+              {list(raw.languages).map((language) => (
+                <Badge key={text(language)}>{text(language)}</Badge>
+              ))}
+            </div>
+          </>
+        )}
+        {tab === 'posts' && (
+          <>
+            <div className="section-heading">
+              <h3>Последние публикации</h3>
+              <button className="text-button" onClick={() => setPosting(!posting)}>
+                <Plus size={16} />
+                Написать
+              </button>
+            </div>
+            {posting && (
+              <GroupPostComposer
+                groupId={group.id}
+                onComplete={() => {
+                  setPosting(false);
+                  posts.reload();
+                }}
+              />
+            )}
+            {posts.loading ? (
+              <Loading />
+            ) : posts.error ? (
+              <ErrorState error={posts.error} retry={posts.reload} />
+            ) : !posts.items.length ? (
+              <Empty title="Публикаций пока нет" />
+            ) : (
+              <div className="explore-post-list">
+                {posts.items.map((value, index) => {
+                  const post = record(value);
+                  return (
+                    <article className="card group-post" key={text(post.id, String(index))}>
+                      <div className="muted small">
+                        {text(post.createdAt)
+                          ? new Date(text(post.createdAt)).toLocaleDateString('ru')
+                          : 'Публикация'}
+                      </div>
+                      <h3>{text(post.title)}</h3>
+                      <p className="preserve-text">{text(post.text)}</p>
+                      {text(post.imageUrl) && (
+                        <SecureImage
+                          className="post-image"
+                          src={text(post.imageUrl)}
+                          alt="Вложение публикации"
+                          loading="lazy"
+                        />
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+            {!demo && (
+              <MoreResults
+                hasMore={posts.hasMore}
+                loading={posts.moreLoading}
+                onClick={posts.loadMore}
+              />
+            )}
+          </>
+        )}
+        {tab === 'instances' && (
+          <>
+            {instances.loading ? (
+              <Loading />
+            ) : instances.error ? (
+              <ErrorState error={instances.error} retry={instances.reload} />
+            ) : !instances.data?.length ? (
+              <Empty
+                title="Активных инстансов нет"
+                text="Здесь появятся доступные вам инстансы группы."
+                icon={<Globe2 size={28} />}
+              />
+            ) : (
+              <div className="explore-post-list">
+                {instances.data.map((value, index) => {
+                  const instance = record(value),
+                    world = record(instance.world);
+                  const worldId = text(instance.worldId, text(world.id));
+                  return (
+                    <button
+                      className="list-row"
+                      key={text(instance.id, String(index))}
+                      onClick={() => {
+                        if (worldId) {
+                          onClose();
+                          openWorld(worldId);
+                        }
+                      }}
+                    >
+                      <Globe2 size={22} />
+                      <div>
+                        <strong>
+                          {text(world.name, text(instance.name, worldId || 'Инстанс группы'))}
+                        </strong>
+                        <p className="muted">
+                          {numeric(instance.n_users)} игроков ·{' '}
+                          {text(instance.region, 'Регион не указан')}
+                        </p>
+                      </div>
+                      <ChevronRight size={18} />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+        {tab === 'gallery' && (
+          <>
+            {galleryList.length ? (
+              <>
+                <label className="field">
+                  Альбом
+                  <select value={gallery} onChange={(e) => setGallery(e.target.value)}>
+                    {galleryList.map((item) => (
+                      <option key={text(item.id)} value={text(item.id)}>
+                        {text(item.name, 'Галерея')}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {galleryImages.loading ? (
+                  <Loading />
+                ) : galleryImages.error ? (
+                  <ErrorState error={galleryImages.error} retry={galleryImages.reload} />
+                ) : galleryImages.items.length ? (
+                  <div className="gallery-grid">
+                    {galleryImages.items.map((value, index) => {
+                      const image = record(value);
+                      return (
+                        <SecureImage
+                          key={text(image.id, String(index))}
+                          src={text(image.imageUrl, text(image.url))}
+                          alt={text(image.description, 'Изображение группы')}
+                          loading="lazy"
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <Empty title="В альбоме пока нет изображений" />
+                )}
+                {!demo && (
+                  <MoreResults
+                    hasMore={galleryImages.hasMore}
+                    loading={galleryImages.moreLoading}
+                    onClick={galleryImages.loadMore}
+                  />
+                )}
+              </>
+            ) : (
+              <Empty
+                title="Галереи пока нет"
+                text="У этой группы нет доступных альбомов."
+                icon={<Image size={28} />}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function GroupPostComposer({ groupId, onComplete }: { groupId: string; onComplete: () => void }) {
+  const { act } = useApp();
+  const [title, setTitle] = useState(''),
+    [body, setBody] = useState(''),
+    [visibility, setVisibility] = useState('group'),
+    [sendNotification, setSendNotification] = useState(false),
+    [busy, setBusy] = useState(false);
+  const [attachment, setAttachment] = useState<File>();
+  return (
+    <form
+      className="card form-stack group-post-composer"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (busy || !title.trim() || !body.trim()) return;
+        setBusy(true);
+        await act(async () => {
+          const image = attachment ? await api.uploadImage(attachment, 'gallery') : undefined;
+          const result = await api.createGroupPost(groupId, {
+            title: title.trim(),
+            text: body.trim(),
+            visibility,
+            sendNotification,
+            ...(image?.id ? { imageId: image.id } : {}),
+          });
+          onComplete();
+          return result;
+        }, 'Публикация создана');
+        setBusy(false);
+      }}
+    >
+      <p className="muted small">Для публикации нужны права, выданные владельцем группы.</p>
+      <label className="field">
+        Заголовок
+        <input required maxLength={64} value={title} onChange={(e) => setTitle(e.target.value)} />
+      </label>
+      <label className="field">
+        Текст
+        <textarea
+          required
+          maxLength={2000}
+          rows={4}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+      </label>
+      <label className="field">
+        Изображение (необязательно)
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          onChange={(e) => setAttachment(e.target.files?.[0])}
+        />
+      </label>
+      <label className="field">
+        Видимость
+        <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+          <option value="group">Участникам группы</option>
+          <option value="public">Всем</option>
+        </select>
+      </label>
+      <label className="check-label">
+        <input
+          type="checkbox"
+          checked={sendNotification}
+          onChange={(e) => setSendNotification(e.target.checked)}
+        />
+        Отправить уведомление участникам
+      </label>
+      <button className="button" disabled={busy || !title.trim() || !body.trim()}>
+        <Send size={16} />
+        {busy ? 'Публикуем…' : 'Опубликовать'}
+      </button>
+    </form>
+  );
+}
+
+function Avatars() {
+  const { user, demo, refresh, notify } = useApp();
+  const [mode, setMode] = useState<'mine' | 'favorites' | 'public'>('mine');
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<Avatar>();
+  const [collections, setCollections] = useState(false);
+  const [lookup, setLookup] = useState(false);
+  const search = useDebounced(query).toLowerCase();
+  const page = usePaged<Avatar>(
+    async (offset) => {
+      if (demo) return offset ? [] : demoAvatars;
+      if (mode === 'public')
+        return search ? api.searchPublicAvatars(query.trim(), Math.floor(offset / 20)) : [];
+      return api.avatars(mode, offset);
+    },
+    [demo, mode, refresh, mode === 'public' ? search : ''],
+    mode === 'public' ? 20 : 50,
+  );
+  const filtered =
+    mode === 'public'
+      ? page.items
+      : page.items.filter((avatar) => avatar.name.toLowerCase().includes(search));
+  async function lookupById() {
+    const id = query.trim();
+    if (!/^avtr_[0-9a-f-]{36}$/i.test(id)) {
+      notify('Введите полный ID аватара, начинающийся с avtr_.');
+      return;
+    }
+    if (demo) {
+      notify('Поиск по ID доступен после входа на Android.');
+      return;
+    }
+    setLookup(true);
+    try {
+      setSelected(await api.avatar(id));
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLookup(false);
+    }
+  }
+  return (
+    <>
+      <div className="toolbar">
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder={
+            mode === 'public'
+              ? 'Название аватара в публичной базе'
+              : 'Поиск в загруженных аватарах или avtr_…'
+          }
+        />
+        <button className="icon-button" aria-label="Обновить аватары" onClick={page.reload}>
+          <RefreshCw size={18} />
+        </button>
+      </div>
+      <div className="explore-filters">
+        <Segmented
+          items={[
+            { id: 'mine', label: 'Мои аватары' },
+            { id: 'favorites', label: 'Избранные' },
+            { id: 'public', label: 'Публичные' },
+          ]}
+          value={mode}
+          onChange={(v) => setMode(v as typeof mode)}
+        />
+        <button className="text-button" onClick={() => setCollections(true)}>
+          <Layers3 size={16} />
+          Коллекции
+        </button>
+      </div>
+      {mode === 'public' && (
+        <p className="muted small">
+          Поиск в публичной базе avtrdb.com. Поисковый запрос передаётся её оператору.
+        </p>
+      )}
+      {query.trim().startsWith('avtr_') && (
+        <button
+          className="button secondary lookup-avatar"
+          disabled={lookup}
+          onClick={() => void lookupById()}
+        >
+          <Search size={16} />
+          {lookup ? 'Ищем…' : 'Открыть аватар по ID'}
+        </button>
+      )}
+      {page.loading ? (
+        <Loading />
+      ) : (
+        <>
+          {page.error && <ErrorState error={page.error} retry={page.reload} />}
+          {!filtered.length && !page.error && (
+            <Empty
+              title={
+                search
+                  ? 'Аватары не найдены'
+                  : mode === 'public'
+                    ? 'Найдите новый образ'
+                    : mode === 'mine'
+                      ? 'Ваш гардероб'
+                      : 'Избранных аватаров пока нет'
+              }
+              text={
+                mode === 'public'
+                  ? 'Введите название, чтобы найти аватар в публичной базе.'
+                  : search
+                    ? 'Поиск выполняется по уже загруженным карточкам. Загрузите следующую страницу или вставьте ID аватара.'
+                    : mode === 'mine'
+                      ? 'Здесь появятся загруженные вами аватары. Другой аватар можно открыть по его ID.'
+                      : 'Добавьте аватар в коллекцию через его карточку.'
+              }
+              icon={<Sparkles size={32} />}
+            />
+          )}
+          <div className="grid explore-avatar-grid">
+            {filtered.map((avatar) => (
+              <button
+                key={avatar.id}
+                className="media-card avatar-card"
+                onClick={() => setSelected(avatar)}
+              >
+                <div className="media-cover avatar-cover">
+                  <SecureImage src={imageOf(avatar)} alt="" loading="lazy" />
+                  {user.currentAvatar === avatar.id && (
+                    <Badge className="current-avatar">
+                      <Check size={12} />
+                      Текущий
+                    </Badge>
+                  )}
+                </div>
+                <div className="card-body">
+                  <h3>{avatar.name}</h3>
+                  <p className="muted">{text(avatar.authorName, 'Неизвестный автор')}</p>
+                  <PlatformBadges packages={avatar.unityPackages} />
+                </div>
+              </button>
+            ))}
+          </div>
+          {!demo && (
+            <MoreResults
+              hasMore={page.hasMore}
+              loading={page.moreLoading}
+              onClick={page.loadMore}
+            />
+          )}
+        </>
+      )}
+      {selected && <AvatarDetail initial={selected} onClose={() => setSelected(undefined)} />}
+      {collections && <Collections type="avatar" onClose={() => setCollections(false)} />}
+    </>
+  );
+}
+
+function AvatarDetail({ initial, onClose }: { initial: Avatar; onClose: () => void }) {
+  const { demo, user, act, openUser, onRefresh } = useApp();
+  const detail = useLoad(async () => (demo ? initial : api.avatar(initial.id)), [initial.id, demo]);
+  const avatar = detail.data || initial;
+  const [confirm, setConfirm] = useState(false),
+    [favorite, setFavorite] = useState(false),
+    [busy, setBusy] = useState(false);
+  const current = user.currentAvatar === avatar.id;
+  return (
+    <Modal title={avatar.name} onClose={onClose}>
+      <SecureImage
+        className="detail-cover avatar-detail-cover"
+        src={imageOf(avatar)}
+        alt={avatar.name}
+      />
+      {detail.error && <ErrorState error={detail.error} retry={detail.reload} />}
+      <div className="detail-title-row">
+        <h3>{avatar.name}</h3>
+        {current && (
+          <Badge className="quest">
+            <Check size={12} />
+            Текущий
+          </Badge>
+        )}
+      </div>
+      <button
+        className="text-button avatar-author"
+        onClick={() => {
+          if (avatar.authorId) {
+            onClose();
+            openUser(avatar.authorId);
+          }
+        }}
+      >
+        {text(avatar.authorName, 'Автор аватара')}
+        <ChevronRight size={15} />
+      </button>
+      <PlatformBadges packages={avatar.unityPackages} />
+      <p className="preserve-text">{text(avatar.description, 'Автор не добавил описание.')}</p>
+      <div className="detail-actions">
+        <button className="button" onClick={() => setConfirm(true)} disabled={current || busy}>
+          <Sparkles size={17} />
+          {current ? 'Уже выбран' : 'Выбрать аватар'}
+        </button>
+        <button className="button secondary" onClick={() => setFavorite(!favorite)}>
+          <Heart size={17} />В коллекцию
+        </button>
+      </div>
+      {confirm && (
+        <div className="confirm-inline">
+          <p>Сменить текущий аватар на «{avatar.name}»?</p>
+          <p className="small muted">Выбор изменится в вашем аккаунте VRChat.</p>
+          <div className="row">
+            <button
+              className="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await act(async () => {
+                  const result = await api.selectAvatar(avatar.id);
+                  setConfirm(false);
+                  onRefresh();
+                  return result;
+                }, 'Аватар выбран');
+                setBusy(false);
+              }}
+            >
+              Подтвердить
+            </button>
+            <button className="button secondary" onClick={() => setConfirm(false)}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+      {favorite && (
+        <FavoritePicker entityId={avatar.id} type="avatar" onComplete={() => setFavorite(false)} />
+      )}
+    </Modal>
+  );
+}
+
+export function FavoritePicker({
+  entityId,
+  type,
+  onComplete,
+}: {
+  entityId: string;
+  type: 'avatar' | 'world' | 'friend';
+  onComplete: () => void;
+}) {
+  const { demo, act } = useApp();
+  const groups = useLoad(
+    async () =>
+      demo
+        ? [{ id: 'fav_demo', type, name: 'avatars1', displayName: 'Любимое' }]
+        : api.favoriteGroups(),
+    [demo, type],
+  );
+  const [selected, setSelected] = useState(''),
+    [busy, setBusy] = useState(false);
+  const relevant = (groups.data || [])
+    .map(record)
+    .filter((group) => text(group.type).startsWith(type));
+  return (
+    <form
+      className="card form-stack favorite-picker"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!selected || busy) return;
+        setBusy(true);
+        await act(async () => {
+          const result = await api.addFavorite(entityId, type, selected);
+          onComplete();
+          return result;
+        }, 'Добавлено в избранное');
+        setBusy(false);
+      }}
+    >
+      <h3>Добавить в коллекцию</h3>
+      {groups.loading ? (
+        <Loading />
+      ) : groups.error ? (
+        <ErrorState error={groups.error} retry={groups.reload} />
+      ) : !relevant.length ? (
+        <p className="muted">Нет доступных коллекций этого типа.</p>
+      ) : (
+        <label className="field">
+          Коллекция
+          <select required value={selected} onChange={(e) => setSelected(e.target.value)}>
+            <option value="">Выберите коллекцию</option>
+            {relevant.map((group) => (
+              <option key={text(group.id, text(group.name))} value={text(group.name)}>
+                {text(group.displayName, text(group.name))}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="row">
+        <button className="button" disabled={!selected || busy}>
+          <Heart size={16} />
+          Добавить
+        </button>
+        <button type="button" className="button secondary" onClick={onComplete}>
+          Отмена
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () => void }) {
+  const { demo, user, act } = useApp();
+  const groups = useLoad(
+    async () =>
+      demo
+        ? [
+            {
+              id: 'fav_demo',
+              type,
+              name: type === 'world' ? 'worlds1' : 'avatars1',
+              displayName: 'Любимое',
+            },
+          ]
+        : api.favoriteGroups(),
+    [demo, type],
+  );
+  const [editing, setEditing] = useState(''),
+    [name, setName] = useState(''),
+    [busy, setBusy] = useState(false);
+  const relevant = (groups.data || [])
+    .map(record)
+    .filter((group) => text(group.type).startsWith(type));
+  return (
+    <Modal title={type === 'world' ? 'Коллекции миров' : 'Коллекции аватаров'} onClose={onClose}>
+      <p className="muted">
+        Переименуйте коллекции. Изменения сохраняются в вашем аккаунте VRChat.
+      </p>
+      {groups.loading ? (
+        <Loading />
+      ) : groups.error ? (
+        <ErrorState error={groups.error} retry={groups.reload} />
+      ) : !relevant.length ? (
+        <Empty title="Коллекции не найдены" />
+      ) : (
+        <div className="explore-post-list">
+          {relevant.map((group) => (
+            <div className="card collection-row" key={text(group.id, text(group.name))}>
+              <div className="row">
+                <Layers3 size={20} />
+                <strong>{text(group.displayName, text(group.name))}</strong>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setEditing(text(group.name));
+                    setName(text(group.displayName, text(group.name)));
+                  }}
+                >
+                  Изменить
+                </button>
+              </div>
+              {editing === group.name && (
+                <form
+                  className="form-stack"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (busy || !name.trim()) return;
+                    setBusy(true);
+                    await act(async () => {
+                      const result = await api.renameFavoriteGroup(
+                        text(group.type) as FavoriteType,
+                        text(group.name),
+                        user.id,
+                        name.trim(),
+                      );
+                      setEditing('');
+                      groups.reload();
+                      return result;
+                    }, 'Коллекция переименована');
+                    setBusy(false);
+                  }}
+                >
+                  <label className="field">
+                    Название
+                    <input
+                      maxLength={32}
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </label>
+                  <div className="row">
+                    <button className="button" disabled={busy || !name.trim()}>
+                      Сохранить
+                    </button>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={() => setEditing('')}
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}

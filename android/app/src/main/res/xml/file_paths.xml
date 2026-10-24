@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Capacitor's file picker camera capture writes only into this app's Pictures directory. -->
+    <external-files-path name="capture" path="Pictures/" />
+</paths>

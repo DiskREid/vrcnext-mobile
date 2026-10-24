@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VRCNext Mobile</string>
+    <string name="title_activity_main">VRCNext Mobile</string>
+    <string name="package_name">com.diskreid.vrcnextmobile</string>
+    <string name="custom_url_scheme">com.diskreid.vrcnextmobile</string>
+</resources>
