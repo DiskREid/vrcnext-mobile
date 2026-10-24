@@ -1,4 +1,5 @@
 import { native, isNative } from './native';
+import type { Print } from './prints';
 import type { NativeBridge, NativeResponse } from './native';
 import type {
   Avatar,
@@ -479,6 +480,13 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
       return Array.from(new Map([...online, ...offline].map((user) => [user.id, user])).values());
     },
     user: (id: string) => request<User>('/users/' + segment(id)),
+    userProfile: (id: string) => request<Record<string, unknown>>('/profile/' + segment(id)),
+    async boop(id: string): Promise<void> {
+      const response = await request<unknown>('/users/' + segment(id) + '/boop', 'POST', {});
+      const success = record(record(response)?.success);
+      if (!success || (typeof success.status_code === 'number' && (success.status_code < 200 || success.status_code >= 300)))
+        throw new ApiError('VRChat не подтвердил отправку Boop. Обновите профиль перед повторной попыткой.');
+    },
     searchUsers: (search: string, offset = 0) =>
       list<User>('/users' + query({ search, n: 50, offset })),
     friendRequest: (id: string) => request('/user/' + segment(id) + '/friendRequest', 'POST', {}),
@@ -763,7 +771,7 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
     deleteFile: (id: string) => request('/file/' + segment(id), 'DELETE'),
     inventory: (offset = 0) => list<InventoryItem>('/inventory' + query({ n: 100, offset })),
     prints: (userId: string, offset = 0) =>
-      list<VrcFile>('/prints/user/' + segment(userId) + query({ n: 100, offset })),
+      list<Print>('/prints/user/' + segment(userId) + query({ n: 100, offset })),
     deletePrint: (id: string) => request('/prints/' + segment(id), 'DELETE'),
     async uploadImage(file: File, tag: UploadTag): Promise<VrcFile> {
       ensureNative();

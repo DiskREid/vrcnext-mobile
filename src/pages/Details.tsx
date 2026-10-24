@@ -14,8 +14,10 @@ import {
   Check,
   Flag,
   Star,
+  Hand,
 } from 'lucide-react';
 import { api, native } from '../api';
+import { mergePublicProfile, readPublicProfile } from '../api/profile';
 import type { User, World, Group, CreateInstanceOptions } from '../api';
 import { useApp, useLoad } from '../state';
 import { demoFriends, demoWorlds, demoGroups } from '../demo';
@@ -107,13 +109,25 @@ export function UserDetails({ target, onClose }: { target: User | string; onClos
       ctx.demo ? Promise.resolve(demoFriends.find((x) => x.id === id) || ctx.user) : api.user(id),
     [id, ctx.refresh],
   );
-  const u = load.data;
+  const profile = useLoad(
+    () =>
+      ctx.demo
+        ? Promise.resolve({
+            bio: '',
+            ...demoFriends.find((x) => x.id === id),
+            ...(id === ctx.user.id ? ctx.user : {}),
+          })
+        : api.userProfile(id).then((value) => readPublicProfile(value, id)),
+    [id],
+  );
+  const u = load.data && mergePublicProfile(load.data, profile.data);
   const banner = useSecureImage(u?.profileBannerUrl);
   const [tab, setTab] = useState('profile'),
     [note, setNote] = useState(''),
     [fav, setFav] = useState(false),
     [confirm, setConfirm] = useState(''),
-    [selected, setSelected] = useState<string[]>([]);
+    [selected, setSelected] = useState<string[]>([]),
+    [booping, setBooping] = useState(false);
   const groups = useLoad(() => (ctx.demo ? Promise.resolve(demoGroups) : api.userGroups(id)), [id]);
   const mutual = useLoad(
     () =>
@@ -184,6 +198,21 @@ export function UserDetails({ target, onClose }: { target: User | string; onClos
                   Добавить
                 </button>
               )}
+              {(u.isFriend || u.friendKey) && u.id !== ctx.user.id && (
+                <button
+                  className="button secondary"
+                  disabled={booping}
+                  onClick={() => {
+                    setBooping(true);
+                    void ctx
+                      .act(() => api.boop(u.id), 'Boop отправлен')
+                      .finally(() => setBooping(false));
+                  }}
+                >
+                  <Hand size={16} />
+                  {booping ? 'Отправка…' : 'Boop'}
+                </button>
+              )}
               <button className="icon-button" aria-label="В избранное" onClick={() => setFav(!fav)}>
                 <Heart size={20} />
               </button>
@@ -200,7 +229,20 @@ export function UserDetails({ target, onClose }: { target: User | string; onClos
             />
             {tab === 'profile' && (
               <div className="form-stack">
-                <p className="preserve-lines">{u.bio || 'Описание пока не добавлено.'}</p>
+                {profile.loading && typeof u.bio !== 'string' ? (
+                  <Loading />
+                ) : (
+                  <>
+                    {profile.error && <ErrorState error={profile.error} retry={profile.reload} />}
+                    {typeof u.bio === 'string' ? (
+                      <p className="preserve-lines">
+                        {u.bio.trim() ? u.bio : 'Описание пока не добавлено.'}
+                      </p>
+                    ) : !profile.error ? (
+                      <p className="muted">VRChat не передал биографию в публичном профиле.</p>
+                    ) : null}
+                  </>
+                )}
                 {u.bioLinks?.map((link) => (
                   <button
                     key={link}

@@ -21,6 +21,26 @@ function fixture(responses: NativeResponse[] = []) {
 }
 const success = (data: unknown): NativeResponse => ({ status: 200, data });
 
+describe('public profile and real boop', () => {
+  it('loads bio using the separate public profile endpoint', async () => {
+    const {client,bridge} = fixture([success({bio:'hello'})]);
+    expect(await client.userProfile('usr_friend')).toEqual({bio:'hello'});
+    expect(bridge.request).toHaveBeenCalledWith({path:'/profile/usr_friend',method:'GET'});
+  });
+  it('posts a boop once and requires a server acknowledgement', async () => {
+    const {client,bridge} = fixture([success({success:{message:'User booped!',status_code:200}})]);
+    await expect(client.boop('usr_friend')).resolves.toBeUndefined();
+    expect(bridge.request).toHaveBeenCalledExactlyOnceWith({path:'/users/usr_friend/boop',method:'POST',body:'{}'});
+    await expect(fixture([success({})]).client.boop('usr_friend')).rejects.toThrow('не подтвердил');
+  });
+  it('propagates rate limits and friendship errors without automatic retries', async () => {
+    const {client,bridge} = fixture([{status:429,data:{},retryAfter:90}]);
+    await expect(client.boop('usr_friend')).rejects.toMatchObject({status:429,retryAfter:90});
+    expect(bridge.request).toHaveBeenCalledOnce();
+    await expect(fixture([{status:400,data:{error:{message:'These users are not friends'}}}]).client.boop('usr_other')).rejects.toThrow('These users are not friends');
+  });
+});
+
 describe('native VRChat authentication', () => {
   it('shows a fresh-install login without any anonymous network request or cookie clearing', async () => {
     const { client, bridge } = fixture();

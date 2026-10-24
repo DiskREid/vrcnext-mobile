@@ -22,9 +22,16 @@ function isProtectedImage(src: string) {
   }
 }
 /** Image bytes cross the bridge; authentication cookies stay in the native transport. */
-export function useSecureImage(src: string | undefined, enabled = true) {
+export function useSecureImage(
+  src: string | undefined,
+  enabled = true,
+  refreshKey: string | number = 0,
+  onLoadError?: () => void,
+) {
   const protectedImage = !!src && isNative && isProtectedImage(src);
   const [image, setImage] = useState<{ src: string; data: string }>();
+  const failure = useRef(onLoadError);
+  failure.current = onLoadError;
   useEffect(() => {
     if (!enabled) {
       setImage(undefined);
@@ -51,12 +58,15 @@ export function useSecureImage(src: string | undefined, enabled = true) {
         if (live) setImage({ src, data });
       })
       .catch(() => {
-        if (live) setImage({ src, data: '' });
+        if (live) {
+          setImage({ src, data: '' });
+          failure.current?.();
+        }
       });
     return () => {
       live = false;
     };
-  }, [src, enabled, protectedImage]);
+  }, [src, enabled, protectedImage, refreshKey]);
   return !protectedImage ? src : enabled && image?.src === src ? image.data : undefined;
 }
 export function clearImageCache() {
@@ -65,8 +75,14 @@ export function clearImageCache() {
 export default function SecureImage({
   src,
   loading = 'lazy',
+  refreshKey = 0,
+  onLoadError,
   ...props
-}: ImgHTMLAttributes<HTMLImageElement>) {
+}: ImgHTMLAttributes<HTMLImageElement> & {
+  /** An explicit retry re-requests failed media; no background retry loop. */
+  refreshKey?: string | number;
+  onLoadError?: () => void;
+}) {
   const ref = useRef<HTMLImageElement>(null);
   const [visible, setVisible] = useState(loading === 'eager');
   useEffect(() => {
@@ -88,7 +104,19 @@ export default function SecureImage({
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [loading, src]);
-  const resolved = useSecureImage(src, visible);
-  return <img ref={ref} {...props} src={resolved || undefined} loading={loading} />;
+  }, [loading, src, refreshKey]);
+  const resolved = useSecureImage(src, visible, refreshKey, onLoadError);
+  return (
+    <img
+      key={`${src}:${refreshKey}`}
+      ref={ref}
+      {...props}
+      src={resolved || undefined}
+      loading={loading}
+      onError={(event) => {
+        onLoadError?.();
+        props.onError?.(event);
+      }}
+    />
+  );
 }

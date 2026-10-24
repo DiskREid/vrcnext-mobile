@@ -44,6 +44,8 @@ import {
   Section,
 } from '../components/ui';
 import SecureImage from '../components/SecureImage';
+import { printDate, printMedia } from '../api/prints';
+import type { Print } from '../api/prints';
 import './Collections.css';
 
 const dateLabel = (
@@ -386,6 +388,7 @@ type CollectionItem = {
   kind: InventoryTab;
   worldId?: string;
   worldName?: string;
+  authorName?: string;
 };
 const inventoryTabs: { id: InventoryTab; label: string }[] = [
   { id: 'gallery', label: 'Фото' },
@@ -432,6 +435,69 @@ function inventoryItem(item: InventoryItem): CollectionItem {
     tags: [item.itemType || item.template?.itemType || ''].filter(Boolean),
     kind: 'inventory',
   };
+}
+function printItem(print: Print): CollectionItem {
+  const media = printMedia(print);
+  return {
+    id: print.id,
+    name: print.note || 'Принт VRChat',
+    image: media.thumbnail,
+    sourceUrl: media.original,
+    createdAt: printDate(print),
+    tags: [],
+    kind: 'prints',
+    worldId: print.worldId,
+    worldName: print.worldName,
+    authorName: print.authorName,
+  };
+}
+
+function CollectionPreview({
+  src,
+  alt,
+  refreshKey,
+  interactive = false,
+}: {
+  src: string;
+  alt: string;
+  refreshKey: string;
+  interactive?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => setFailed(false), [src, refreshKey]);
+  if (!src) return <span className="collection-media-status">Изображение недоступно</span>;
+  return (
+    <>
+      <SecureImage
+        src={src}
+        alt={alt}
+        refreshKey={`${refreshKey}:${attempt}`}
+        loading={interactive ? 'eager' : 'lazy'}
+        onLoadError={() => setFailed(true)}
+        onLoad={() => setFailed(false)}
+        style={failed ? { visibility: 'hidden' } : undefined}
+      />
+      {failed && (
+        <span className="collection-media-status" role="status">
+          Не удалось загрузить изображение.
+          {interactive ? (
+            <button
+              className="button secondary"
+              onClick={() => {
+                setFailed(false);
+                setAttempt((value) => value + 1);
+              }}
+            >
+              <RefreshCw size={16} /> Повторить
+            </button>
+          ) : (
+            <span>Откройте карточку, чтобы повторить.</span>
+          )}
+        </span>
+      )}
+    </>
+  );
 }
 function validProfileImage(item: CollectionItem) {
   if (!item.sourceUrl || !item.id.startsWith('file_')) return false;
@@ -492,8 +558,7 @@ export function InventoryPage() {
           }))
         : [];
     if (tab === 'inventory') return (await api.inventory(offset)).map(inventoryItem);
-    if (tab === 'prints')
-      return (await api.prints(user.id, offset)).map((item) => fileItem(item, tab));
+    if (tab === 'prints') return (await api.prints(user.id, offset)).map(printItem);
     if (tab === 'emoji') {
       const [staticEmoji, animatedEmoji] = await Promise.all([
         api.files('emoji', offset),
@@ -508,6 +573,11 @@ export function InventoryPage() {
     return (await api.files(tab, offset)).map((item) => fileItem(item, tab));
   }
   const load = useLoad<CollectionItem[]>(() => fetchItems(0), [pageKey, demo]);
+  const [mediaRevision, setMediaRevision] = useState(0);
+  function reload() {
+    setMediaRevision((value) => value + 1);
+    load.reload();
+  }
   useEffect(() => {
     if (load.data) {
       setItems(load.data);
@@ -600,7 +670,7 @@ export function InventoryPage() {
           <button
             className="icon-button"
             aria-label="Обновить инвентарь"
-            onClick={load.reload}
+            onClick={reload}
             disabled={load.loading}
           >
             <RefreshCw size={19} />
@@ -639,7 +709,7 @@ export function InventoryPage() {
       {load.loading ? (
         <Loading />
       ) : load.error ? (
-        <ErrorState error={load.error} retry={load.reload} />
+        <ErrorState error={load.error} retry={reload} />
       ) : items.length === 0 ? (
         <Empty
           title="Здесь пока пусто"
@@ -668,16 +738,11 @@ export function InventoryPage() {
                 className={`media-cover inventory-cover ${tab === 'icon' || tab === 'emoji' || tab === 'sticker' ? 'contain' : ''}`}
               >
                 <ImageIcon className="inventory-image-placeholder" size={38} />
-                {item.image && (
-                  <SecureImage
-                    src={item.image}
-                    alt=""
-                    loading="lazy"
-                    onError={(event) => {
-                      event.currentTarget.style.visibility = 'hidden';
-                    }}
-                  />
-                )}
+                <CollectionPreview
+                  src={item.image}
+                  alt=""
+                  refreshKey={`${pageKey}:${mediaRevision}`}
+                />
                 <div className="inventory-image-badges">
                   {item.tags.includes('emojianimated') && <Badge>АНИМ.</Badge>}
                   {tab === 'inventory' && item.tags[0] && <Badge>{item.tags[0]}</Badge>}
@@ -770,13 +835,19 @@ export function InventoryPage() {
             <>
               <div className="collection-image-view">
                 {selected.image ? (
-                  <SecureImage src={selected.image} alt={selected.name} />
+                  <CollectionPreview
+                    src={selected.sourceUrl || selected.image}
+                    alt={selected.name}
+                    refreshKey={`${pageKey}:${mediaRevision}`}
+                    interactive
+                  />
                 ) : (
                   <Empty title="Нет изображения" />
                 )}
               </div>
               <div className="form-stack">
                 {selected.createdAt && <p className="muted">{dateLabel(selected.createdAt)}</p>}
+                {selected.authorName && <p className="muted">Автор: {selected.authorName}</p>}
                 {selected.worldName && <p>{selected.worldName}</p>}
                 {(selected.kind === 'icon' || selected.kind === 'gallery') &&
                   validProfileImage(selected) && (

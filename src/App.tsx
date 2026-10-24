@@ -39,7 +39,9 @@ import { api, native, ApiError, isNative } from './api';
 import type { PluginListenerHandle } from '@capacitor/core';
 import { AppProvider, useApp, useLoad } from './state';
 import type { Activity as ActivityItem } from './state';
-import { demoUser, demoFriends, demoWorlds, demoEvents } from './demo';
+import { demoUser, demoWorlds, demoEvents } from './demo';
+import { useFriends } from './data/friends';
+import PullRefresh from './components/PullRefresh';
 import {
   PageHeader,
   Section,
@@ -88,6 +90,7 @@ export default function App() {
     [selectedWorld, setSelectedWorld] = useState<World | string | null>(null),
     [toast, setToast] = useState(''),
     [revision, setRevision] = useState(0),
+    [notificationsRefresh, setNotificationsRefresh] = useState(0),
     [online, setOnline] = useState(navigator.onLine),
     [pipeline, setPipeline] = useState('connecting'),
     [activity, setActivity] = useState<ActivityItem[]>([]),
@@ -95,9 +98,9 @@ export default function App() {
     [showDemo, setShowDemo] = useState(true);
   const contentRef = useRef<HTMLElement>(null),
     mutationLock = useRef(false),
-    refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     pipelineConnected = useRef(false);
+  const friends = useFriends(user?.id, demo, revision);
   const notify = (text: string) => {
     clearTimeout(toastTimer.current);
     setToast(text);
@@ -207,8 +210,8 @@ export default function App() {
               (event.content.user as Record<string, unknown> | undefined)?.displayName || userId,
             ),
           );
-        clearTimeout(refreshTimer.current);
-        refreshTimer.current = setTimeout(refresh, 2000);
+        friends.apply(event);
+        if (event.type.startsWith('notification')) setNotificationsRefresh((v) => v + 1);
       });
       if (!live) {
         await h.remove();
@@ -231,7 +234,6 @@ export default function App() {
     });
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        refresh();
         if (!pipelineConnected.current) void native.connectPipeline().catch(() => {});
       }
     };
@@ -239,7 +241,6 @@ export default function App() {
     return () => {
       live = false;
       handles.forEach((h) => void h.remove());
-      clearTimeout(refreshTimer.current);
       document.removeEventListener('visibilitychange', onVisible);
       void native.disconnectPipeline();
       pipelineConnected.current = false;
@@ -298,6 +299,8 @@ export default function App() {
         demo,
         online,
         refresh: revision,
+        friends,
+        notificationsRefresh,
         notify,
         act,
         openUser: (target) => {
@@ -442,7 +445,7 @@ export default function App() {
           {pending > 0 && (
             <div className="progress-line" aria-label="Выполняется действие" role="status" />
           )}
-          <main ref={contentRef} className="main-content" id="main-content">
+          <PullRefresh mainRef={contentRef} onRefresh={refresh}>
             {screen === 'home' ? (
               <HomePage navigate={navigate} />
             ) : screen === 'friends' ? (
@@ -471,7 +474,7 @@ export default function App() {
             <footer className="page-footer">
               VRCNext Mobile <span>✦</span> Рядом с вашими мирами
             </footer>
-          </main>
+          </PullRefresh>
           <nav className="bottom-nav" aria-label="Основная навигация">
             {tabs.map((t) => (
               <button
@@ -512,10 +515,7 @@ export default function App() {
 }
 function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
   const ctx = useApp();
-  const data = useLoad(
-    () => (ctx.demo ? Promise.resolve(demoFriends) : api.allOnlineFriends()),
-    [ctx.refresh],
-  );
+  const data = { ...ctx.friends, data: ctx.friends.data.filter((f) => f.location !== 'offline' && f.state !== 'offline') };
   const online = data.data?.filter((f) => f.location && f.location !== 'offline') || [];
   const worlds = useLoad(async () => {
     if (ctx.demo) return demoWorlds;
@@ -528,7 +528,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
     ];
     const result = await Promise.allSettled(unique.slice(0, 8).map((id) => api.world(id)));
     return result.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
-  }, [data.data, ctx.demo]);
+  }, [(data.data || []).map((f) => f.location?.split(':')[0]).filter((x) => x?.startsWith('wrld_')).sort().join(','), ctx.demo]);
   return (
     <>
       <PageHeader
@@ -718,17 +718,11 @@ function FriendsPage() {
     }, 350);
     return () => clearTimeout(t);
   }, [query, search]);
-  const friends = useLoad(
-    () =>
-      ctx.demo
-        ? Promise.resolve(demoFriends)
-        : search && debounced
-          ? api.searchUsers(debounced, page * 50)
-          : search
-            ? Promise.resolve([])
-            : api.allFriends(),
+  const results = useLoad(
+    () => ctx.demo ? Promise.resolve(ctx.friends.data) : search && debounced ? api.searchUsers(debounced, page * 50) : Promise.resolve([]),
     [ctx.refresh, search, debounced, page],
   );
+  const friends = search ? results : ctx.friends;
   useEffect(() => {
     if (search && friends.data)
       setPeople((p) =>
@@ -837,6 +831,7 @@ function FriendsPage() {
 }
 const notificationLabel = (type: string) =>
   ({
+    boop: 'Boop от друга',
     friendRequest: 'Заявка в друзья',
     invite: 'Приглашение',
     requestInvite: 'Запрос приглашения',
@@ -868,7 +863,7 @@ function NotificationsPage() {
             },
           ] as Notification[])
         : api.notifications(offset),
-    [ctx.refresh, offset],
+    [ctx.refresh, ctx.notificationsRefresh, offset],
   );
   useEffect(() => {
     if (load.data)

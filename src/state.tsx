@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import type { FriendState } from './data/friends';
 import type { ReactNode } from 'react';
 import type { User, World } from './api';
 export type Activity = { id: string; title: string; detail: string; time: string };
@@ -8,6 +9,8 @@ export type AppState = {
   demo: boolean;
   online: boolean;
   refresh: number;
+  friends: FriendState;
+  notificationsRefresh: number;
   notify: (text: string) => void;
   act: <T>(operation: () => Promise<T>, success?: string) => Promise<T | undefined>;
   openUser: (user: User | string) => void;
@@ -27,14 +30,15 @@ export function useLoad<T>(loader: () => Promise<T>, deps: unknown[] = []) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
+  const loaded = useRef(false);
   useEffect(() => {
     let live = true;
-    setLoading(true);
+    setLoading(!loaded.current);
     setError('');
     Promise.resolve()
       .then(loader)
       .then((v) => {
-        if (live) setData(v);
+        if (live) { loaded.current = true; setData(v); }
       })
       .catch((e) => {
         if (live) setError(e instanceof Error ? e.message : String(e));

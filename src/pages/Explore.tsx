@@ -1,5 +1,5 @@
 import SecureImage from '../components/SecureImage';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Check,
@@ -22,6 +22,7 @@ import { api } from '../api';
 import type { Avatar, Group, World, FavoriteType, GroupPost, VrcFile } from '../api';
 import { demoAvatars, demoGroups, demoWorlds } from '../demo';
 import { useApp, useLoad } from '../state';
+import { usePaged } from '../hooks/usePaged';
 import {
   AvatarImage,
   Badge,
@@ -60,79 +61,6 @@ function useDebounced(value: string) {
     return () => clearTimeout(timer);
   }, [value]);
   return debounced;
-}
-
-function usePaged<T extends { id: string }>(
-  loader: (offset: number) => Promise<T[]>,
-  deps: unknown[],
-  pageSize = 50,
-) {
-  const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [moreLoading, setMoreLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState('');
-  const [revision, setRevision] = useState(0);
-  const generation = useRef(0);
-  const offsetRef = useRef(0);
-  const busyRef = useRef(false);
-  useEffect(() => {
-    const current = ++generation.current;
-    setLoading(true);
-    setItems([]);
-    setError('');
-    setMoreLoading(false);
-    offsetRef.current = 0;
-    busyRef.current = false;
-    loader(0)
-      .then((result) => {
-        if (current !== generation.current) return;
-        setItems(result);
-        offsetRef.current = result.length;
-        setHasMore(result.length >= pageSize);
-      })
-      .catch((e) => {
-        if (current === generation.current) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (current === generation.current) setLoading(false);
-      });
-    return () => {
-      generation.current++;
-    };
-  }, [...deps, revision]);
-  async function loadMore() {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setMoreLoading(true);
-    setError('');
-    const current = generation.current;
-    try {
-      const result = await loader(offsetRef.current);
-      if (current !== generation.current) return;
-      offsetRef.current += result.length;
-      const seen = new Set(items.map((i) => i.id));
-      const additions = result.filter((i) => !seen.has(i.id));
-      setHasMore(result.length >= pageSize && additions.length > 0);
-      setItems((previous) => [...previous, ...additions]);
-    } catch (e) {
-      if (current === generation.current) setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (current === generation.current) {
-        busyRef.current = false;
-        setMoreLoading(false);
-      }
-    }
-  }
-  return {
-    items,
-    loading,
-    moreLoading,
-    hasMore,
-    error,
-    loadMore,
-    reload: () => setRevision((v) => v + 1),
-  };
 }
 
 export function PlatformBadges({ packages }: { packages: unknown }) {
@@ -226,7 +154,9 @@ function Worlds() {
       if (/^wrld_[0-9a-f-]{36}$/i.test(search)) return offset ? [] : [await api.world(search)];
       return api.worlds(search, offset, mode);
     },
-    [demo, search, mode, refresh],
+    [demo, search, mode],
+    50,
+    refresh,
   );
   return (
     <>
@@ -237,8 +167,10 @@ function Worlds() {
           title="Обновить миры"
           aria-label="Обновить миры"
           onClick={page.reload}
+          disabled={page.loading || page.refreshing || page.moreLoading}
+          aria-busy={page.refreshing}
         >
-          <RefreshCw size={18} />
+          <RefreshCw size={18} className={page.refreshing ? 'spin' : undefined} />
         </button>
       </div>
       <div className="explore-filters">
@@ -315,7 +247,7 @@ function Worlds() {
           {!demo && (
             <MoreResults
               hasMore={page.hasMore}
-              loading={page.moreLoading}
+              loading={page.moreLoading || page.refreshing}
               onClick={page.loadMore}
             />
           )}
@@ -344,14 +276,22 @@ function Groups() {
       if (search) return api.searchGroups(search, offset);
       return offset ? [] : (await api.groups(user.id)).map(normalizeGroup);
     },
-    [demo, user.id, search, refresh],
+    [demo, user.id, search],
+    50,
+    refresh,
   );
   return (
     <>
       <div className="toolbar">
         <SearchField value={query} onChange={setQuery} placeholder="Найти группу по названию" />
-        <button className="icon-button" aria-label="Обновить группы" onClick={page.reload}>
-          <RefreshCw size={18} />
+        <button
+          className="icon-button"
+          aria-label="Обновить группы"
+          onClick={page.reload}
+          disabled={page.loading || page.refreshing || page.moreLoading}
+          aria-busy={page.refreshing}
+        >
+          <RefreshCw size={18} className={page.refreshing ? 'spin' : undefined} />
         </button>
       </div>
       <p className="explore-list-label">{search ? 'РЕЗУЛЬТАТЫ ПОИСКА' : 'ВАШИ СООБЩЕСТВА'}</p>
@@ -401,7 +341,7 @@ function Groups() {
           {!demo && search && (
             <MoreResults
               hasMore={page.hasMore}
-              loading={page.moreLoading}
+              loading={page.moreLoading || page.refreshing}
               onClick={page.loadMore}
             />
           )}
@@ -816,8 +756,9 @@ function Avatars() {
         return search ? api.searchPublicAvatars(query.trim(), Math.floor(offset / 20)) : [];
       return api.avatars(mode, offset);
     },
-    [demo, mode, refresh, mode === 'public' ? search : ''],
+    [demo, user.id, mode, mode === 'public' ? search : ''],
     mode === 'public' ? 20 : 50,
+    refresh,
   );
   const filtered =
     mode === 'public'
@@ -854,8 +795,14 @@ function Avatars() {
               : 'Поиск в загруженных аватарах или avtr_…'
           }
         />
-        <button className="icon-button" aria-label="Обновить аватары" onClick={page.reload}>
-          <RefreshCw size={18} />
+        <button
+          className="icon-button"
+          aria-label="Обновить аватары"
+          onClick={page.reload}
+          disabled={page.loading || page.refreshing || page.moreLoading}
+          aria-busy={page.refreshing}
+        >
+          <RefreshCw size={18} className={page.refreshing ? 'spin' : undefined} />
         </button>
       </div>
       <div className="explore-filters">
@@ -943,7 +890,7 @@ function Avatars() {
           {!demo && (
             <MoreResults
               hasMore={page.hasMore}
-              loading={page.moreLoading}
+              loading={page.moreLoading || page.refreshing}
               onClick={page.loadMore}
             />
           )}

@@ -2859,3 +2859,6 @@ img {
 .auth-help .detail-actions {
   gap: 8px;
 }
+
+.pull-refresh { display:flex; align-items:center; justify-content:center; gap:10px; color:var(--accent); padding:12px; font-size:12px; }
+.main-content { overscroll-behavior-y: contain; }
