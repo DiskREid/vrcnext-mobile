@@ -1,5 +1,5 @@
 import SecureImage, { clearImageCache } from './components/SecureImage';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import {
   Home,
@@ -33,23 +33,26 @@ import {
   MapPin,
   Plus,
 } from 'lucide-react';
-import type { User, World, Notification, Group } from './api';
+import type { User, World, Notification, Group, CalendarEvent } from './api';
 import { App as AndroidApp } from '@capacitor/app';
 import { api, native, ApiError, isNative } from './api';
 import type { PluginListenerHandle } from '@capacitor/core';
-import { AppProvider, useApp, useLoad } from './state';
+import { AppProvider, PageScope, useApp, useLoad } from './state';
 import type { Activity as ActivityItem } from './state';
 import { demoUser, demoWorlds, demoEvents } from './demo';
 import { useFriends } from './data/friends';
 import { useHistory } from './data/history';
 import { useObservation } from './data/observation';
+import { useCalendarSync } from './data/calendar-sync';
+import { parseCalendarLink } from './api/calendar';
 import { presenceLabel } from './data/locations';
+import { reconcilePage } from './hooks/paged-data';
 import Feed from './pages/Feed';
 import FavoritesPage from './pages/Favorites';
 import Locations from './pages/Locations';
 import Social from './pages/Social';
-import GameLogPage from './pages/GameLog';
-import ChartsPage from './pages/Charts';
+const GameLogPage = lazy(() => import('./pages/GameLog'));
+const ChartsPage = lazy(() => import('./pages/Charts'));
 import { clearFavoriteEntityCache } from './api/favorites';
 import PullRefresh from './components/PullRefresh';
 import {
@@ -68,7 +71,7 @@ import {
 } from './components/ui';
 import Auth from './pages/Auth';
 import Explore, { GroupDetail } from './pages/Explore';
-import { CalendarPage, InventoryPage, MessengerPage } from './pages/Collections';
+import { CalendarPage, CalendarEventDetail, InventoryPage, MessengerPage } from './pages/Collections';
 import { ProfilePage, SettingsPage, TimelinePage, ModerationPage } from './pages/Personal';
 import { UserDetails, WorldDetails, statusName, rankOf } from './pages/Details';
 type Screen =
@@ -102,9 +105,13 @@ export default function App() {
     [demo, setDemo] = useState(false),
     [screen, setScreen] = useState<Screen>('home'),
     [previous, setPrevious] = useState<Screen>('home'),
+    [visited, setVisited] = useState<Screen[]>(['home']),
+    [pageRevisions, setPageRevisions] = useState<Partial<Record<Screen, number>>>({}),
+    [mutationRevision, setMutationRevision] = useState(0),
     [selectedUser, setSelectedUser] = useState<User | string | null>(null),
     [selectedWorld, setSelectedWorld] = useState<World | string | null>(null),
     [selectedGroup, setSelectedGroup] = useState<Group | null>(null),
+    [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null),
     [toast, setToast] = useState(''),
     [revision, setRevision] = useState(0),
     [notificationsRefresh, setNotificationsRefresh] = useState(0),
@@ -114,11 +121,14 @@ export default function App() {
     [pending, setPending] = useState(0),
     [showDemo, setShowDemo] = useState(true);
   const contentRef = useRef<HTMLElement>(null),
+    scrollPositions = useRef<Partial<Record<Screen, number>>>({}),
     mutationLock = useRef(false),
     toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
+    notificationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     pipelineConnected = useRef(false);
   const friends = useFriends(user?.id, demo, revision);
   const history = useHistory(user?.id, demo);
+  const calendarSync = useCalendarSync(user?.id, demo, online);
   const observation = useObservation(user, demo, online, pipeline === 'connected', friends, history, setUser);
   const pipelineSnapshot = useRef({friends, user, history});
   pipelineSnapshot.current = {friends, user, history};
@@ -135,13 +145,20 @@ export default function App() {
         200,
       ),
     );
-  const refresh = () => { clearFavoriteEntityCache(); setRevision((v) => v + 1); };
+  const refresh = () => {
+    clearFavoriteEntityCache();
+    setRevision((v) => v + 1);
+    setPageRevisions((current) => ({ ...current, [screen]: (current[screen] || 0) + 1 }));
+    if (screen === 'gameLog' || screen === 'charts') observation.refresh();
+    if (screen === 'calendar' || screen === 'notifications') calendarSync.refresh();
+  };
   const login = (u: User) => {
     clearImageCache();
     clearFavoriteEntityCache();
     setDemo(false);
     setUser(u);
     setScreen('home');
+    setVisited(['home']); setPageRevisions({}); scrollPositions.current = {};
     record('Вход в аккаунт', u.displayName);
   };
   const logout = async () => {
@@ -161,9 +178,11 @@ export default function App() {
     setDemo(false);
     setActivity([]);
     setScreen('home');
+    setVisited(['home']); setPageRevisions({}); scrollPositions.current = {};
     setSelectedUser(null);
     setSelectedWorld(null);
     setSelectedGroup(null);
+    setSelectedEvent(null);
   };
   const act = async <T,>(operation: () => Promise<T>, success?: string): Promise<T | undefined> => {
     if (demo) {
@@ -183,6 +202,7 @@ export default function App() {
         record(success);
       }
       refresh();
+      setMutationRevision((value) => value + 1);
       return result;
     } catch (e) {
       notify(e instanceof Error ? e.message : 'Не удалось выполнить действие');
@@ -194,10 +214,14 @@ export default function App() {
     }
   };
   const navigate = (s: Screen) => {
+    scrollPositions.current[screen] = contentRef.current?.scrollTop || 0;
     setPrevious(screen);
+    setVisited((current) => current.includes(s) ? current : [...current, s]);
     setScreen(s);
-    contentRef.current?.scrollTo({ top: 0, behavior: 'instant' });
   };
+  useLayoutEffect(() => {
+    contentRef.current?.scrollTo({ top: scrollPositions.current[screen] || 0, behavior: 'instant' });
+  }, [screen]);
   useEffect(() => {
     const c = localStorage.getItem('accent');
     if (c) document.documentElement.style.setProperty('--accent', c);
@@ -246,7 +270,7 @@ export default function App() {
             if (typeof partial.location === 'string') latest.history.observeSession({ ...partial, id, displayName: partial.displayName || latest.user.displayName }, latest.friends.refreshing ? [] : latest.friends.data, 'pipeline');
           }
         }
-        if (event.type.startsWith('notification')) setNotificationsRefresh((v) => v + 1);
+        if (event.type.startsWith('notification')) { clearTimeout(notificationTimer.current); notificationTimer.current = setTimeout(() => setNotificationsRefresh((v) => v + 1), 1000); }
       });
       if (!live) {
         await h.remove();
@@ -278,6 +302,7 @@ export default function App() {
       live = false;
       handles.forEach((h) => void h.remove());
       document.removeEventListener('visibilitychange', onVisible);
+      clearTimeout(notificationTimer.current);
       void native.disconnectPipeline();
       pipelineConnected.current = false;
     };
@@ -292,8 +317,7 @@ export default function App() {
         return;
       }
       if (user && screen !== 'home') {
-        setScreen('home');
-        contentRef.current?.scrollTo({ top: 0 });
+        navigate('home');
         return;
       }
       void AndroidApp.exitApp();
@@ -316,6 +340,7 @@ export default function App() {
             setUser(demoUser);
             setScreen('home');
             setShowDemo(true);
+            setVisited(['home']); setPageRevisions({}); scrollPositions.current = {};
           }}
         />
         {toast && (
@@ -338,20 +363,24 @@ export default function App() {
         friends,
         history,
         observation,
+        calendarSync,
         notificationsRefresh,
         notify,
         act,
         openUser: (target) => {
           setSelectedWorld(null);
           setSelectedGroup(null);
+          setSelectedEvent(null);
           setSelectedUser(target);
         },
         openWorld: (target) => {
           setSelectedUser(null);
           setSelectedGroup(null);
+          setSelectedEvent(null);
           setSelectedWorld(target);
         },
-        openGroup: (target) => { setSelectedUser(null); setSelectedWorld(null); setSelectedGroup(target); },
+        openGroup: (target) => { setSelectedUser(null); setSelectedWorld(null); setSelectedEvent(null); setSelectedGroup(target); },
+        openCalendarEvent: (target) => { setSelectedUser(null); setSelectedWorld(null); setSelectedGroup(null); setSelectedEvent(target); },
         onRefresh: refresh,
         logout,
         activity,
@@ -484,47 +513,37 @@ export default function App() {
               </button>
             </div>
           )}
+          {calendarSync.reminders[0] && <div className="calendar-reminder-banner" role="status">
+            <button onClick={() => { setSelectedUser(null); setSelectedWorld(null); setSelectedGroup(null); setSelectedEvent(calendarSync.reminders[0].event); calendarSync.dismissReminder(calendarSync.reminders[0].id); }}><CalendarDays size={17} /><span>Скоро: {calendarSync.reminders[0].event.title || 'Событие группы'}</span></button>
+            <button className="icon-button" aria-label="Скрыть напоминание события" onClick={() => calendarSync.dismissReminder(calendarSync.reminders[0].id)}><X size={16} /></button>
+          </div>}
           {pending > 0 && (
             <div className="progress-line" aria-label="Выполняется действие" role="status" />
           )}
           <PullRefresh mainRef={contentRef} onRefresh={refresh}>
-            {screen === 'home' ? (
-              <HomePage navigate={navigate} />
-            ) : screen === 'friends' ? (
-              <FriendsPage />
-            ) : screen === 'explore' ? (
-              <Explore />
-            ) : screen === 'notifications' ? (
-              <NotificationsPage />
-            ) : screen === 'more' ? (
-              <MorePage navigate={navigate} />
-            ) : screen === 'profile' ? (
-              <ProfilePage onUpdated={setUser} />
-            ) : screen === 'calendar' ? (
-              <CalendarPage />
-            ) : screen === 'inventory' ? (
-              <InventoryPage />
-            ) : screen === 'messenger' ? (
-              <MessengerPage />
-            ) : screen === 'charts' ? (
-              <ChartsPage />
-            ) : screen === 'gameLog' ? (
-              <GameLogPage />
-            ) : screen === 'social' ? (
-              <Social />
-            ) : screen === 'favorites' ? (
-              <FavoritesPage />
-            ) : screen === 'locations' ? (
-              <Locations />
-            ) : screen === 'feed' ? (
-              <Feed />
-            ) : screen === 'timeline' ? (
-              <TimelinePage />
-            ) : screen === 'moderation' ? (
-              <ModerationPage />
-            ) : (
-              <SettingsPage />
-            )}
+            {visited.map((page) => <section key={page} hidden={screen !== page} className="retained-screen" data-screen={page}>
+              <PageScope active={screen === page} refresh={mutationRevision + (pageRevisions[page] || 0)}>
+                <Suspense fallback={<Loading />}>
+                  {page === 'home' ? <HomePage navigate={navigate} />
+                    : page === 'friends' ? <FriendsPage />
+                    : page === 'explore' ? <Explore />
+                    : page === 'notifications' ? <NotificationsPage />
+                    : page === 'more' ? <MorePage navigate={navigate} />
+                    : page === 'profile' ? <ProfilePage onUpdated={setUser} />
+                    : page === 'calendar' ? <CalendarPage />
+                    : page === 'inventory' ? <InventoryPage />
+                    : page === 'messenger' ? <MessengerPage />
+                    : page === 'charts' ? <ChartsPage />
+                    : page === 'gameLog' ? <GameLogPage />
+                    : page === 'social' ? <Social />
+                    : page === 'favorites' ? <FavoritesPage />
+                    : page === 'locations' ? <Locations />
+                    : page === 'feed' ? <Feed />
+                    : page === 'timeline' ? <TimelinePage />
+                    : page === 'moderation' ? <ModerationPage /> : <SettingsPage />}
+                </Suspense>
+              </PageScope>
+            </section>)}
             <footer className="page-footer">
               VRCNext Mobile <span>✦</span> Рядом с вашими мирами
             </footer>
@@ -547,6 +566,7 @@ export default function App() {
           </nav>
         </div>
       </div>
+      {selectedEvent && <CalendarEventDetail initial={selectedEvent} onClose={() => setSelectedEvent(null)} />}
       {selectedGroup && <GroupDetail initial={selectedGroup} onClose={() => setSelectedGroup(null)} onChanged={refresh} />}
       {selectedUser && <UserDetails target={selectedUser} onClose={() => setSelectedUser(null)} />}
       {selectedWorld && (
@@ -570,6 +590,7 @@ export default function App() {
 }
 function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
   const ctx = useApp();
+  const worldSnapshot = useRef<World[]>([]);
   const data = { ...ctx.friends, data: ctx.friends.data.filter((f) => f.location !== 'offline' && f.state !== 'offline') };
   const online = data.data?.filter((f) => f.location && f.location !== 'offline') || [];
   const worlds = useLoad(async () => {
@@ -582,8 +603,11 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
       ),
     ];
     const result = await Promise.allSettled(unique.slice(0, 8).map((id) => api.world(id)));
-    return result.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
-  }, [(data.data || []).map((f) => f.location?.split(':')[0]).filter((x) => x?.startsWith('wrld_')).sort().join(','), ctx.demo]);
+    const incoming = result.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+    if (result.length && !incoming.length) throw new Error('Не удалось загрузить миры друзей. Повторите обновление.');
+    worldSnapshot.current = reconcilePage(worldSnapshot.current, incoming);
+    return worldSnapshot.current;
+  }, [[...new Set((data.data || []).map((f) => f.location?.split(':')[0]).filter((x) => x?.startsWith('wrld_')))].sort().join(','), ctx.demo, ctx.refresh]);
   return (
     <>
       <PageHeader
@@ -690,6 +714,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
           </MoreButton>
         }
       >
+        {worlds.error && <ErrorState error={worlds.error} retry={worlds.reload} />}
         {worlds.loading ? (
           <Loading />
         ) : worlds.data?.length ? (
@@ -792,7 +817,7 @@ function FriendsPage() {
       (filter === 'all' ||
         (filter === 'online' && (f.location === 'private' || f.location?.startsWith('wrld_'))) ||
         (filter === 'web' && (f.state === 'online' || f.state === 'active') && f.location !== 'private' && !f.location?.startsWith('wrld_')) ||
-        (filter === 'offline' && (f.status === 'offline' || f.state === 'offline'))),
+        (filter === 'offline' && !f.location?.startsWith('wrld_') && f.location !== 'private' && f.state !== 'online' && f.state !== 'active')),
   );
   return (
     <>
@@ -887,20 +912,36 @@ const notificationLabel = (type: string) =>
     inviteResponse: 'Ответ на приглашение',
     requestInviteResponse: 'Ответ на запрос',
     'group.announcement': 'Объявление группы',
+    'group.event.created': 'Новое событие группы',
+    'group.event.starting': 'Событие группы скоро начнётся',
+    'event.announcement': 'Объявление мероприятия',
     'group.invite': 'Приглашение в группу',
     'group.joinRequest': 'Запрос в группу',
     groupAnnouncement: 'Объявление группы',
   })[type] || 'Уведомление VRChat';
+function GroupEventNotices() {
+  const ctx = useApp();
+  const upcoming = ctx.calendarSync.events.filter((event) => Date.parse(event.startsAt || event.startDate || '') > Date.now()).sort((a,b) => Date.parse(a.startsAt || a.startDate || '') - Date.parse(b.startsAt || b.startDate || ''));
+  if (ctx.demo) return null;
+  return <section className="section group-event-notices">
+    <div className="section-heading"><h2>Предстоящие события групп</h2><button className="text-button" disabled={ctx.calendarSync.loading} onClick={ctx.calendarSync.refresh}>Обновить события</button></div>
+    {ctx.calendarSync.error && <ErrorState error={ctx.calendarSync.error} retry={ctx.calendarSync.refresh} />}
+    <p className="muted small">Синхронизация раз в 5 минут при открытом приложении.{ctx.calendarSync.lastSync ? ` Последняя: ${new Date(ctx.calendarSync.lastSync).toLocaleString('ru')}.` : ''}</p>
+    {ctx.calendarSync.loading && !upcoming.length ? <Loading /> : !upcoming.length ? <p className="muted">Предстоящих событий в полученных данных нет.</p> : upcoming.slice(0, 8).map((event) => <button key={event.id} className="card group-event-notice" onClick={() => ctx.openCalendarEvent(event)}><CalendarDays size={19} /><span><strong>{event.title || event.name || 'Событие группы'}</strong><small>{event.group?.name || event.groupId || 'Группа'} · {new Date(event.startsAt || event.startDate!).toLocaleString('ru')}</small>{event.description && <small className="group-event-excerpt">{event.description}</small>}</span><ChevronRight size={17} /></button>)}
+  </section>;
+}
 function NotificationsPage() {
   const ctx = useApp(),
     [offset, setOffset] = useState(0),
     [items, setItems] = useState<Notification[]>([]),
     [response, setResponse] = useState<Notification | null>(null),
     [text, setText] = useState('');
+  const scope = `${ctx.pageActive !== false}:${ctx.refresh}:${ctx.notificationsRefresh}:${offset}`;
+  const observation = useRef({ scope, generation: 0 });
+  if (observation.current.scope !== scope) observation.current = { scope, generation: observation.current.generation + 1 };
   const load = useLoad(
-    () =>
-      ctx.demo
-        ? Promise.resolve([
+    async () => {
+      if (ctx.demo) return {items: [
             {
               id: 'demo_invite',
               type: 'invite',
@@ -910,16 +951,23 @@ function NotificationsPage() {
               created_at: new Date().toISOString(),
               details: { worldId: 'wrld_demo1:demo' },
             },
-          ] as Notification[])
-        : api.notifications(offset),
+          ] as Notification[], hasMore: false};
+      const generation = observation.current.generation;
+      const isCurrent = () => observation.current.generation === generation;
+      const page = await api.notificationPage(offset, isCurrent);
+      if (!isCurrent()) return { items: [], hasMore: false };
+      // Modern V2 is a recent snapshot. Refresh it even while older V1 pages are open.
+      const head = offset ? (await api.notificationPage(0, isCurrent)).items : [];
+      return { items: [...head, ...page.items], hasMore: page.hasMore };
+    },
     [ctx.refresh, ctx.notificationsRefresh, offset],
   );
   useEffect(() => {
     if (load.data)
       setItems((p) =>
         offset === 0
-          ? load.data!
-          : Array.from(new Map([...p, ...load.data!].map((n) => [n.id, n])).values()),
+          ? load.data!.items
+          : Array.from(new Map([...p, ...load.data!.items].map((n) => [n.id, n])).values()),
       );
   }, [load.data]);
   const action = (operation: () => Promise<unknown>, success: string, id: string) =>
@@ -939,6 +987,7 @@ function NotificationsPage() {
         title="Уведомления"
         subtitle="Приглашения, друзья и события групп"
       />
+      <GroupEventNotices />
       {load.loading && !items.length ? (
         <Loading />
       ) : load.error ? (
@@ -966,12 +1015,12 @@ function NotificationsPage() {
                 <div className="notification-meta">
                   <Badge>{notificationLabel(n.type)}</Badge>
                   <time>
-                    {new Date(n.created_at || n.createdAt || Date.now()).toLocaleString('ru', {
+                    {n.created_at || n.createdAt ? new Date(n.created_at || n.createdAt!).toLocaleString('ru', {
                       day: 'numeric',
                       month: 'short',
                       hour: '2-digit',
                       minute: '2-digit',
-                    })}
+                    }) : 'Время не передано'}
                   </time>
                 </div>
                 <button
@@ -987,7 +1036,7 @@ function NotificationsPage() {
                       className="button primary compact"
                       onClick={() =>
                         action(
-                          () => api.acceptNotification(n, ctx.user.location),
+                          async () => { await api.acceptNotification(n, ctx.user.location); if (n.type === 'friendRequest' && n.senderUserId) ctx.history.recordFriendAction(n.senderUserId, n.senderUsername || n.senderUserId, 'friend-add'); },
                           'Запрос принят',
                           n.id,
                         )
@@ -1025,8 +1074,15 @@ function NotificationsPage() {
                       Пригласить
                     </button>
                   )}
+                  {parseCalendarLink(n._link || n.link) && <button className="button secondary compact" onClick={() => {
+                    const link = parseCalendarLink(n._link || n.link)!;
+                    ctx.openCalendarEvent({ id: link.eventId, groupId: link.groupId, title: n.title || 'Событие группы' });
+                  }}>Открыть мероприятие</button>}
+                  {n.seen !== true && <button className="button secondary compact" onClick={() => void ctx.act(async () => { await api.readNotification(n); setItems((current) => current.map((item) => item.id === n.id ? {...item, seen:true} : item)); }, 'Уведомление прочитано')}>Прочитано</button>}
                   <button
                     className="button secondary compact"
+                    disabled={n.canDelete === false}
+                    title={n.canDelete === false ? 'VRChat не разрешает удаление этого уведомления' : undefined}
                     onClick={() =>
                       action(() => api.dismissNotification(n), 'Уведомление скрыто', n.id)
                     }
@@ -1039,8 +1095,8 @@ function NotificationsPage() {
           ))}
         </div>
       )}
-      {(load.data?.length || 0) >= 100 && (
-        <button className="button secondary load-more" onClick={() => setOffset((o) => o + 100)}>
+      {load.data?.hasMore && (
+        <button className="button secondary load-more" disabled={load.loading} onClick={() => setOffset((o) => o + 100)}>
           Загрузить ещё
         </button>
       )}

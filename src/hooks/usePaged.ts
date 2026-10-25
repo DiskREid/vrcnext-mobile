@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { AppContext } from '../state';
 import { emptyPage, PagedData } from './paged-data';
 
 /** Query changes reset; an explicit refresh keeps cards, ordering and every loaded page. */
@@ -8,6 +9,7 @@ export function usePaged<T extends { id: string }>(
   pageSize = 50,
   refreshToken?: unknown,
 ) {
+  const active = useContext(AppContext)?.pageActive !== false;
   const key = JSON.stringify(queryDeps);
   const [state, setState] = useState(() => emptyPage<T>(key));
   const pager = useRef<PagedData<T> | null>(null);
@@ -17,14 +19,18 @@ export function usePaged<T extends { id: string }>(
   const previousRefresh = useRef(refreshToken);
   useEffect(() => {
     const controller = pager.current!;
+    if (!active) return;
+    // A completed retained query remains visible until an explicit invalidation/refresh.
+    if (controller.state.key === key && !controller.state.loading) return () => controller.cancel();
     void controller.reset(key, latestLoader.current, pageSize);
     return () => controller.cancel();
-  }, [key, pageSize]);
+  }, [key, pageSize, active]);
   useEffect(() => {
+    if (!active) return;
     if (Object.is(previousRefresh.current, refreshToken)) return;
     previousRefresh.current = refreshToken;
     void pager.current!.refresh();
-  }, [refreshToken]);
+  }, [refreshToken, active]);
   // Effects run after render: never briefly show another search/account's cards.
   const visible = state.key === key ? state : emptyPage<T>(key);
   return {

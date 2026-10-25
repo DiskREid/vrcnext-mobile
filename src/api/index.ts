@@ -1,5 +1,6 @@
 import { native, isNative } from './native';
 import type { Print } from './prints';
+import { normalizeCalendarEvent, normalizeCalendarPage } from './calendar';
 import type { NativeBridge, NativeResponse } from './native';
 import type {
   Avatar,
@@ -122,7 +123,11 @@ const jsonRecord = (value: unknown): Record<string, unknown> | undefined => {
   return record(value);
 };
 /** The desktop client merges both notification protocols and parses embedded JSON. */
-export function normalizeNotification(value: unknown, v2 = false): Notification {
+export function normalizeNotification(
+  value: unknown,
+  v2 = false,
+  protocol?: Notification['_protocol'],
+): Notification {
   const raw = record(value);
   if (!raw || typeof raw.id !== 'string' || typeof raw.type !== 'string')
     throw new ApiError('VRChat вернул некорректное уведомление.');
@@ -132,7 +137,10 @@ export function normalizeNotification(value: unknown, v2 = false): Notification 
     id: raw.id,
     type: raw.type,
     senderUserId: string(raw.senderUserId) || string(raw.senderId),
-    senderUsername: string(raw.senderDisplayName) || string(raw.senderUsername),
+    senderUsername:
+      string(raw.senderDisplayName) ||
+      string(raw.senderUsername) ||
+      (raw.type === 'boop' ? string(details.boopingUserDisplayName) : undefined),
     message:
       string(raw.message) ||
       string(details.responseMessage) ||
@@ -142,8 +150,11 @@ export function normalizeNotification(value: unknown, v2 = false): Notification 
     seen: raw.seen === true,
     details,
     _v2: v2 || raw._v2 === true,
+    _protocol: protocol || (v2 || raw._v2 === true ? 'modern-v2' : 'v1'),
+    canDelete: typeof raw.canDelete === 'boolean' ? raw.canDelete : undefined,
     _data: jsonRecord(raw.data) || jsonRecord(raw._data),
     _link: string(raw.link) || string(raw._link),
+    link: string(raw.link) || string(raw._link),
     title: string(raw.title),
     imageUrl: string(raw.imageUrl),
   };
@@ -249,7 +260,7 @@ function requireLocation(location: string) {
 
 /** All network I/O uses the native transport; browser preview never accepts account credentials. */
 export function createApi(transport: NativeBridge, available: () => boolean = () => true) {
-  let v2Supported = true;
+  let v2Protocol: 'unknown' | 'modern-v2' | 'legacy-v2' | 'unsupported' = 'unknown';
   let authenticatedUserId: string | undefined;
   function ensureNative() {
     if (!available())
@@ -370,7 +381,7 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
           'credentials',
         );
       }
-      v2Supported = true;
+      v2Protocol = 'unknown';
       authenticatedUserId = undefined;
       try {
         // Do not retain either credential beyond this request.
@@ -650,29 +661,46 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
         displayName,
       }),
     async notifications(offset = 0): Promise<Notification[]> {
+      return (await client.notificationPage(offset)).items;
+    },
+    async notificationPage(offset = 0, isCurrent: () => boolean = () => true): Promise<{ items: Notification[]; hasMore: boolean }> {
+      if (!isCurrent()) return { items: [], hasMore: false };
       const v1 = (
         await list<unknown>('/auth/user/notifications' + query({ n: 100, offset, hidden: false }))
       ).map((n) => normalizeNotification(n));
+      if (!isCurrent()) return { items: [], hasMore: false };
       const v2 = await client.notificationsV2(offset);
       // The same event can be returned by both endpoints; retain the v1 action identity.
       const merged = new Map(v1.map((n) => [n.id, n]));
       for (const n of v2) if (!merged.has(n.id)) merged.set(n.id, n);
-      return [...merged.values()].sort((a, b) =>
+      return { items: [...merged.values()].sort((a, b) =>
         (b.created_at || '').localeCompare(a.created_at || ''),
-      );
+      ), hasMore: v1.length >= 100 || (v2Protocol === 'legacy-v2' && v2.length >= 100) };
     },
     async notificationsV2(offset = 0): Promise<Notification[]> {
-      if (!v2Supported) return [];
-      try {
-        return (await list<unknown>('/auth/user/notificationsV2' + query({ n: 100, offset }))).map(
-          (n) => normalizeNotification(n, true),
-        );
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404) {
-          v2Supported = false;
-          return [];
+      if (!Number.isSafeInteger(offset) || offset < 0)
+        throw new ApiError('Некорректная страница уведомлений.');
+      if (v2Protocol === 'unsupported') return [];
+      // Modern V2 offers only a recent snapshot, not offset pagination. Do not repeatedly
+      // download it when the caller is loading older V1 notifications.
+      if (offset > 0 && v2Protocol !== 'legacy-v2') return [];
+      if (v2Protocol !== 'legacy-v2') {
+        try {
+          const result = await list<unknown>('/notifications' + query({ limit: 100 }));
+          v2Protocol = 'modern-v2';
+          return result.map((n) => normalizeNotification(n, true, 'modern-v2'));
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 404) throw error;
+          v2Protocol = 'legacy-v2';
         }
-        throw error;
+      }
+      try {
+        const result = await list<unknown>('/auth/user/notificationsV2' + query({ n: 100, offset }));
+        return result.map((n) => normalizeNotification(n, true, 'legacy-v2'));
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 404) throw error;
+        v2Protocol = 'unsupported';
+        return [];
       }
     },
     async acceptNotification(
@@ -693,7 +721,7 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
             'Уведомление не содержит идентификатор группы. Откройте группу вручную.',
           );
         await client.joinGroup(groupId);
-        return client.hideNotification(n.id);
+        return n.canDelete === false ? client.readNotification(n) : client.hideNotification(n);
       }
       if (n.type === 'group.joinRequest') {
         const userId =
@@ -707,7 +735,7 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
             'Уведомление не содержит группу или пользователя. Откройте запрос в VRChat.',
           );
         await client.respondGroupJoinRequest(groupId, userId, 'accept');
-        return client.hideNotification(n.id);
+        return n.canDelete === false ? client.readNotification(n) : client.hideNotification(n);
       }
       if (n.type === 'invite') {
         const location =
@@ -717,18 +745,29 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
               ? details.location
               : '';
         await client.inviteSelf(location);
-        return client.hideNotification(n.id);
+        return n.canDelete === false ? client.readNotification(n) : client.hideNotification(n);
       }
       if (n.type === 'requestInvite') {
         if (!n.senderUserId) throw new ApiError('Уведомление не содержит отправителя.');
         await client.invite(n.senderUserId, currentLocation || '');
-        return client.hideNotification(n.id);
+        return n.canDelete === false ? client.readNotification(n) : client.hideNotification(n);
       }
       return request('/auth/user/notifications/' + segment(n.id) + '/accept', 'PUT', {});
     },
-    hideNotification: (id: string) =>
-      request('/auth/user/notifications/' + segment(id) + '/hide', 'PUT', {}),
+    hideNotification: (notification: string | Notification) => {
+      const n = typeof notification === 'string' ? undefined : notification;
+      const id = typeof notification === 'string' ? notification : notification.id;
+      if (n?.canDelete === false)
+        throw new ApiError('VRChat не разрешает удалить это уведомление. Его можно отметить прочитанным.', 403);
+      return (n?._protocol || (n?._v2 ? 'modern-v2' : 'v1')) === 'modern-v2'
+        ? request('/notifications/' + segment(id), 'DELETE')
+        : request('/auth/user/notifications/' + segment(id) + '/hide', 'PUT', {});
+    },
     async dismissNotification(n: Notification): Promise<unknown> {
+      // Check before declining a group invitation: a blocked delete must not perform
+      // an unrelated remote mutation and then report the whole action as failed.
+      if (n.canDelete === false)
+        throw new ApiError('VRChat не разрешает удалить это уведомление. Его можно отметить прочитанным.', 403);
       const details = n.details || {};
       const groupId =
         n.type === 'group.invite' || n.type === 'group.joinRequest'
@@ -745,26 +784,29 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
         if (!userId) throw new ApiError('Не удалось определить отправителя запроса.');
         await client.respondGroupJoinRequest(groupId, userId, 'reject');
       }
-      return client.hideNotification(n.id);
+      return client.hideNotification(n);
     },
-    readNotification: (id: string) =>
-      request('/auth/user/notifications/' + segment(id) + '/see', 'PUT', {}),
-    calendar: (date: Date, filter: 'all' | 'following' = 'all', offset = 0) =>
-      list<CalendarEvent>(
-        '/calendar' +
-          (filter === 'following' ? '/following' : '') +
-          query({
-            date: new Date(Date.UTC(date.getFullYear(), date.getMonth(), 1)).toISOString(),
-            n: 100,
-            offset,
-          }),
-      ),
-    calendarEvent: (groupId: string, id: string) =>
-      request<CalendarEvent>('/calendar/' + segment(groupId) + '/' + segment(id)),
-    followEvent: (groupId: string, id: string, isFollowing: boolean) =>
-      request('/calendar/' + segment(groupId) + '/' + segment(id) + '/follow', 'POST', {
+    readNotification: (notification: string | Notification) => {
+      const n = typeof notification === 'string' ? undefined : notification;
+      const id = typeof notification === 'string' ? notification : notification.id;
+      return (n?._protocol || (n?._v2 ? 'modern-v2' : 'v1')) === 'modern-v2'
+        ? request('/notifications/' + segment(id) + '/see', 'POST', {})
+        : request('/auth/user/notifications/' + segment(id) + '/see', 'PUT', {});
+    },
+    async calendar(date: Date, filter: 'all' | 'following' = 'all', offset = 0) {
+      return (await client.calendarPage(date, filter, offset)).events;
+    },
+    calendarPage: async (date: Date, filter: 'all' | 'following' = 'all', offset = 0) =>
+      normalizeCalendarPage(await request<unknown>(
+        '/calendar' + (filter === 'following' ? '/following' : '') +
+          query({ date: new Date(Date.UTC(date.getFullYear(), date.getMonth(), 1)).toISOString(), n: 100, offset }),
+      ), offset, filter === 'following'),
+    calendarEvent: async (groupId: string, id: string) =>
+      normalizeCalendarEvent(await request<unknown>('/calendar/' + segment(groupId) + '/' + segment(id))),
+    followEvent: async (groupId: string, id: string, isFollowing: boolean) =>
+      normalizeCalendarEvent(await request<unknown>('/calendar/' + segment(groupId) + '/' + segment(id) + '/follow', 'POST', {
         isFollowing,
-      }),
+      })),
     files: (tag: UploadTag | 'emojianimated', offset = 0) =>
       list<VrcFile>('/files' + query({ tag, n: 100, offset })),
     file: (id: string) => request<VrcFile>('/file/' + segment(id)),

@@ -14,6 +14,23 @@ function deferred<T>() {
 }
 
 describe('paged query refresh', () => {
+  it('retains rows after leaving a screen during refresh and ignores the late response', async () => {
+    const late = deferred<Item[]>();
+    const page = new PagedData<Item>(() => {});
+    await page.reset('all', async () => [item('a'), item('b')], 2);
+    let pending = false;
+    await page.reset('all', () => pending ? late.promise : Promise.resolve([item('a'), item('b')]), 2);
+    pending = true;
+    const request = page.refresh();
+    page.cancel();
+    expect(page.state.refreshing).toBe(false);
+    expect(page.state.items.map((row) => row.id)).toEqual(['a', 'b']);
+    late.resolve([item('c')]);
+    await request;
+    expect(page.state.items.map((row) => row.id)).toEqual(['a', 'b']);
+    await page.refresh();
+    expect(page.state.items.map((row) => row.id)).toEqual(['c']);
+  });
   it('keeps loaded pages and row order while updating changed objects and pagination', async () => {
     let refreshing = false;
     const loader = vi.fn(async (offset: number) => {

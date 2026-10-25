@@ -8,12 +8,15 @@ VRCNext Mobile — самостоятельная неофициальная м�
 C#-слой VRChat API. Android не запускает этот исполняемый файл: мобильный интерфейс
 и нативный сетевой слой создаются отдельно по результатам изучения исходников.
 
-Матрица ниже обновлена по исходникам готовящейся мобильной версии 0.1.1: `src/App.tsx`,
+Матрица ниже обновлена по исходникам текущей доработки (этапы 1–5): `src/App.tsx`,
 `src/pages/`, `src/api/` и `android/app/src/main/java/com/diskreid/vrcnextmobile/`.
 Это **проверка наличия реализации**, а не подтверждение работы с реальным аккаунтом.
 Пользователь сообщил о вылете первого запуска 0.1.0 и об отказе после Email OTP.
 Вход, ответы серверов, изменения аккаунта и взаимодействие с Android/VRChat требуют
-повторной проверки исправлений по [плану испытаний](DEVICE_TEST_PLAN.md).
+проверки на физическом устройстве по [плану испытаний](DEVICE_TEST_PLAN.md).
+Установка и сборка APK не доказывают успешный вход или отсутствие вылета на HiOS.
+Неудачный WebView-тест эмулятора для 0.1.1 остаётся историческим результатом,
+а не подтверждением запуска этой доработки.
 Автоматические проверки с подставленным транспортом не заменяют такую проверку.
 
 Статусы:
@@ -31,6 +34,10 @@ C#-слой VRChat API. Android не запускает этот исполня�
 Демонстрационный режим показывает пример интерфейса и блокирует действия,
 изменяющие аккаунт. Его данные не являются доказательством работы VRChat API.
 
+Прямой Google/OAuth-вход в сторонний клиент не реализован: публичный контракт
+не даёт приложению зарегистрированного Google-flow для переноса сессии. Справка
+открывает официальный сайт; его cookie автоматически не переходят в Mobile.
+
 ## Объём мобильной версии
 
 По уточнению пользователя приложение сосредоточено на друзьях, аккаунте, мирах,
@@ -47,34 +54,34 @@ PC companion не является планируемым обязательны
 | Раздел / функция оригинала | Источник ПК | Текущий статус мобильной версии | Мобильная реализация |
 | --- | --- | --- | --- |
 | Вход, восстановление сессии, выход | `Services/VRChatAPI/AuthAPI.cs`, `VRChatApiService.cs` | Реализовано в коде. HTTPS и нативный cookie jar, AES-GCM с Android Keystore, собственный User-Agent; пароль не сохраняется. Нужна проверка входа и восстановления на устройстве. | `src/pages/Auth.tsx`, `src/api/index.ts`, `VrcNativePlugin.java`, `SecureCookieJar.java` |
-| Двухфакторная проверка TOTP и Email OTP | `Services/VRChatAPI/AuthAPI.cs` | Реализовано в коде. Выбор предложенного сервером метода и проверка кода; живые TOTP/Email OTP ещё не проверены. | `src/pages/Auth.tsx`, `src/api/index.ts` |
+| Двухфакторная проверка TOTP и Email OTP | `Services/VRChatAPI/AuthAPI.cs` | Реализовано в коде: серверные методы Email OTP/TOTP и резервный код, сохранение временной сессии между паролем и кодом, различение этапов ошибок. Исправлено отбрасывание документированных cookie без Secure; нужен новый живой вход со свежим кодом. | `src/pages/Auth.tsx`, `src/api/index.ts`, `SessionCookies.java` |
 | Несколько аккаунтов и переключение | `main/AuthController.cs`, `frontend/modules/settings/accounts.js` | Не реализовано. Хранится одна текущая сессия; другой аккаунт требует выхода и нового входа. | `src/pages/Auth.tsx`, `SecureCookieJar.java` |
 | Статус, текст статуса, местоимения | `Services/VRChatAPI/UsersAPI.cs` | Реализовано в коде: четыре статуса, текст до 32 символов, местоимения. Нужно подтвердить сохранение сервером. | `src/pages/Personal.tsx`, `src/api/index.ts` |
-| Биография, языки и социальные ссылки | `Services/VRChatAPI/UsersAPI.cs`, `frontend/modules/user-profile/profile-editor.js` | Реализовано в коде. Биография, коды языков через запятую, ссылки построчно; изменение через `/profile/{self}`. | `src/pages/Personal.tsx`, `src/api/index.ts` |
+| Биография, языки и социальные ссылки | `Services/VRChatAPI/UsersAPI.cs`, `frontend/modules/user-profile/profile-editor.js` | Реализовано в коде: отдельное чтение публичного `/profile/{id}`, объединение с `/users/{id}`, явная ошибка вместо ложного пустого Bio. Свой редактор не затирает введённый текст поздним ответом и не отправляет неизвестное поле как пустое. | `src/pages/Personal.tsx`, `src/pages/Details.tsx`, `src/api/profile.ts` |
 | Иконка, баннер, темы оформления профиля, значки | `Services/VRChatAPI/UsersAPI.cs`, `InventoryAPI.cs`, `FilesAPI.cs` | Частично: из инвентаря можно применить загруженную/существующую иконку и изображение галереи как баннер, с проверкой VRC+ и подтверждением. Полного редактора тем и значков нет; операции аккаунта не проверены на устройстве. | `src/api/index.ts`, `src/pages/Collections.tsx` |
 | Домашний мир | `Services/VRChatAPI/UsersAPI.cs` | Не реализовано: сценария установки homeLocation нет. | — |
-| Друзья: онлайн, в игре, web/active, офлайн | `Services/VRChatAPI/FriendsAPI.cs`, `frontend/core/sidebars/friends/friends.js` | Реализовано в коде: загрузка обеих категорий с пагинацией, поиск и фильтры. Друзья не сгруппированы в сворачиваемые секции как в оригинале. | `src/App.tsx`, `src/api/index.ts` |
-| Избранные друзья, группы избранного | `Services/VRChatAPI/FavoritesAPI.cs` | Частично: добавить друга в выбранную серверную группу. Отдельной закреплённой секции избранных, перемещения и удаления через интерфейс нет. | `src/pages/Details.tsx`, `src/api/index.ts` |
-| Просмотр профиля, доверительный ранг, последние посещения | `Services/VRChatAPI/UsersAPI.cs`, `frontend/core/modals/user-modal/user-modal.js` | Частично: профиль, ранг, статус, местоимения, 18+ отметка, bio, ссылки и местоположение, если открыто. Отдельное отображение last seen не перенесено. | `src/pages/Details.tsx` |
+| Друзья: онлайн, в игре, web/active, офлайн | `Services/VRChatAPI/FriendsAPI.cs`, `frontend/core/sidebars/friends/friends.js` | Реализовано в коде: полный список с пагинацией, поиск/фильтры, точечные WebSocket-изменения по ID. Нет перезагрузки всех списков по каждому событию; строки не пересортировываются при изменении присутствия. Private-инстанс отличается от активности сайта. | `src/App.tsx`, `src/data/friends.ts`, `src/pages/Social.tsx` |
+| Избранные друзья, группы избранного | `Services/VRChatAPI/FavoritesAPI.cs` | Реализовано в коде: отдельный раздел «Избранное», все доступные категории, статусы/местоположение и профиль; добавление, удаление и перемещение с подтверждением сервера. | `src/pages/Favorites.tsx`, `src/api/favorites.ts` |
+| Просмотр профиля, доверительный ранг, последние посещения | `Services/VRChatAPI/UsersAPI.cs`, `frontend/core/modals/user-modal/user-modal.js` | Реализовано в коде: 8 вкладок, публичное Bio, изображения, бейджи, языки, ID, даты API, доступный инстанс/его владелец/счётчики/известные друзья. Неизвестные ранг, даты и платформы не выдумываются. Данные доступны в форматированном раскрывающемся JSON с очисткой секретов, копированием и экспортом через Android picker. | `src/pages/Details.tsx`, `src/components/UserProfileTabs.tsx`, `src/api/profile-data.ts` |
 | Поиск людей, заявка в друзья, удаление из друзей | `Services/VRChatAPI/UsersAPI.cs`, `FriendsAPI.cs` | Реализовано в коде: поиск с пагинацией, отправка заявки, подтверждаемое удаление. Нужна проверка на контролируемом тестовом контакте. | `src/App.tsx`, `src/pages/Details.tsx` |
 | Заметки о пользователях | `Services/VRChatAPI/UsersAPI.cs` | Реализовано в коде: просмотр и сохранение заметки через `/userNotes`; нужна проверка редактирования, пустого текста и повторного открытия. | `src/pages/Details.tsx`, `src/api/index.ts` |
-| Общие друзья и группы | `Services/VRChatAPI/UsersAPI.cs` | Частично: группы пользователя и первая страница общих друзей. Общие группы и полная пагинация mutuals не перенесены. | `src/pages/Details.tsx`, `src/api/index.ts` |
-| Блокировка / заглушение и списки модерации | `Services/VRChatAPI/PlayerModerationAPI.cs` | Реализовано в коде: подтверждение block/mute, отдельные списки и обратное действие. Проверка реальных разрешений и результата требуется. | `src/pages/Details.tsx`, `src/pages/Personal.tsx` |
-| Boop | `Services/VRChatAPI/UsersAPI.cs` | Не реализовано. | — |
-| Панель активности друзей и миров | `frontend/modules/dashboard/dashboard.js`, `Services/VRChatAPI/VRChatWebSocketService.cs` | Частично: друзья и карточки максимум восьми доступных миров; агрегирование по инстансам и подробный список присутствующих друзей не совпадают с ПК-версией. | `src/App.tsx` |
-| События друзей и уведомления в реальном времени | `Services/VRChatAPI/VRChatWebSocketService.cs`, `Services/TimelineService.cs` | Реализовано в коде: нативный WebSocket, переподключение, обновление данных и краткая активность. Фоновый сервис Android отсутствует; соединение приостанавливается с приложением. | `src/App.tsx`, `VrcNativePlugin.java` |
-| Уведомления V1 / V2, заявки в друзья, приглашения | `Services/VRChatAPI/NotificationsAPI.cs`, `main/NotificationsController.cs` | Частично: объединение V1/V2, разбор JSON-полей, откат при V2 404, список в интерфейсе. Богатые toast-карточки оригинала и все типы действий не перенесены полностью. | `src/App.tsx`, `src/api/index.ts` |
-| Принять, скрыть, прочитать уведомление | `Services/VRChatAPI/NotificationsAPI.cs` | Частично: UI принятия friendRequest, group.invite и group.joinRequest, отклонения групповых запросов и скрытия. Прочтение есть только в API, массовой очистки нет. Все действия с реальными уведомлениями требуют проверки. | `src/App.tsx`, `src/api/index.ts` |
+| Общие друзья и группы | `Services/VRChatAPI/UsersAPI.cs` | Реализовано в коде: постраничные mutual friends и mutual groups, группы пользователя, переходы к профилю/группе. 403 и закрытые сведения не считаются успешной полной выборкой. | `src/components/UserProfileTabs.tsx`, `src/api/profile-data.ts` |
+| Блокировка / заглушение и списки модерации | `Services/VRChatAPI/PlayerModerationAPI.cs` | Реализовано в коде: подтверждаемые block/mute, отдельные списки Social/Moderation и снятие ограничений. Локальная запись добавляется после подтверждённого действия; старая серверная история не восстанавливается. | `src/pages/Details.tsx`, `src/pages/Social.tsx`, `src/data/history.ts` |
+| Boop | `Services/VRChatAPI/UsersAPI.cs` | Реализовано в коде: `POST /users/{id}/boop`, блокировка повторной отправки на время запроса, проверка серверного acknowledgement и показ ошибок/429. Кнопка для доступного друга, не для самого себя. Доставка реальному получателю ещё требует проверки. | `src/pages/Details.tsx`, `src/api/index.ts` |
+| Панель активности друзей и миров | `frontend/modules/dashboard/dashboard.js`, `Services/VRChatAPI/VRChatWebSocketService.cs` | Главная сохранена; добавлен отдельный Friends Locations: группировка по полному location, мир/изображение/тип, число друзей и переходы. Скрытые location разных друзей не объединяются в якобы общий инстанс. | `src/App.tsx`, `src/pages/Locations.tsx`, `src/data/locations.ts` |
+| События друзей и уведомления в реальном времени | `Services/VRChatAPI/VRChatWebSocketService.cs`, `Services/TimelineService.cs` | Реализовано в коде: нативный WebSocket с переподключением, точечные статусы и постоянная «Лента» с поиском и фильтрами. События между остановкой и возобновлением приложения не дорисовываются. Фоновый сервис Android отсутствует. | `src/App.tsx`, `src/pages/Feed.tsx`, `src/data/history.ts`, `VrcNativePlugin.java` |
+| Уведомления V1 / V2, заявки в друзья, приглашения | `Services/VRChatAPI/NotificationsAPI.cs`, `main/NotificationsController.cs` | Частично: объединение V1 и современного V2 `/notifications`, разбор JSON-полей, Boop и ссылок на события; fallback на старый V2 только при 404, дедупликация по ID. Ошибки 403/429 не скрываются как отсутствие уведомлений. Богатые toast-карточки оригинала и все типы действий не перенесены полностью. | `src/App.tsx`, `src/api/index.ts` |
+| Принять, скрыть, прочитать уведомление | `Services/VRChatAPI/NotificationsAPI.cs` | Реализовано в коде: UI принятия friendRequest, group.invite и group.joinRequest, отклонения групповых запросов, скрытия и отметки прочитанным. V1/V2 используют свои методы; `canDelete:false` запрещает удаление. Массовой очистки нет. Все действия с реальными уведомлениями требуют проверки. | `src/App.tsx`, `src/api/index.ts` |
 | Пригласить друга и запросить приглашение | `Services/VRChatAPI/InviteAPI.cs` | Реализовано в коде. Нужен действительный instance/location; недоступный location отклоняется. | `src/pages/Details.tsx`, `src/api/index.ts` |
 | Массовое приглашение | `main/InstanceController.cs`, `frontend/core/modals/friend-invite-modal/friend-invite-modal.js` | Частично: выбор друзей, последовательная отправка с паузой 1,5 секунды и прогрессом. Отмена уже выполняющейся очереди не реализована. | `src/pages/Details.tsx` |
 | Ответ на приглашение и приглашение с фото | `Services/VRChatAPI/InviteAPI.cs` | Частично: текстовый ответ через доступный response/requestResponse слот. Приглашения и ответы с фото отсутствуют. | `src/App.tsx`, `src/api/index.ts` |
 | Messenger: простые сообщения через приглашения | `Services/VRChatAPI/InviteAPI.cs`, `frontend/core/messenger/messenger.js` | Частично: список друзей, отправка до 60 символов, входящие msg-сообщения, 12 message-шаблонов, повторное использование текста и cooldown. Дополнительный request-пул, история переписки и сохранённая история ПК не перенесены. | `src/pages/Collections.tsx`, `src/api/index.ts` |
-| Популярные / активные миры, поиск и пагинация | `Services/VRChatAPI/WorldAPI.cs`, `frontend/modules/worlds/worlds.js` | Реализовано в коде: режимы популярные/активные, поиск по имени/ID, подгрузка страниц. | `src/pages/Explore.tsx`, `src/api/index.ts` |
+| Популярные / активные миры, поиск и пагинация | `Services/VRChatAPI/WorldAPI.cs`, `frontend/modules/worlds/worlds.js` | Реализовано в коде: режимы популярные/активные, поиск по имени/ID, страницы. Ручное обновление кнопкой/свайпом сохраняет карточки, порядок и загруженное окно; поздние ответы старого запроса отбрасываются. | `src/pages/Explore.tsx`, `src/hooks/usePaged.ts`, `src/hooks/paged-data.ts` |
 | Карточка мира: описание, автор, статистика, теги, платформы | `Services/VRChatAPI/WorldAPI.cs`, `frontend/core/modals/world-modal/world-modal.js` | Частично: описание, автор, онлайн, capacity, favorites, теги, PC/Android; посещения и время в мире в карточке не показаны. | `src/pages/Details.tsx`, `src/pages/Explore.tsx` |
-| Список инстансов и друзья в мире | `Services/VRChatAPI/WorldAPI.cs`, `InstancesAPI.cs` | Частично: открытые инстансы, число игроков, регион и приглашение себе. Полный состав игроков и список друзей по каждому инстансу не реализованы. | `src/pages/Details.tsx` |
+| Список инстансов и друзья в мире | `Services/VRChatAPI/WorldAPI.cs`, `InstancesAPI.cs` | Частично: доступные серверные сведения, регион/число игроков, приглашение себе; Friends Locations и профиль показывают известных друзей в точном инстансе. Полный состав чужого/приватного инстанса API не раскрывает. | `src/pages/Details.tsx`, `src/pages/Locations.tsx`, `src/components/UserProfileTabs.tsx` |
 | Собственные загруженные миры | `Services/VRChatAPI/WorldAPI.cs` | Реализовано в коде: режим «Мои миры» и пагинация. | `src/pages/Explore.tsx`, `src/api/index.ts` |
 | Редактирование / удаление собственного мира | `Services/VRChatAPI/WorldAPI.cs`, `FilesAPI.cs` | Не реализовано. Просмотр собственных миров не включает изменение или удаление. | — |
-| Избранные миры, перенос между группами, переименование групп | `Services/VRChatAPI/FavoritesAPI.cs` | Частично: список избранных, добавление в серверную группу, переименование групп. Перемещения/удаления записей и просмотра содержимого отдельной группы через UI нет. | `src/pages/Explore.tsx`, `src/pages/Details.tsx` |
+| Избранные миры, перенос между группами, переименование групп | `Services/VRChatAPI/FavoritesAPI.cs` | Реализовано в коде: все возвращённые группы `world` и `vrcPlusWorld` (включая 8, если доступны), содержимое каждой, поиск, добавление/удаление, перенос между типами и категориями, название/видимость группы. Ошибка переноса сверяется с сервером, исходные теги сохраняются для восстановления. В чужом профиле — публичные категории и `friends` только при подтверждённой свежим профилем дружбе; явное `isFriend:false` имеет приоритет над старым ключом. Чужие приватные категории не запрашиваются; серверный отказ содержимого показан явно. | `src/pages/Favorites.tsx`, `src/pages/Explore.tsx`, `src/api/favorites.ts`, `src/api/profile-data.ts` |
 | Создание обычного инстанса, регион, видимость | `Services/VRChatAPI/InstancesAPI.cs` | Реализовано в коде через POST /instances: Public, Friends+, Friends, Invite/Invite+, EU/US/USE/JP и приглашение себе. Отличается от локального построения location оригинала; нужны живые проверки. | `src/pages/Details.tsx`, `src/api/index.ts` |
 | Создание group/group+/group public инстанса | `Services/VRChatAPI/InstancesAPI.cs` | Частично: выбор группы, доступа и региона. Именование, queue, age gate и minimum avatar performance в UI отсутствуют; права проверяет сервер. | `src/pages/Details.tsx`, `src/api/index.ts` |
 | Пригласить себя, закрыть инстанс, короткая ссылка | `Services/VRChatAPI/InstancesAPI.cs` | Частично: приглашение себе. Закрытие и получение shortName отсутствуют. | `src/pages/Details.tsx`, `src/api/index.ts` |
@@ -85,21 +92,75 @@ PC companion не является планируемым обязательны
 | Участники, роли, заявки, приглашения, баны, журнал аудита | `Services/VRChatAPI/GroupsAPI.cs` | В основном не реализовано. В уведомлениях доступны ответ на group.joinRequest и group.invite; отдельного административного раздела участников, ролей, банов и аудита нет. | `src/api/index.ts` |
 | Галереи и активные инстансы группы | `Services/VRChatAPI/GroupsAPI.cs` | Реализовано в коде: выбор галереи, пагинация изображений, список доступных инстансов группы с переходом к миру. | `src/pages/Explore.tsx`, `src/api/index.ts` |
 | Создание / удаление группы | `Services/VRChatAPI/GroupsAPI.cs` | Не реализовано. | — |
-| Календарь событий: все / избранные / отслеживаемые, выбор месяца | `Services/VRChatAPI/CalendarAPI.cs`, `frontend/modules/calendar/calendar.js` | Частично: календарь, выбор дня/месяца, все/отслеживаемые, подгрузка и локальное время. Фильтр Featured отсутствует. | `src/pages/Collections.tsx`, `src/api/index.ts` |
-| Подробности события и подписка на него | `Services/VRChatAPI/CalendarAPI.cs` | Реализовано в коде: карточка события из полученного списка, подписка/отмена и переход к миру. Отдельный API загрузки подробностей есть, но не используется UI. | `src/pages/Collections.tsx`, `src/api/index.ts` |
+| Календарь событий: все / избранные / отслеживаемые, выбор месяца | `Services/VRChatAPI/CalendarAPI.cs`, `frontend/modules/calendar/calendar.js` | Частично: календарь, выбор дня/месяца, все/отслеживаемые, поиск, постраничное чтение с учётом `hasNext`/`totalCount`, названия групп и локальное время. Обновление сохраняет выбранный месяц/день. Фильтр Featured отсутствует. | `src/pages/Collections.tsx`, `src/api/calendar.ts` |
+| Подробности события и подписка на него | `Services/VRChatAPI/CalendarAPI.cs` | Реализовано в коде: отдельное чтение подробностей по действительным ID события/группы, описание, группа, время, переходы к группе/миру, подписка/отмена и повторное чтение `userInterest.isFollowing`. | `src/pages/Collections.tsx`, `src/api/calendar.ts`, `src/api/index.ts` |
+| Ближайшие события и напоминания | `frontend/modules/calendar/`, `Services/VRChatAPI/CalendarAPI.cs` | Реализовано в коде: реальные ближайшие события в разделе уведомлений, синхронизация текущего/следующего месяца раз в 5 минут на переднем плане, кеш по аккаунтам. Локальный баннер для отслеживаемого события за 15 минут, без повторов одного начала; первый снимок служит исходной точкой. Ограничение страниц/ошибка видны явно. Системных push-уведомлений при закрытом приложении нет. | `src/App.tsx`, `src/data/calendar-sync.ts` |
 | Создание / удаление события группы | `Services/VRChatAPI/CalendarAPI.cs` | Не реализовано. | — |
-| Собственные аватары, избранные аватары, группы избранного | `Services/VRChatAPI/AvatarsAPI.cs`, `FavoritesAPI.cs` | Частично: собственные/избранные, страницы, поиск среди загруженных карточек, добавление в группу и переименование групп. Перенос/удаление из группы в UI отсутствуют. | `src/pages/Explore.tsx`, `src/api/index.ts` |
+| Собственные аватары, избранные аватары, группы избранного | `Services/VRChatAPI/AvatarsAPI.cs`, `FavoritesAPI.cs` | Реализовано в коде: свои аватары и отдельное избранное с доступными категориями, превью, авторами, поиском, добавлением/удалением/переносом и управлением категориями. Перечисление произвольных чужих загрузок официальным API недоступно; в профиле есть явный поиск автора через avtrdb с проверкой точного authorId. | `src/pages/Explore.tsx`, `src/pages/Favorites.tsx`, `src/components/UserProfileTabs.tsx`, `src/api/favorites.ts` |
 | Смена активного аватара | `Services/VRChatAPI/AvatarsAPI.cs` | Реализовано в коде: подтверждение, PUT /avatars/{id}/select, значок текущего. Обновление текущего профиля и Android-совместимость требуют проверки на устройстве. | `src/pages/Explore.tsx`, `src/api/index.ts` |
 | Редактирование / удаление своего аватара и галереи | `Services/VRChatAPI/AvatarsAPI.cs`, `FilesAPI.cs` | Не реализовано. | — |
 | Поиск публичных аватаров через avtrdb / avtr.icu | `Services/VRChatAPI/AvatarsAPI.cs`, `Services/Avatar Databases/` | Частично: только avtrdb.com, страницы по 20, отдельный нативный HTTP-клиент без VRChat cookie и нормализация ответа. avtr.icu отсутствует. | `src/pages/Explore.tsx`, `src/api/index.ts`, `VrcNativePlugin.java` |
 | База db.vrcnext.com, Rose Database, анализ файлов | `Services/VRChatAPI/AvatarsAPI.cs`, `Services/Avatar Databases/VrcndbSigning.cs` | Не реализовано. Приватные signing/build keys оригинального проекта не копируются. | — |
 | Фото, галерея, иконки, emoji, sticker | `Services/VRChatAPI/FilesAPI.cs`, `frontend/modules/inventory/inventory.js` | Частично: просмотр, страницы, статическая PNG-загрузка с предпросмотром/обрезкой, VRC+ ограничение UI, удаление, открытие оригинала внешним приложением. Анимированные emoji читаются, но их загрузка, mask/style и отдельное сохранение/шаринг файла не перенесены. | `src/pages/Collections.tsx`, `src/api/index.ts`, `VrcNativePlugin.java` |
-| Prints, полученные предметы, украшения профиля | `Services/VRChatAPI/InventoryAPI.cs`, `EconomyAPI.cs` | Частично: просмотр prints/inventory и удаление print. Создание prints, разрешение всех inventory templates и применение украшений профиля отсутствуют. | `src/pages/Collections.tsx`, `src/api/index.ts` |
+| Prints, полученные предметы, украшения профиля | `Services/VRChatAPI/InventoryAPI.cs`, `EconomyAPI.cs` | Частично: просмотр prints/inventory и удаление print. Исправлена отдельная схема Print: изображение берётся из `files.image`, загружается нативно с авторизацией, есть миниатюра/просмотр и явная повторная попытка. Создание prints, разрешение всех inventory templates и применение украшений профиля отсутствуют. | `src/pages/Collections.tsx`, `src/api/prints.ts`, `src/components/SecureImage.tsx` |
 | Статус по расписанию | `main/StatusScheduleController.cs`, `Services/StatusSchedule/StatusScheduleSettings.cs` | Не реализовано. Фонового Android-планировщика нет. | — |
 | Action Flow / автоматизация | `main/ActionFlowController.cs`, `Services/ActionFlow/ActionFlowSettings.cs` | Не реализовано. | — |
 | Event Snipe | `main/SnipeController.cs`, `frontend/modules/tools/event-snipe/event-snipe.js` | Не реализовано. | — |
 | Permini / расширенные проверки | `frontend/modules/tools/permini/permini.js` | Не реализовано. | — |
-| Темы, цвет акцента, язык, настройки и локальный кэш | `frontend/modules/settings/`, `frontend/core/i18n/`, `Services/Helpers/ModalCacheHelper.cs` | Частично: пять цветов акцента, русский интерфейс, локальное сохранение цвета. Редактора тем, выбора языка, произвольного фона и Fast Fetch/SQLite-кэша оригинала нет. | `src/pages/Personal.tsx`, `src/styles.css`, `src/App.tsx` |
+| Темы, цвет акцента, язык, настройки и локальный кэш | `frontend/modules/settings/`, `frontend/core/i18n/`, `Services/Helpers/ModalCacheHelper.cs` | Частично: сохранён текущий тёмный стиль и 5 акцентов, русский интерфейс, кеш изображений/метаданных, отдельная постоянная история IndexedDB и кеш наблюдений графа. Редактора тем, выбора языка, произвольного фона и полного Fast Fetch/SQLite-кеша ПК нет. | `src/pages/Personal.tsx`, `src/styles.css`, `src/data/history-storage.ts`, `src/data/friend-network.ts` |
+| Защита от снимка экрана | Дополнительная настройка Android по запросу пользователя | Реализовано в коде: «Настройки → Конфиденциальность → Защита от снимка экрана». По умолчанию выключена, включая обновление старой версии: скриншоты разрешены. Включение применяет Android `FLAG_SECURE` ко всему приложению, включая вход; выключение снимает флаг сразу. Выбор сохраняется нативно между запусками/обновлениями и после выхода из аккаунта. В браузере управление недоступно. Фактическая съёмка/запись на HiOS ещё не проверена. | `src/pages/Personal.tsx`, `MainActivity.java`, `ScreenProtection.java` |
+
+## Сохранение интерфейса и синхронизация
+
+Посещённые разделы остаются смонтированными в пределах текущего входа: поиск,
+фильтры, загруженные страницы и позиция прокрутки восстанавливаются при возврате.
+Скрытые страницы приостанавливают свои загрузки; тяжёлые журнал и диаграммы
+загружаются при открытии. Ручное обновление относится к текущему разделу,
+WebSocket меняет присутствие друга по ID и отдельно обновляет уведомления.
+Сохранение состояния между разделами не обещает восстановления каждого поля
+формы после принудительного завершения Android-процесса.
+
+Календарная синхронизация не является игровым журналом: сохраняются серверные
+снимки и локальные напоминания. Смена аккаунта разделяет кеш, ошибка оставляет
+предыдущие данные с явным сообщением. После401 автоматические попытки прекращаются
+до ручного обновления/нового входа; 429 учитывает Retry-After. Регулярные запросы
+выполняются только при активном приложении и доступной сети.
+
+## Наблюдения, история и диаграммы
+
+- «Лента» сохраняет реально полученные события входа/выхода, местоположения,
+  статуса, аватара и Bio; Friend Log — наблюдаемые добавления/удаления, имя,
+  Trust Rank и другие доступные изменения. Первый снимок создаёт исходную точку,
+  а не историю за прошедшее время. `friend-active` означает активность сайта или
+  приложения и не записывается как вход в игру.
+- IndexedDB версии 2 добавляет посещения и сессии к прежним событиям без удаления
+  таблицы истории. Обычное обновление APK и выход из аккаунта историю не стирают;
+  данные разных аккаунтов разделены. Сбой записи показывается явно, очередь
+  допускает повтор. Очистка истории не теряет наблюдения, полученные во время
+  самой операции очистки.
+- Собственное местоположение проверяется примерно раз в 120 секунд только в
+  активном приложении; явное событие о своём location также может дать снимок.
+  Составление location из worldId/instanceId разрешено лишь из одного свежего
+  ответа, когда location отсутствует. Скрытое или offline-значение не обходится.
+- «Журнал игры» показывает наблюдаемые миры/инстансы, интервалы, сессии и друзей,
+  с которыми пересекались. Это оценка по API, не точный журнал запуска игры.
+  Свертывание, потеря связи, перезапуск и большой разрыв образуют пропуск;
+  незавершённая запись закрывается на последнем наблюдении, без добавления часов.
+- Instance Activity использует те же сохранённые интервалы: дата, цветные полосы,
+  изменение масштаба и перемещение пальцами, подробности по нажатию. Аналитика
+  показывает миры, частоту встреч и совместное время за день или всю историю.
+  Неизвестные промежутки и время после lastObserved не заполняются.
+- Mutual Friend Network показывает известную часть социальных связей. Совместное
+  нахождение в мире само по себе не считается дружбой. Новый запрос выполняется
+  по явному выбору контакта, последовательно; повторный снимок кешируется на
+  15 минут. Цвет обозначает компоненту известных связей, не достоверную полную
+  социальную группу. Закрытые данные и ограниченный кеш не позволяют объявлять
+  граф полной сетью всех друзей.
+
+Источники: `src/pages/Feed.tsx`, `Social.tsx`, `GameLog.tsx`, `Charts.tsx`,
+`src/data/history*.ts`, `game-history.ts`, `chart-data.ts`, `friend-network.ts`,
+`src/components/FriendNetwork.tsx`. Синтетические данные тестов и деморежима
+никогда не становятся историей настоящего аккаунта.
 
 ## Функции ПК и ограничения локальных игровых данных
 
@@ -111,9 +172,9 @@ PC companion не является планируемым обязательны
 | Функция оригинала | Источник | Ограничение / статус |
 | --- | --- | --- |
 | Полный список игроков текущего инстанса | `Services/VRChatAPI/VRChatLogWatcher.cs`, `main/InstanceController.cs` | Нужны игровые данные. API не раскрывает полный состав произвольного приватного инстанса. В Mobile доступны присутствие друзей и серверные сведения об инстансе. |
-| История встреч, посещений, фото и сессий | `Services/TimelineService.cs`, `VRChatLogWatcher.cs` | История игрового клиента не импортируется. Есть только журнал текущей мобильной сессии (до 200 записей в памяти), включая действия приложения и часть событий друзей API. |
-| Время с людьми / в мирах, Meet Network | `Services/VrcSessionTracker.cs`, `Services/TimelineService.cs` | Нужны игровые данные. Статистика локальной SQLite и логов ПК не восстанавливается обычным API. |
-| Mutual Network | `frontend/modules/tools/mutual-network/` | Не реализовано. Просмотр общих друзей сохранён; полноценный граф связей и локальная история встреч отсутствуют. |
+| История встреч, посещений, фото и сессий | `Services/TimelineService.cs`, `VRChatLogWatcher.cs` | Частично: постоянная лента, Friend Log, журнал посещений/сессий и наблюдаемых встреч на этом устройстве, по аккаунтам. Фото читаются из серверной медиатеки; журналы/файлы ПК и история до начала наблюдения не импортируются. Старый краткий журнал действий текущего запуска остаётся отдельной функцией. |
+| Время с людьми / в мирах, Meet Network | `Services/VrcSessionTracker.cs`, `Services/TimelineService.cs` | Частично: оценка по свежим снимкам собственного location (120 сек на переднем плане) и точным местоположениям известных друзей; длительность ограничена lastObserved, интервалы объединяются без двойного счёта. Счётчик/время/последняя встреча доступны в Social, аналитике и Instance Activity. Пропуски, незнакомые игроки, видео и точная статистика ПК-логов недоступны. |
+| Mutual Network | `frontend/modules/tools/mutual-network/` | Реализовано в коде: интерактивный Mutual Friend Network, поиск/фильтры, pan/pinch zoom, открытие профиля, явное постраничное чтение общих друзей выбранного контакта. Кеш снимков разделён по аккаунтам, содержит дату; 403/ошибка не означают отсутствия связей. В граф добавляются только подтверждённые рёбра, не связи между всеми участниками одного списка. |
 | Media Library: папки VRChat/OBS, метаданные, избранное, рейтинг, теги | `Services/SQLite/MediaLibraryStore.cs`, `main/PhotosController.cs`, `frontend/modules/media-library/` | Серверная медиатека и выбор изображений на телефоне реализованы частично. Импорт библиотеки ПК и сканирование OBS-папок не входят в Android-сценарий; локальные рейтинги/теги/избранное пока не реализованы. |
 | Media Relay: наблюдение за папками и Discord webhooks | `main/RelayController.cs`, `frontend/modules/tools/media-relay/` | Наблюдение за папками Windows вне мобильного объёма. Мобильный сценарий отправки изображений в Discord пока не реализован. |
 | Запуск VRChat и SlimeVR/FaceTracking/Standable | `main/MessageRouter.cs`, `Services/Helpers/VrcLaunchPipe.cs` | Вне мобильного объёма по запросу пользователя. Нет кнопок запуска ПК-программ или зависимости от PC companion. |
@@ -130,22 +191,25 @@ PC companion не является планируемым обязательны
 Базовый адрес: `https://api.vrchat.cloud/api/1`. Оригинал хранит `auth` и
 `twoFactorAuth` в `CookieContainer`, а не использует разработческий API-ключ.
 
-| Область | Контракт оригинала |
+| Область | Контракт, учтённый в мобильном коде |
 | --- | --- |
 | Вход | `GET /auth/user`, `Authorization: Basic base64(percentEncode(username) + ':' + percentEncode(password))`. При 2FA сервер возвращает `requiresTwoFactorAuth`. |
 | 2FA | `POST /auth/twofactorauth/totp/verify` или `/emailotp/verify`, JSON `{ "code": "..." }`, затем снова `GET /auth/user`. |
 | Выход | `PUT /logout`; локальные cookie необходимо удалить независимо от успешности сети. |
-| Друзья | `GET /auth/user/friends?offline=false&n=50&offset=...` и такой же запрос с `offline=true`. |
+| Друзья | `GET /auth/user/friends?offline=false&n=100&offset=...` и такой же запрос с `offline=true`, до конца списка. |
+| Публичный профиль / Boop | Bio, языки, ссылки и оформление: `GET /profile/{id}` отдельно от `/users/{id}`; `POST /users/{id}/boop` с проверкой серверного подтверждения. |
+| Избранное | Чтение всех доступных `/favorites/groups/{type}?ownerId=...`, в том числе `world` и `vrcPlusWorld`; записи `/favorites?type=...`; создание `POST /favorites`, удаление по ID записи. Чужое содержимое запрашивается только при видимости `public` либо `friends` и подтверждённой дружбе; `private` другого пользователя запрещено до запроса. |
 | WebSocket | `wss://pipeline.vrchat.cloud/?authToken=...`, cookie auth/2FA, собственный User-Agent. Типы: `friend-location`, `friend-offline`, `friend-online`, `friend-update`, `friend-active`, `friend-add`, `friend-delete`, `notification`, `notification-v2`, `notification-v2-update`, `notification-v2-delete`, `user-update`. |
 | Messenger | `GET /message/{self}/{message\|request}` возвращает слоты `slot`, `message`, `canBeUpdated`, `remainingCooldownMinutes`. `PUT .../{slot}` редактирует текст. Затем обычное приглашение или запрос приглашения с `messageSlot`. |
 | Ограничения Messenger | По 12 слотов в пуле `message` и дополнительном пуле `request`, изменение слота ограничивается примерно 60 минутами. В оригинале текст помечается префиксом `msg `. Это не API произвольного личного чата. |
 | Ответ Messenger | Пулы `response` / `requestResponse`; `POST /invite/{notificationId}/response` с `responseSlot`. |
-| Календарь | `GET /calendar?date=<первый-день-месяца-UTC-ISO>&n=100&offset=...`; отслеживаемые — `/calendar/following`. Ответ: массив или объект с `results`, `events`, `data` либо `items`. |
+| Уведомления | V1: `/auth/user/notifications`; современный V2: `GET /notifications?limit=100`, `POST /notifications/{id}/see`, `DELETE /notifications/{id}`. Только при 404 чтение откатывается на legacy `/auth/user/notificationsV2`; прочтение/скрытие legacy используют V1-пути и PUT. Протокол сохраняется у каждой записи, запрет `canDelete:false` проверяется перед изменением. |
+| Календарь | `GET /calendar?date=<первый-день-месяца-UTC-ISO>&n=100&offset=...`; отслеживаемые — `/calendar/following`. Ответ: массив или объект с `results`, `events`, `data` либо `items`; пагинация учитывает `hasNext`/`totalCount`. Подробности: `GET /calendar/{groupId}/{eventId}`, `ownerId` нормализуется в groupId, подписка читается из `userInterest.isFollowing`. |
 | Подписка на событие | `POST /calendar/{groupId}/{calendarId}/follow`, JSON `{ "isFollowing": true }` или `false`. |
 | События группы | Создание `POST /calendar/{groupId}/event` с `title`, `description`, `startsAt`, `endsAt`, `category`, `accessType`, `sendCreationNotification`, `isDraft: false`, необязательным `imageId`. Удаление `DELETE /calendar/{groupId}/{eventId}`. |
 | Изображения инвентаря | `GET /files?tag=<gallery\|icon\|emoji\|sticker>&n=100&offset=...`. Загрузка `POST /file/image` multipart: `tag`, `file`, необязательные `animationStyle`, `maskTag`; удаление `DELETE /file/{fileId}`. |
 | Предметы инвентаря | `GET /inventory?n=100&offset=...` возвращает массив либо `{ data, totalCount }`; предмет и его шаблон — разные сущности. |
-| Prints | `GET /prints/user/{self}?n=100&offset=...`: массив либо `{prints}` / `{data}`. `POST /prints` multipart `image`, `timestamp`, необязательные `note`, `worldId`, `worldName`. Удаление `DELETE /prints/{printId}`. |
+| Prints | `GET /prints/user/{self}?n=100&offset=...`: массив либо `{prints}` / `{data}`; изображение Print находится в `files.image`, это не File.versions. Реализовано удаление `DELETE /prints/{printId}`; создание Print через multipart остаётся вне текущего UI. |
 
 API может измениться независимо от приложения. Ошибки, 401, 403, 429, отсутствие
 прав VRC+, истечение сессии и отмена операции должны отображаться явно. Не

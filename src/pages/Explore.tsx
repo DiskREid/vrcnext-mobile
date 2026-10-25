@@ -21,7 +21,7 @@ import {
 import { api } from '../api';
 import type { Avatar, Group, World, FavoriteType, GroupPost, VrcFile } from '../api';
 import { demoAvatars, demoGroups, demoWorlds } from '../demo';
-import { useApp, useLoad } from '../state';
+import { PageScope, useApp, useLoad } from '../state';
 import { usePaged } from '../hooks/usePaged';
 import { clearFavoriteEntityCache, loadFavoriteGroups, loadFavoriteWorlds } from '../api/favorites';
 import { FavoriteCategoryPicker, demoFavoriteGroups } from './Favorites';
@@ -106,8 +106,14 @@ function MoreResults({
 }
 
 export default function Explore({ initialTab = 'worlds' }: { initialTab?: ExploreTab }) {
+  const ctx = useApp();
   const [tab, setTab] = useState<ExploreTab>(initialTab);
-  useEffect(() => setTab(initialTab), [initialTab]);
+  const [visited, setVisited] = useState<ExploreTab[]>([initialTab]);
+  const selectTab = (next: ExploreTab) => {
+    setVisited((current) => current.includes(next) ? current : [...current, next]);
+    setTab(next);
+  };
+  useEffect(() => selectTab(initialTab), [initialTab]);
   return (
     <div className="explore-page">
       <PageHeader
@@ -127,16 +133,18 @@ export default function Explore({ initialTab = 'worlds' }: { initialTab?: Explor
             key={id}
             aria-pressed={tab === id}
             className={tab === id ? 'active' : ''}
-            onClick={() => setTab(id)}
+            onClick={() => selectTab(id)}
           >
             <Icon size={18} />
             {label}
           </button>
         ))}
       </div>
-      {tab === 'worlds' && <Worlds />}
-      {tab === 'groups' && <Groups />}
-      {tab === 'avatars' && <Avatars />}
+      {visited.map((page) => <div key={page} hidden={tab !== page} data-explore-tab={page}>
+        <PageScope active={tab === page} refresh={ctx.refresh}>
+          {page === 'worlds' ? <Worlds /> : page === 'groups' ? <Groups /> : <Avatars />}
+        </PageScope>
+      </div>)}
     </div>
   );
 }

@@ -70,7 +70,7 @@ function LocationCard({ group }: { group: FriendLocation }) {
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    if (!group.worldId || !visible) return;
+    if (!group.worldId || !visible || ctx.pageActive === false) return;
     let live = true;
     const force = lastRefresh.current !== ctx.refresh || retry > 0;
     lastRefresh.current = ctx.refresh;
@@ -92,7 +92,7 @@ function LocationCard({ group }: { group: FriendLocation }) {
     return () => {
       live = false;
     };
-  }, [group.worldId, ctx.user.id, ctx.demo, ctx.refresh, retry, visible]);
+  }, [group.worldId, ctx.user.id, ctx.demo, ctx.refresh, retry, visible, ctx.pageActive]);
   return (
     <article ref={ref} className="card location-card">
       <button

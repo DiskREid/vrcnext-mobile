@@ -21,6 +21,7 @@ import {
 import { api, native } from '../api';
 import type {
   CalendarEvent,
+  Group,
   InventoryItem,
   MessageTemplate,
   Notification,
@@ -45,6 +46,8 @@ import {
 } from '../components/ui';
 import SecureImage from '../components/SecureImage';
 import { printDate, printMedia } from '../api/prints';
+import { createCalendarClient, withCalendarGroups } from '../api/calendar';
+import { reconcilePage } from '../hooks/paged-data';
 import type { Print } from '../api/prints';
 import './Collections.css';
 
@@ -78,302 +81,159 @@ function occursOn(event: CalendarEvent, day: Date) {
   );
 }
 
+const calendarClient = createCalendarClient(api.request);
+type CalendarWindow = { key: string; events: CalendarEvent[]; hasNext: boolean; nextOffset: number; pages: number; warning: string };
+
 export function CalendarPage() {
-  const { demo, act, refresh, openWorld, notify } = useApp();
-  const [month, setMonth] = useState(
-    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-  );
+  const ctx = useApp();
+  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'following'>('all');
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
-  const [pending, setPending] = useState(false);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [moreLoading, setMoreLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [nextOffset, setNextOffset] = useState(100);
-  const key = `${month.getFullYear()}:${month.getMonth()}:${filter}:${refresh}`;
-  const latestKey = useRef(key);
-  latestKey.current = key;
-  const load = useLoad<CalendarEvent[]>(
-    async () =>
-      demo
-        ? filter === 'following'
-          ? demoEvents.filter((event) => event.isFollowing)
-          : demoEvents
-        : api.calendar(month, filter),
-    [key, demo],
-  );
+  const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState<CalendarWindow>();
+  const key = `${ctx.user.id}:${ctx.demo}:${month.getFullYear()}:${month.getMonth()}:${filter}`;
+  const latestKey = useRef(key); latestKey.current = ctx.pageActive === false ? '' : key;
+  const scope = `${key}:${ctx.pageActive !== false}`;
+  const observation = useRef({ scope, generation: 0 });
+  if (observation.current.scope !== scope) observation.current = { scope, generation: observation.current.generation + 1 };
+  useEffect(() => { if (ctx.pageActive === false) setSelected(null); }, [ctx.pageActive]);
+  const window = useRef({ key: '', pages: 1 });
+  const load = useLoad<CalendarWindow>(async () => {
+    const generation = observation.current.generation;
+    const isCurrent = () => latestKey.current === key && observation.current.generation === generation;
+    setRefreshing(true);
+    try {
+      const pages = window.current.key === key ? window.current.pages : 1;
+      let offset = 0, hasNext = false, completed = 0;
+      const events: CalendarEvent[] = [];
+      if (ctx.demo) {
+        events.push(...demoEvents.filter((event) => filter !== 'following' || event.isFollowing));
+        completed = 1;
+      } else for (let index = 0; index < pages; index++) {
+        if (!isCurrent()) break;
+        const result = await calendarClient.month(month, filter, offset);
+        if (!isCurrent()) break;
+        const seen = new Set(events.map((event) => event.id));
+        const additions = result.events.filter((event) => !seen.has(event.id));
+        if (index && result.hasNext && !additions.length) throw new Error('VRChat повторил страницу календаря.');
+        events.push(...additions); completed++; offset = result.nextOffset; hasNext = result.hasNext;
+        if (!hasNext) break;
+      }
+      let groups: Group[] = [], warning = '';
+      if (!ctx.demo && isCurrent()) try { groups = await calendarClient.groups(ctx.user.id); }
+      catch (error) { warning = error instanceof Error ? error.message : 'Не удалось загрузить названия групп.'; }
+      return { key, events: withCalendarGroups(events, groups), hasNext, nextOffset: offset, pages: completed, warning };
+    } finally { if (isCurrent()) setRefreshing(false); }
+  }, [key, ctx.refresh]);
   useEffect(() => {
-    if (load.data) {
-      setEvents(load.data);
-      setHasMore(!demo && load.data.length === 100);
-      setNextOffset(100);
-    }
-  }, [load.data, demo]);
+    if (load.data?.key !== key) return;
+    const fresh = load.data;
+    window.current = { key, pages: fresh.pages };
+    setPage((old) => ({ ...fresh, events: old?.key === key ? reconcilePage(old.events, fresh.events) : fresh.events }));
+  }, [load.data, key]);
+  const current = page?.key === key ? page : undefined;
+  const events = current?.events || [];
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const preceding = (month.getDay() + 6) % 7;
-  const days = Array.from(
-    { length: daysInMonth },
-    (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1),
-  );
-  const visible = events
-    .filter((event) => {
-      const start = new Date(eventStart(event));
-      return selectedDay
-        ? days.some((day) => localDay(day) === selectedDay && occursOn(event, day))
-        : !Number.isNaN(start.getTime()) && days.some((day) => occursOn(event, day));
-    })
-    .sort((a, b) => new Date(eventStart(a)).getTime() - new Date(eventStart(b)).getTime());
-  function moveMonth(direction: number) {
-    setSelectedDay(null);
-    setMonth(new Date(month.getFullYear(), month.getMonth() + direction, 1));
-  }
+  const days = Array.from({ length: daysInMonth }, (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1));
+  const visible = events.filter((event) => selectedDay
+    ? days.some((day) => localDay(day) === selectedDay && occursOn(event, day))
+    : days.some((day) => occursOn(event, day))).sort((a, b) => Date.parse(eventStart(a)) - Date.parse(eventStart(b)));
+  function moveMonth(direction: number) { setSelectedDay(null); setMonth(new Date(month.getFullYear(), month.getMonth() + direction, 1)); }
   async function loadMore() {
+    if (!current || moreLoading || refreshing || ctx.pageActive === false) return;
     const captured = key;
+    const generation = observation.current.generation;
+    const isCurrent = () => latestKey.current === captured && observation.current.generation === generation;
     setMoreLoading(true);
     try {
-      const next = await api.calendar(month, filter, nextOffset);
-      if (latestKey.current === captured) {
-        setEvents((previous) => [
-          ...previous,
-          ...next.filter((item) => !previous.some((old) => old.id === item.id)),
-        ]);
-        setHasMore(next.length === 100);
-        setNextOffset((offset) => offset + 100);
-      }
-    } catch (error) {
-      notify(error instanceof Error ? error.message : 'Не удалось загрузить события');
-    } finally {
-      setMoreLoading(false);
-    }
+      const next = await calendarClient.month(month, filter, current.nextOffset);
+      if (!isCurrent()) return;
+      const names = current.events.flatMap((event) => event.group ? [event.group] : []);
+      const existing = new Set(current.events.map((event) => event.id));
+      const additions = withCalendarGroups(next.events, names).filter((event) => !existing.has(event.id));
+      if (next.hasNext && !additions.length) throw new Error('VRChat повторил страницу календаря.');
+      window.current = { key, pages: current.pages + 1 };
+      setPage({ ...current, events: [...current.events, ...additions], nextOffset: next.nextOffset, hasNext: next.hasNext, pages: current.pages + 1 });
+    } catch (error) { if (isCurrent()) ctx.notify(error instanceof Error ? error.message : 'Не удалось загрузить события'); }
+    finally { setMoreLoading(false); }
   }
-  async function follow(event: CalendarEvent) {
-    const groupId =
-      event.groupId || event.group?.id || ('ownerId' in event ? String(event.ownerId || '') : '');
-    if (!groupId) {
-      notify('VRChat не вернул группу этого события. Откройте событие на сайте VRChat.');
-      return;
-    }
+  return <>
+    <PageHeader eyebrow="ВСТРЕЧАЕМСЯ В VRCHAT" title="Календарь" subtitle="События ваших групп и новые встречи."
+      actions={<button className="icon-button" aria-label="Обновить календарь" onClick={load.reload} disabled={refreshing || moreLoading} aria-busy={refreshing}><RefreshCw size={19} className={refreshing ? 'spin' : undefined} /></button>} />
+    <div className="toolbar"><Segmented items={[{ id: 'all', label: 'Все события' }, { id: 'following', label: 'Подписки' }]} value={filter} onChange={(value) => { setFilter(value as 'all' | 'following'); setSelectedDay(null); }} /></div>
+    {load.error && <ErrorState error={load.error} retry={load.reload} />}
+    {current?.warning && <ErrorState error={current.warning} retry={load.reload} />}
+    <div className="calendar-layout">
+      <section className="card calendar-card" aria-label="Календарь месяца">
+        <div className="calendar-month-row"><button className="icon-button" aria-label="Предыдущий месяц" onClick={() => moveMonth(-1)}><ArrowLeft size={19} /></button><h2>{month.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h2><button className="icon-button" aria-label="Следующий месяц" onClick={() => moveMonth(1)}><ArrowRight size={19} /></button></div>
+        <div className="calendar-weekdays" aria-hidden="true">{['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => <span key={day}>{day}</span>)}</div>
+        <div className="calendar-grid">{Array.from({ length: preceding }, (_, i) => <span key={`blank-${i}`} />)}{days.map((day) => {
+          const date = localDay(day), count = events.filter((event) => occursOn(event, day)).length, today = date === localDay(new Date());
+          return <button key={date} onClick={() => setSelectedDay(selectedDay === date ? null : date)} className={`calendar-day ${selectedDay === date ? 'selected' : ''} ${today ? 'today' : ''}`} aria-pressed={selectedDay === date} aria-label={`${day.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}, событий: ${count}${today ? ', сегодня' : ''}`}><span>{day.getDate()}</span>{count > 0 && <i aria-hidden="true" />}</button>;
+        })}</div>
+        <div className="calendar-footer"><button className="text-button" onClick={() => { setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); setSelectedDay(localDay(new Date())); }}>Сегодня</button>{selectedDay && <button className="text-button" onClick={() => setSelectedDay(null)}>Весь месяц</button>}</div>
+        <p className="calendar-timezone muted"><Clock3 size={13} />Время: {Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+      </section>
+      <Section title={selectedDay ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'События месяца'}>
+        {!current && !load.error ? <Loading /> : !visible.length && !load.error ? <Empty title="Свободный день" text={ctx.demo ? 'Демособытие появится в календаре завтрашнего дня.' : 'Событий не найдено. Попробуйте другой день или фильтр.'} icon={<CalendarDays size={32} />} /> : <div className="event-list">{visible.map((event) => <button key={event.id} className="card event-card" onClick={() => setSelected(event)}>
+          <div className="event-date"><span>{new Date(eventStart(event)).toLocaleDateString('ru-RU', { month: 'short' })}</span><strong>{new Date(eventStart(event)).getDate()}</strong></div>
+          <div className="event-content"><div className="row"><h3>{event.title || event.name || 'Событие VRChat'}</h3>{event.isFollowing && <Bell size={15} aria-label="Вы подписаны" />}</div><p className="muted">{dateLabel(eventStart(event), { hour: '2-digit', minute: '2-digit' })}{event.group?.name && ` · ${event.group.name}`}</p>{event.description && <p className="event-excerpt">{event.description}</p>}</div>
+        </button>)}</div>}
+        {current?.hasNext && <button className="button secondary load-more" disabled={moreLoading || refreshing} onClick={() => void loadMore()}>{moreLoading ? 'Загрузка…' : 'Ещё события'}</button>}
+      </Section>
+    </div>
+    {selected && ctx.pageActive !== false && <CalendarEventDetail initial={selected} onClose={() => setSelected(null)} onChanged={(event) => { setSelected(event); setPage((old) => old ? { ...old, events: old.events.map((item) => item.id === event.id ? event : item) } : old); }} />}
+  </>;
+}
+
+export function CalendarEventDetail(props: { initial: CalendarEvent; onClose: () => void; onChanged?: (event: CalendarEvent) => void }) {
+  return <CalendarDetail key={`${props.initial.groupId || props.initial.ownerId}:${props.initial.id}`} {...props} />;
+}
+function CalendarDetail({ initial, onClose, onChanged }: { initial: CalendarEvent; onClose: () => void; onChanged?: (event: CalendarEvent) => void }) {
+  const ctx = useApp();
+  const [pending, setPending] = useState(false), [event, setEvent] = useState(initial);
+  const groupId = initial.groupId || initial.group?.id || initial.ownerId;
+  const detail = useLoad(async () => {
+    if (ctx.demo) return initial;
+    if (!groupId?.startsWith('grp_')) throw new Error('VRChat не передал группу события. Подробности недоступны.');
+    const fresh = await calendarClient.detail(groupId, initial.id);
+    return { ...initial, ...fresh, groupId: fresh.groupId || groupId, isFollowing: fresh.isFollowing ?? initial.isFollowing };
+  }, [initial.id, groupId, ctx.demo]);
+  const group = useLoad(async () => {
+    if (ctx.demo) return initial.group;
+    if (!groupId?.startsWith('grp_')) return undefined;
+    const ownGroups = await calendarClient.groups(ctx.user.id);
+    return ownGroups.find((item) => item.id === groupId) || api.group(groupId);
+  }, [groupId, ctx.user.id, ctx.demo]);
+  useEffect(() => { if (detail.data) setEvent(detail.data); }, [detail.data]);
+  async function follow() {
+    if (!groupId?.startsWith('grp_')) { ctx.notify('Группа события недоступна.'); return; }
     setPending(true);
-    const success = await act(
-      async () => {
-        await api.followEvent(groupId, event.id, !event.isFollowing);
-        return true;
-      },
-      event.isFollowing ? 'Подписка на событие отменена' : 'Вы подписались на событие',
-    );
-    if (success) {
-      setEvents((previous) =>
-        previous.map((item) =>
-          item.id === event.id ? { ...item, isFollowing: !event.isFollowing } : item,
-        ),
-      );
-      setSelected((previous) =>
-        previous?.id === event.id ? { ...previous, isFollowing: !event.isFollowing } : previous,
-      );
-    }
+    await ctx.act(async () => {
+      const desired = !event.isFollowing;
+      let fresh = await api.followEvent(groupId, event.id, desired);
+      if (typeof fresh.isFollowing !== 'boolean') fresh = await calendarClient.detail(groupId, event.id);
+      if (fresh.isFollowing !== desired) throw new Error('VRChat не подтвердил изменение подписки. Обновите событие и попробуйте ещё раз.');
+      const next = { ...event, ...fresh, groupId: fresh.groupId || groupId };
+      setEvent(next); onChanged?.(next); ctx.calendarSync.refresh();
+    }, event.isFollowing ? 'Подписка на событие отменена' : 'Вы подписались на событие');
     setPending(false);
   }
-  return (
-    <>
-      <PageHeader
-        eyebrow="ВСТРЕЧАЕМСЯ В VRCHAT"
-        title="Календарь"
-        subtitle="События ваших групп и новые встречи."
-        actions={
-          <button
-            className="icon-button"
-            aria-label="Обновить календарь"
-            onClick={load.reload}
-            disabled={load.loading}
-          >
-            <RefreshCw size={19} />
-          </button>
-        }
-      />
-      <div className="toolbar">
-        <Segmented
-          items={[
-            { id: 'all', label: 'Все события' },
-            { id: 'following', label: 'Подписки' },
-          ]}
-          value={filter}
-          onChange={(value) => {
-            setFilter(value as 'all' | 'following');
-            setSelectedDay(null);
-          }}
-        />
+  return <Modal title={event.title || event.name || 'Событие VRChat'} onClose={onClose}>
+    {detail.loading && <Loading />}{detail.error && <ErrorState error={detail.error} retry={detail.reload} />}{group.error && <ErrorState error={group.error} retry={group.reload} />}
+    {event.imageUrl && <SecureImage className="collection-detail-image" src={event.imageUrl} alt="" />}
+    <div className="form-stack"><p className="row"><CalendarDays size={18} />{dateLabel(eventStart(event))}</p>{eventEnd(event) && <p className="muted">До {dateLabel(eventEnd(event))}</p>}
+      {(group.data?.name || event.group?.name) && <Badge>{group.data?.name || event.group?.name}</Badge>}
+      <p className="collection-description">{event.description || 'Организатор не добавил описание.'}</p>
+      <div className="detail-actions"><button className="button" disabled={pending || detail.loading || !!detail.error || !groupId} onClick={() => void follow()}>{event.isFollowing ? <BellOff size={17} /> : <Bell size={17} />}{pending ? 'Сохранение…' : event.isFollowing ? 'Отписаться' : 'Подписаться'}</button>
+        {groupId && <button className="button secondary" onClick={() => { onClose(); ctx.openGroup(group.data || event.group || { id: groupId, name: groupId }); }}>Открыть группу</button>}
+        {event.worldId && <button className="button secondary" onClick={() => { onClose(); ctx.openWorld(event.worldId!); }}>Открыть мир</button>}
       </div>
-      <div className="calendar-layout">
-        <section className="card calendar-card" aria-label="Календарь месяца">
-          <div className="calendar-month-row">
-            <button
-              className="icon-button"
-              aria-label="Предыдущий месяц"
-              onClick={() => moveMonth(-1)}
-            >
-              <ArrowLeft size={19} />
-            </button>
-            <h2>{month.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h2>
-            <button
-              className="icon-button"
-              aria-label="Следующий месяц"
-              onClick={() => moveMonth(1)}
-            >
-              <ArrowRight size={19} />
-            </button>
-          </div>
-          <div className="calendar-weekdays" aria-hidden="true">
-            {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="calendar-grid">
-            {Array.from({ length: preceding }, (_, i) => (
-              <span key={`blank-${i}`} />
-            ))}
-            {days.map((day) => {
-              const key = localDay(day),
-                count = events.filter((event) => occursOn(event, day)).length,
-                today = key === localDay(new Date());
-              return (
-                <button
-                  key={key}
-                  onClick={() => setSelectedDay(selectedDay === key ? null : key)}
-                  className={`calendar-day ${selectedDay === key ? 'selected' : ''} ${today ? 'today' : ''}`}
-                  aria-pressed={selectedDay === key}
-                  aria-label={`${day.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}, событий: ${count}${today ? ', сегодня' : ''}`}
-                >
-                  <span>{day.getDate()}</span>
-                  {count > 0 && <i aria-hidden="true" />}
-                </button>
-              );
-            })}
-          </div>
-          <div className="calendar-footer">
-            <button
-              className="text-button"
-              onClick={() => {
-                setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-                setSelectedDay(localDay(new Date()));
-              }}
-            >
-              Сегодня
-            </button>
-            {selectedDay && (
-              <button className="text-button" onClick={() => setSelectedDay(null)}>
-                Весь месяц
-              </button>
-            )}
-          </div>
-          <p className="calendar-timezone muted">
-            <Clock3 size={13} /> Время: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-          </p>
-        </section>
-        <Section
-          title={
-            selectedDay
-              ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString('ru-RU', {
-                  day: 'numeric',
-                  month: 'long',
-                })
-              : 'События месяца'
-          }
-        >
-          {load.loading ? (
-            <Loading />
-          ) : load.error ? (
-            <ErrorState error={load.error} retry={load.reload} />
-          ) : visible.length === 0 ? (
-            <Empty
-              title="Свободный день"
-              text={
-                demo
-                  ? 'Демособытие появится в календаре завтрашнего дня.'
-                  : 'Событий не найдено. Попробуйте другой день или фильтр.'
-              }
-              icon={<CalendarDays size={32} />}
-            />
-          ) : (
-            <div className="event-list">
-              {visible.map((event) => (
-                <button
-                  key={event.id}
-                  className="card event-card"
-                  onClick={() => setSelected(event)}
-                >
-                  <div className="event-date">
-                    <span>
-                      {new Date(eventStart(event)).toLocaleDateString('ru-RU', { month: 'short' })}
-                    </span>
-                    <strong>{new Date(eventStart(event)).getDate()}</strong>
-                  </div>
-                  <div className="event-content">
-                    <div className="row">
-                      <h3>{event.title || event.name || 'Событие VRChat'}</h3>
-                      {event.isFollowing && <Bell size={15} aria-label="Вы подписаны" />}
-                    </div>
-                    <p className="muted">
-                      {dateLabel(eventStart(event), { hour: '2-digit', minute: '2-digit' })}
-                      {event.group?.name && ` · ${event.group.name}`}
-                    </p>
-                    {event.description && <p className="event-excerpt">{event.description}</p>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          {!load.loading && hasMore && (
-            <button
-              className="button secondary load-more"
-              disabled={moreLoading}
-              onClick={loadMore}
-            >
-              {moreLoading ? 'Загрузка…' : 'Ещё события'}
-            </button>
-          )}
-        </Section>
-      </div>
-      {selected && (
-        <Modal
-          title={selected.title || selected.name || 'Событие VRChat'}
-          onClose={() => setSelected(null)}
-        >
-          {selected.imageUrl && (
-            <SecureImage className="collection-detail-image" src={selected.imageUrl} alt="" />
-          )}
-          <div className="form-stack">
-            <p className="row">
-              <CalendarDays size={18} />
-              {dateLabel(eventStart(selected))}
-            </p>
-            {eventEnd(selected) && <p className="muted">До {dateLabel(eventEnd(selected))}</p>}
-            {selected.group?.name && <Badge>{selected.group.name}</Badge>}
-            <p className="collection-description">
-              {selected.description || 'Организатор не добавил описание.'}
-            </p>
-            <div className="detail-actions">
-              <button className="button" disabled={pending} onClick={() => follow(selected)}>
-                {selected.isFollowing ? <BellOff size={17} /> : <Bell size={17} />}{' '}
-                {pending ? 'Сохранение…' : selected.isFollowing ? 'Отписаться' : 'Подписаться'}
-              </button>
-              {selected.worldId && (
-                <button
-                  className="button secondary"
-                  onClick={() => {
-                    setSelected(null);
-                    openWorld(selected.worldId!);
-                  }}
-                >
-                  Открыть мир
-                </button>
-              )}
-            </div>
-          </div>
-        </Modal>
-      )}
-    </>
-  );
+    </div>
+  </Modal>;
 }
 
 type InventoryTab = UploadTag | 'prints' | 'inventory';

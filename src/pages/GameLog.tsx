@@ -118,7 +118,7 @@ function WorldHeader({ visit }: { visit: GameVisit }) {
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    if (!visible || ctx.demo) return;
+    if (!visible || ctx.demo || ctx.pageActive === false) return;
     let live = true;
     setBusy(true);
     setError('');
@@ -135,7 +135,7 @@ function WorldHeader({ visit }: { visit: GameVisit }) {
     return () => {
       live = false;
     };
-  }, [visible, ctx.user.id, ctx.demo, visit.worldId, retry]);
+  }, [visible, ctx.user.id, ctx.demo, visit.worldId, retry, ctx.pageActive]);
   return (
     <div ref={ref} className="game-world-header">
       <button className="game-world-button" onClick={() => ctx.openWorld(world || visit.worldId)}>

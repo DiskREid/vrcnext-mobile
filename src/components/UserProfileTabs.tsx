@@ -19,6 +19,7 @@ import {
   normalizeProfileGroups,
   profileData,
   profileDate,
+  profileFriendAccess,
   safeProfileJson,
 } from '../api/profile-data';
 import type { JsonRecord, ProfileFavoriteGroup } from '../api/profile-data';
@@ -469,15 +470,23 @@ function WorldsTab({ user }: { user: User }) {
   );
 }
 
-function FavoriteWorldContents({ user, group }: { user: User; group: ProfileFavoriteGroup }) {
+function FavoriteWorldContents({
+  user,
+  group,
+  viewerIsFriend,
+}: {
+  user: User;
+  group: ProfileFavoriteGroup;
+  viewerIsFriend: boolean;
+}) {
   const ctx = useApp(),
     [search, setSearch] = useState('');
   const load = useLoad(
     () =>
       ctx.demo
         ? Promise.resolve(demoWorlds)
-        : profileData.favoriteWorlds(user.id, group, user.id === ctx.user.id),
-    [user.id, group.name, ctx.demo],
+        : profileData.favoriteWorlds(user.id, group, user.id === ctx.user.id, viewerIsFriend),
+    [user.id, ctx.user.id, group.type, group.name, group.visibility, viewerIsFriend, ctx.demo],
   );
   const worlds = (load.data || []).filter((world) =>
     world.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
@@ -506,6 +515,7 @@ function FavoritesTab({ user }: { user: User }) {
   const ctx = useApp(),
     [selected, setSelected] = useState('');
   const own = user.id === ctx.user.id;
+  const viewerIsFriend = profileFriendAccess(user);
   const load = useLoad<ProfileFavoriteGroup[]>(
     () =>
       ctx.demo
@@ -518,17 +528,22 @@ function FavoritesTab({ user }: { user: User }) {
               type: 'world',
             },
           ])
-        : profileData.favoriteGroups(user.id, own),
-    [user.id, ctx.demo],
+        : profileData.favoriteGroups(user.id, own, viewerIsFriend),
+    [user.id, own, viewerIsFriend, ctx.demo],
   );
-  const groups = load.data || [],
+  const groups = (load.data || []).filter(
+      (group) =>
+        own || group.visibility === 'public' || (viewerIsFriend && group.visibility === 'friends'),
+    ),
     group = groups.find((item) => `${item.type}:${item.name}` === selected) || groups[0];
   return (
     <div className="form-stack">
       <p className="muted small">
         {own
           ? 'Доступные категории вашего аккаунта.'
-          : 'Только публичные категории, опубликованные пользователем. Приватные коллекции не запрашиваются.'}
+          : viewerIsFriend
+            ? 'Публичные категории и коллекции для подтверждённых друзей. Приватные коллекции не запрашиваются.'
+            : 'Только публичные категории, опубликованные пользователем. Приватные коллекции не запрашиваются.'}
       </p>
       {load.error && <ErrorState error={load.error} retry={load.reload} />}
       {load.loading && !load.data ? (
@@ -549,7 +564,12 @@ function FavoritesTab({ user }: { user: User }) {
               ))}
             </select>
           </label>
-          <FavoriteWorldContents key={`${group.type}:${group.name}`} user={user} group={group} />
+          <FavoriteWorldContents
+            key={`${group.type}:${group.name}`}
+            user={user}
+            group={group}
+            viewerIsFriend={viewerIsFriend}
+          />
         </>
       ) : (
         !load.error && <Empty title="Нет доступных категорий избранного" />

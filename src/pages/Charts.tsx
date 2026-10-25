@@ -72,7 +72,7 @@ function useWorldName(id: string, active: boolean) {
     return () => observer.disconnect();
   }, [active]);
   useEffect(() => {
-    if (!active || !visible || ctx.demo) return;
+    if (!active || !visible || ctx.demo || ctx.pageActive === false) return;
     let live = true;
     setLoading(true); setError('');
     loadWorld(ctx.user.id, id, () => live, revision > 0)
@@ -80,7 +80,7 @@ function useWorldName(id: string, active: boolean) {
       .catch((failure) => { if (live) setError(failure instanceof Error ? failure.message : 'Не удалось загрузить название мира'); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [ctx.user.id, ctx.demo, active, visible, id, revision]);
+  }, [ctx.user.id, ctx.demo, active, visible, id, revision, ctx.pageActive]);
   return { ref, name: world?.id === id ? world.name : id, loading, error, retry: () => setRevision((v) => v + 1) };
 }
 

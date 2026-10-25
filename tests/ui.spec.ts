@@ -242,8 +242,87 @@ test.describe('VRCNext Mobile browser demo', () => {
     await navigate(page, 'Ещё');
     await page.getByRole('button', { name: /^Настройки Внешний вид и приложение/ }).click();
     await expect(page.getByRole('heading', { name: 'Настройки', exact: true })).toBeVisible();
+    const screenProtection = page.getByRole('switch', { name: 'Защита от снимка экрана', exact: true });
+    await expect(screenProtection).toBeVisible();
+    await expect(screenProtection).toBeDisabled();
+    await expect(screenProtection).not.toBeChecked();
+    await expect(page.getByText('Доступна в Android-приложении. Браузер не позволяет управлять снимками экрана.')).toBeVisible();
     await noHorizontalOverflow(page);
     await screenshot(page, testInfo, 'settings');
+  });
+
+  test('friends retain scroll, filters, search and row order across navigation and explicit refresh', async ({ page }) => {
+    await demo(page);
+    await navigate(page, 'Друзья');
+    const friends = page.locator('[data-screen="friends"]');
+    const cards = friends.locator('.friend-card');
+    await expect(cards).toHaveCount(6);
+    const order = await cards.locator('h3').allTextContents();
+    const main = page.locator('.main-content');
+    const scroll = await main.evaluate((element) => {
+      element.scrollTo({ top: Math.min(120, element.scrollHeight - element.clientHeight), behavior: 'instant' });
+      return element.scrollTop;
+    });
+    expect(scroll, 'friend list should have actual scrollable content').toBeGreaterThan(30);
+    await navigate(page, 'Главная');
+    await navigate(page, 'Друзья');
+    await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBeCloseTo(scroll, 0);
+    expect(await cards.locator('h3').allTextContents()).toEqual(order);
+
+    await page.getByRole('button', { name: 'В VRChat', exact: true }).click();
+    await page.getByRole('searchbox', { name: 'Поиск по друзьям' }).fill('Luna');
+    await expect(cards).toHaveCount(1);
+    await navigate(page, 'Ещё');
+    await navigate(page, 'Друзья');
+    await expect(page.getByRole('searchbox', { name: 'Поиск по друзьям' })).toHaveValue('Luna');
+    await expect(page.getByRole('button', { name: 'В VRChat', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Обновить данные', exact: true }).click();
+    await expect(cards).toHaveCount(1);
+    await expect(cards.getByRole('heading', { name: 'Luna', exact: true })).toBeVisible();
+    await expect(page.getByRole('searchbox', { name: 'Поиск по друзьям' })).toHaveValue('Luna');
+
+    // Dispatch a touch sequence through Chromium, hitting the real page heading at the top.
+    await main.evaluate((element) => { element.scrollTo({ top: 0, behavior: 'instant' }); });
+    const heading = await friends.getByRole('heading', { name: 'Друзья', exact: true }).boundingBox();
+    expect(heading).not.toBeNull();
+    const client = await page.context().newCDPSession(page);
+    const x = heading!.x + Math.min(30, heading!.width / 2);
+    const y = heading!.y + heading!.height / 2;
+    await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 150 }] });
+    await expect(page.getByRole('status').filter({ hasText: 'Отпустите для обновления' })).toBeVisible();
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(page.locator('.pull-refresh')).toHaveCount(0);
+    await expect(cards).toHaveCount(1);
+    await expect(page.getByRole('searchbox', { name: 'Поиск по друзьям' })).toHaveValue('Luna');
+    await noHorizontalOverflow(page);
+  });
+
+  test('Explore retains favorite category and search through inner tabs and screen changes', async ({ page }) => {
+    await demo(page);
+    await navigate(page, 'Открыть');
+    await page.getByRole('button', { name: 'Избранное', exact: true }).click();
+    await page.getByLabel('Коллекция избранного').selectOption('worlds2');
+    const search = page.getByRole('searchbox', { name: 'Название мира или wrld_…' });
+    await search.fill('Sakura');
+    const worlds = page.locator('.explore-world-grid:visible .world-card');
+    await expect(worlds).toHaveCount(1);
+    const original = await worlds.locator('h3').allTextContents();
+    await page.locator('.explore-main-tabs').getByRole('button', { name: 'Группы', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Evening Explorers', exact: true })).toBeVisible();
+    await page.locator('.explore-main-tabs').getByRole('button', { name: 'Миры', exact: true }).click();
+    await expect(search).toHaveValue('Sakura');
+    await expect(page.getByLabel('Коллекция избранного')).toHaveValue('worlds2');
+    await expect(page.getByRole('button', { name: 'Избранное', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await navigate(page, 'Главная');
+    await navigate(page, 'Открыть');
+    await expect(search).toHaveValue('Sakura');
+    await expect(page.getByLabel('Коллекция избранного')).toHaveValue('worlds2');
+    await page.getByRole('button', { name: 'Обновить миры', exact: true }).click();
+    await expect(worlds).toHaveCount(1);
+    expect(await worlds.locator('h3').allTextContents()).toEqual(original);
+    await expect(search).toHaveValue('Sakura');
+    await noHorizontalOverflow(page);
   });
 });
 

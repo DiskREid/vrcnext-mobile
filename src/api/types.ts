@@ -126,6 +126,8 @@ export interface Notification {
   link?: string;
   data?: Record<string, unknown> | string;
   _v2?: boolean;
+  _protocol?: 'v1' | 'modern-v2' | 'legacy-v2';
+  canDelete?: boolean;
   _data?: Record<string, unknown>;
   _link?: string;
 }
@@ -170,6 +172,7 @@ export interface CalendarEvent {
   endDate?: string;
   imageUrl?: string;
   isFollowing?: boolean;
+  userInterest?: { isFollowing?: boolean };
   featured?: boolean;
   worldId?: string;
   group?: Group;

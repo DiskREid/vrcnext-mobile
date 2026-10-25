@@ -19,6 +19,16 @@ const query = (parameters: Record<string, string | number>) =>
   '?' + new URLSearchParams(Object.entries(parameters).map(([key, value]) => [key, String(value)]));
 const segment = encodeURIComponent;
 
+/** Only the freshly loaded account-relative user response establishes friend access. */
+export function profileFriendAccess(user: Pick<User, 'isFriend' | 'friendKey'>): boolean {
+  return (
+    user.isFriend === true ||
+    (user.isFriend === undefined &&
+      typeof user.friendKey === 'string' &&
+      user.friendKey.trim().length > 0)
+  );
+}
+
 /** Kept separate from the account's private favorite collections. */
 export function createProfileData(request: typeof api.request) {
   return {
@@ -55,7 +65,11 @@ export function createProfileData(request: typeof api.request) {
       request<unknown>('/users/' + segment(id) + '/mutuals/groups' + query({ n: 100, offset }))
         .then((value) => unwrapList<Group>(value))
         .then(normalizeProfileGroups),
-    async favoriteGroups(id: string, own: boolean): Promise<ProfileFavoriteGroup[]> {
+    async favoriteGroups(
+      id: string,
+      own: boolean,
+      viewerIsFriend = false,
+    ): Promise<ProfileFavoriteGroup[]> {
       async function loadType(type: ProfileFavoriteGroup['type']): Promise<ProfileFavoriteGroup[]> {
         const value = await request<unknown>('/favorites/groups/' + type + query({ ownerId: id }));
         const container = asRecord(value);
@@ -67,7 +81,9 @@ export function createProfileData(request: typeof api.request) {
           if (
             typeof group.name !== 'string' ||
             !group.name ||
-            (!own && group.visibility !== 'public')
+            (!own &&
+              group.visibility !== 'public' &&
+              !(viewerIsFriend === true && group.visibility === 'friends'))
           )
             return [];
           return [
@@ -94,10 +110,19 @@ export function createProfileData(request: typeof api.request) {
         throw error;
       }
     },
-    async favoriteWorlds(id: string, group: ProfileFavoriteGroup, own: boolean): Promise<World[]> {
+    async favoriteWorlds(
+      id: string,
+      group: ProfileFavoriteGroup,
+      own: boolean,
+      viewerIsFriend = false,
+    ): Promise<World[]> {
       // Never probe another user's private groups or construct category names by index.
-      if (!own && group.visibility !== 'public')
-        throw new ApiError('Эта категория не опубликована пользователем.', 403);
+      if (
+        !own &&
+        group.visibility !== 'public' &&
+        !(viewerIsFriend === true && group.visibility === 'friends')
+      )
+        throw new ApiError('Эта категория недоступна этому аккаунту.', 403);
       const value = asRecord(
         await request<unknown>(
           '/favorites/groups/' + group.type + '/' + segment(group.name) + query({ ownerId: id }),

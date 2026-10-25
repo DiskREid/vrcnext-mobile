@@ -6,6 +6,7 @@ import {
   checked,
   createApi,
   isTwoFactorChallenge,
+  normalizeNotification,
   unwrapList,
 } from './index';
 import type { NativeBridge, NativeResponse } from './native';
@@ -20,6 +21,20 @@ function fixture(responses: NativeResponse[] = []) {
   return { bridge, client: createApi(bridge) };
 }
 const success = (data: unknown): NativeResponse => ({ status: 200, data });
+
+describe('calendar actions use server state', () => {
+  it('posts a follow change once and reads nested actual subscription state', async () => {
+    const { client, bridge } = fixture([success({ id: 'cal_real', ownerId: 'grp_real', userInterest: { isFollowing: true } })]);
+    expect(await client.followEvent('grp_real', 'cal_real', true)).toMatchObject({ id: 'cal_real', groupId: 'grp_real', isFollowing: true });
+    expect(bridge.request).toHaveBeenCalledExactlyOnceWith({ path: '/calendar/grp_real/cal_real/follow', method: 'POST', body: '{"isFollowing":true}' });
+  });
+  it('does not manufacture a followed event from an invalid or failed mutation response', async () => {
+    await expect(fixture([success({})]).client.followEvent('grp_real', 'cal_real', true)).rejects.toThrow('идентификатора');
+    const { client, bridge } = fixture([{ status: 429, data: {}, retryAfter: 120 }]);
+    await expect(client.followEvent('grp_real', 'cal_real', true)).rejects.toMatchObject({ status: 429, retryAfter: 120 });
+    expect(bridge.request).toHaveBeenCalledOnce();
+  });
+});
 
 describe('public profile and real boop', () => {
   it('loads bio using the separate public profile endpoint', async () => {
@@ -418,6 +433,26 @@ describe('public avatar database search', () => {
 });
 
 describe('v2 notifications and group actions', () => {
+  it('keeps pagination when a full legacy V2 page shares IDs with V1', async () => {
+    const entries = Array.from({ length: 100 }, (_, index) => ({ id: `not_${index}`, type: 'boop' }));
+    const { client } = fixture([success(entries.slice(0, 99)), { status: 404, data: {} }, success(entries)]);
+    const page = await client.notificationPage();
+    expect(page.items).toHaveLength(100);
+    expect(page.items.filter((item) => item._protocol === 'legacy-v2')).toHaveLength(1);
+    expect(page.hasMore).toBe(true);
+  });
+  it('does not offer offset pagination for a full modern-only snapshot', async () => {
+    const entries = Array.from({ length: 100 }, (_, index) => ({ id: `not_${index}`, type: 'boop' }));
+    const { client } = fixture([success([]), success(entries)]);
+    expect(await client.notificationPage()).toMatchObject({ hasMore: false });
+  });
+  it('stops between notification protocols when its foreground screen becomes obsolete', async () => {
+    const { client, bridge } = fixture();
+    let active = true;
+    vi.mocked(bridge.request).mockImplementationOnce(async () => { active = false; return success([]); });
+    expect(await client.notificationPage(0, () => active)).toEqual({ items: [], hasMore: false });
+    expect(bridge.request).toHaveBeenCalledOnce();
+  });
   it('merges notification versions, parses encoded payloads, and retains v1 action IDs', async () => {
     const { client } = fixture([
       success([
@@ -455,13 +490,91 @@ describe('v2 notifications and group actions', () => {
       _v2: false,
     });
   });
-  it('treats only endpoint 404 as unsupported v2, not network or permission failures', async () => {
-    const { bridge, client } = fixture([{ status: 404, data: {} }]);
+  it('disables v2 only after both modern and legacy endpoints return 404', async () => {
+    const { bridge, client } = fixture([{ status: 404, data: {} }, { status: 404, data: {} }]);
     expect(await client.notificationsV2()).toEqual([]);
     expect(await client.notificationsV2()).toEqual([]);
-    expect(bridge.request).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(bridge.request).mock.calls.map(([request]) => request.path)).toEqual([
+      '/notifications?limit=100',
+      '/auth/user/notificationsV2?n=100&offset=0',
+    ]);
+  });
+  it('keeps modern permission, network and rate errors visible without trying a legacy endpoint', async () => {
     const other = fixture([{ status: 403, data: {} }]);
     await expect(other.client.notificationsV2()).rejects.toMatchObject({ status: 403 });
+    expect(other.bridge.request).toHaveBeenCalledOnce();
+    const limited = fixture([{ status: 429, data: {}, retryAfter: 120 }]);
+    await expect(limited.client.notificationsV2()).rejects.toMatchObject({ status: 429, retryAfter: 120 });
+    expect(limited.bridge.request).toHaveBeenCalledOnce();
+    const offline = fixture();
+    vi.mocked(offline.bridge.request).mockRejectedValue(new Error('Offline'));
+    await expect(offline.client.notificationsV2()).rejects.toThrow('подключиться');
+    expect(offline.bridge.request).toHaveBeenCalledOnce();
+  });
+  it('uses modern V2 once at offset zero and never sends an invented offset query', async () => {
+    const { bridge, client } = fixture([
+      success([{ id: 'not_boop', type: 'boop', canDelete: true, data: { boopingUserDisplayName: 'Friend' } }]),
+    ]);
+    expect(await client.notificationsV2()).toMatchObject([
+      { id: 'not_boop', senderUsername: 'Friend', _protocol: 'modern-v2', _v2: true, canDelete: true },
+    ]);
+    expect(await client.notificationsV2(100)).toEqual([]);
+    expect(bridge.request).toHaveBeenCalledExactlyOnceWith({ path: '/notifications?limit=100', method: 'GET' });
+  });
+  it('falls back to legacy V2 after 404 and uses its actual pagination and action routes', async () => {
+    const { bridge, client } = fixture([
+      { status: 404, data: {} },
+      success([{ id: 'not_old', type: 'group.announcement' }]),
+      success([]), success({}), success({}),
+    ]);
+    const [notification] = await client.notificationsV2();
+    expect(notification._protocol).toBe('legacy-v2');
+    await client.notificationsV2(100);
+    await client.readNotification(notification);
+    await client.hideNotification(notification);
+    expect(vi.mocked(bridge.request).mock.calls.map(([request]) => [request.path, request.method])).toEqual([
+      ['/notifications?limit=100', 'GET'],
+      ['/auth/user/notificationsV2?n=100&offset=0', 'GET'],
+      ['/auth/user/notificationsV2?n=100&offset=100', 'GET'],
+      ['/auth/user/notifications/not_old/see', 'PUT'],
+      ['/auth/user/notifications/not_old/hide', 'PUT'],
+    ]);
+  });
+  it('does not turn a permission failure from the fallback endpoint into an empty list', async () => {
+    const { client, bridge } = fixture([{ status: 404, data: {} }, { status: 403, data: {} }]);
+    await expect(client.notificationsV2()).rejects.toMatchObject({ status: 403 });
+    expect(bridge.request).toHaveBeenCalledTimes(2);
+  });
+  it('acknowledges and deletes modern V2 with their documented HTTP methods', async () => {
+    const { bridge, client } = fixture([success({}), success({})]);
+    const notification = { id: 'not_modern', type: 'group.event.created', _protocol: 'modern-v2' as const, _v2: true, canDelete: true };
+    await client.readNotification(notification);
+    await client.dismissNotification(notification);
+    expect(vi.mocked(bridge.request).mock.calls.map(([request]) => [request.path, request.method, request.body])).toEqual([
+      ['/notifications/not_modern/see', 'POST', '{}'],
+      ['/notifications/not_modern', 'DELETE', undefined],
+    ]);
+  });
+  it('refuses a protected notification delete before any group mutation, but permits acknowledgement', async () => {
+    const { bridge, client } = fixture([success({})]);
+    const notification = { id: 'not_protected', type: 'group.invite', _protocol: 'modern-v2' as const, canDelete: false, details: { groupId: 'grp_real' } };
+    await expect(client.dismissNotification(notification)).rejects.toMatchObject({ status: 403 });
+    expect(bridge.request).not.toHaveBeenCalled();
+    await client.readNotification(notification);
+    expect(bridge.request).toHaveBeenCalledExactlyOnceWith({ path: '/notifications/not_protected/see', method: 'POST', body: '{}' });
+  });
+  it('joins from a protected modern invite and acknowledges it without an impermissible delete', async () => {
+    const { bridge, client } = fixture([success({}), success({})]);
+    await client.acceptNotification({ id: 'not_invite', type: 'group.invite', _protocol: 'modern-v2', canDelete: false, details: { groupId: 'grp_real' } });
+    expect(vi.mocked(bridge.request).mock.calls.map(([request]) => [request.path, request.method])).toEqual([
+      ['/groups/grp_real/join', 'POST'],
+      ['/notifications/not_invite/see', 'POST'],
+    ]);
+  });
+  it('preserves real event links, titles and explicit deletion permissions', () => {
+    expect(normalizeNotification({ id: 'not_event', type: 'event.announcement', title: 'Real event', link: 'event:grp_real,cal_real', canDelete: false }, true, 'modern-v2')).toMatchObject({
+      title: 'Real event', link: 'event:grp_real,cal_real', _link: 'event:grp_real,cal_real', canDelete: false, _protocol: 'modern-v2',
+    });
   });
   it('accepts group invites through join, then hides only after join succeeded', async () => {
     const { bridge, client } = fixture([success({}), success({})]);

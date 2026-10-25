@@ -50,7 +50,7 @@ import org.json.JSONTokener;
 /** Native-only VRChat transport: no cookies or pipeline tokens cross the WebView boundary. */
 @CapacitorPlugin(name = "VrcNative")
 public class VrcNativePlugin extends Plugin {
-    private static final String USER_AGENT = "Mobile-VRCNext/0.1.1 (https://github.com/DiskREid/vrcnext-mobile/issues)";
+    private static final String USER_AGENT = "Mobile-VRCNext/0.2.0 (https://github.com/DiskREid/vrcnext-mobile/issues)";
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -151,6 +151,26 @@ public class VrcNativePlugin extends Plugin {
     @PluginMethod public void sessionState(PluginCall call) {
         if (tasks.isClosed()) { release(call); return; }
         resolve(call, new JSObject().put("hasAuth", cookies != null && cookies.token("auth") != null));
+    }
+
+    @PluginMethod public void screenProtection(PluginCall call) {
+        if (tasks.isClosed()) { release(call); return; }
+        resolve(call, new JSObject().put("enabled", ScreenProtection.isEnabled(getContext())));
+    }
+
+    @PluginMethod public void setScreenProtection(PluginCall call) {
+        if (tasks.isClosed()) { release(call); return; }
+        Boolean enabled = call.getBoolean("enabled");
+        if (enabled == null) { reject(call, "An enabled value is required", "INVALID_ARGUMENT"); return; }
+        getActivity().runOnUiThread(() -> {
+            if (tasks.isClosed()) { release(call); return; }
+            try {
+                ScreenProtection.setEnabled(getActivity(), enabled);
+                resolve(call, new JSObject().put("enabled", ScreenProtection.isEnabled(getContext())));
+            } catch (RuntimeException failure) {
+                reject(call, "Could not change screenshot protection", "SCREEN_PROTECTION_ERROR");
+            }
+        });
     }
 
     private HttpUrl apiUrl(String path) { return ApiEndpoint.resolve(path); }

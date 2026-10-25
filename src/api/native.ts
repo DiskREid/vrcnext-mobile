@@ -19,6 +19,8 @@ export interface PipelineEvent {
 }
 export interface NativeBridge {
   sessionState(): Promise<{ hasAuth: boolean }>;
+  screenProtection(): Promise<{ enabled: boolean }>;
+  setScreenProtection(options: { enabled: boolean }): Promise<{ enabled: boolean }>;
   loadImage(options: { url: string }): Promise<{ dataUrl: string }>;
   request(options: NativeRequest): Promise<NativeResponse>;
   searchPublicAvatars(options: { query: string; page: number }): Promise<NativeResponse>;

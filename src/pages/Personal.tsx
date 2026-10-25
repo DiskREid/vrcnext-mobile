@@ -2,6 +2,7 @@ import DiagnosticsPanel from '../components/DiagnosticsPanel';
 import { useEffect, useRef, useState } from 'react';
 import { LockKeyhole, LogOut, Info, Palette, Clock, ExternalLink, Check } from 'lucide-react';
 import { api } from '../api';
+import { isNative, native } from '../api/native';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
 import type { User, ProfileUpdate } from '../api';
 import { useApp, useLoad } from '../state';
@@ -25,7 +26,7 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
     [languages, setLanguages] = useState(user.languages?.join(', ') || ''),
     [links, setLinks] = useState(user.bioLinks?.join('\n') || ''),
     [busy, setBusy] = useState(false);
-  const edited = useRef(new Set<'bio' | 'languages' | 'links'>());
+  const edited = useRef(new Set<'bio' | 'languages' | 'links' | 'status' | 'text' | 'pronouns'>());
   const profile = useLoad(
     () =>
       demo
@@ -41,6 +42,11 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
     if (!edited.current.has('languages')) setLanguages(complete.languages?.join(', ') || '');
     if (!edited.current.has('links')) setLinks(complete.bioLinks?.join('\n') || '');
   }, [profile.data, user.id]);
+  useEffect(() => {
+    if (!edited.current.has('status')) setStatus(user.status || 'active');
+    if (!edited.current.has('text')) setText(user.statusDescription || '');
+    if (!edited.current.has('pronouns')) setPronouns(user.pronouns || '');
+  }, [user.id, user.status, user.statusDescription, user.pronouns]);
   const save = (e: React.FormEvent) => {
     e.preventDefault();
     void act(async () => {
@@ -69,6 +75,7 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
             : {}),
         };
         const next = await api.updateProfile(user.id, update);
+        edited.current.clear();
         // The /auth/user response may omit the split public profile fields.
         onUpdated(mergePublicProfile({ ...user, ...next }, update as Record<string, unknown>));
       } finally {
@@ -92,7 +99,7 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
         <div className="field-grid">
           <label className="field">
             Статус
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select value={status} onChange={(e) => { edited.current.add('status'); setStatus(e.target.value); }}>
               {['join me', 'active', 'ask me', 'busy'].map((s) => (
                 <option key={s} value={s}>
                   {statusName(s)}
@@ -102,12 +109,12 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
           </label>
           <label className="field">
             Местоимения
-            <input value={pronouns} onChange={(e) => setPronouns(e.target.value)} maxLength={64} />
+            <input value={pronouns} onChange={(e) => { edited.current.add('pronouns'); setPronouns(e.target.value); }} maxLength={64} />
           </label>
         </div>
         <label className="field">
           Текст статуса<span className="input-hint">{text.length} / 32</span>
-          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={32} />
+          <input value={text} onChange={(e) => { edited.current.add('text'); setText(e.target.value); }} maxLength={32} />
         </label>
         <label className="field">
           О себе
@@ -160,6 +167,33 @@ export function SettingsPage() {
   const { logout } = useApp(),
     [accent, setAccent] = useState(localStorage.getItem('accent') || '#a398ff'),
     [confirm, setConfirm] = useState(false);
+  const [screenProtection, setScreenProtection] = useState<boolean | null>(isNative ? null : false);
+  const [protectionBusy, setProtectionBusy] = useState(false);
+  const [protectionError, setProtectionError] = useState('');
+  const [protectionReadRevision, setProtectionReadRevision] = useState(0);
+  useEffect(() => {
+    if (!isNative) return;
+    let active = true;
+    setProtectionError('');
+    native.screenProtection().then(
+      ({ enabled }) => { if (active) setScreenProtection(enabled); },
+      () => { if (active) setProtectionError('Не удалось прочитать настройку защиты экрана.'); },
+    );
+    return () => { active = false; };
+  }, [protectionReadRevision]);
+  const changeScreenProtection = async (enabled: boolean) => {
+    if (!isNative || protectionBusy || screenProtection === null) return;
+    setProtectionBusy(true);
+    setProtectionError('');
+    try {
+      const result = await native.setScreenProtection({ enabled });
+      setScreenProtection(result.enabled);
+    } catch {
+      setProtectionError('Не удалось изменить защиту экрана. Повторите попытку.');
+    } finally {
+      setProtectionBusy(false);
+    }
+  };
   const setColor = (c: string) => {
     setAccent(c);
     document.documentElement.style.setProperty('--accent', c);
@@ -194,10 +228,32 @@ export function SettingsPage() {
         <section className="card settings-section">
           <LockKeyhole />
           <h2>Конфиденциальность</h2>
+          <label className="screen-protection-setting">
+            <span>
+              <strong>Защита от снимка экрана</strong>
+              <span className="muted small">
+                {isNative
+                  ? 'Включите, чтобы запретить скриншоты и скрывать содержимое приложения при записи экрана. По умолчанию выключена.'
+                  : 'Доступна в Android-приложении. Браузер не позволяет управлять снимками экрана.'}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Защита от снимка экрана"
+              checked={screenProtection === true}
+              disabled={!isNative || protectionBusy || screenProtection === null}
+              onChange={(event) => void changeScreenProtection(event.target.checked)}
+            />
+          </label>
+          {protectionError && <div role="alert">
+            <p>{protectionError}</p>
+            {screenProtection === null && <button className="button secondary compact" onClick={() => setProtectionReadRevision((value) => value + 1)}>Повторить чтение настройки</button>}
+          </div>}
           <DiagnosticsPanel />
           <p className="muted">
             Пароль не сохраняется. Cookie сессии шифруются ключом Android Keystore. Резервное
-            копирование и снимки экрана отключены. Нет аналитики и промежуточного сервера.
+            копирование отключено. Защитой от снимков экрана можно управлять выше. Нет аналитики и промежуточного сервера.
           </p>
           <p className="muted small">
             Для защиты сессии приложение не показывает cookie и токены. Выход удаляет сохранённую
@@ -224,7 +280,7 @@ export function SettingsPage() {
         <section className="card settings-section">
           <Info />
           <h2>
-            VRCNext Mobile <Badge>0.1.1</Badge>
+            VRCNext Mobile <Badge>0.2.0</Badge>
           </h2>
           <p className="muted">
             Неофициальная Android-адаптация VRCNext от shinyflvre и участников VRCNext. Не связана с
@@ -320,7 +376,7 @@ export function TimelinePage() {
   );
 }
 export function ModerationPage() {
-  const { demo, act, refresh, openUser } = useApp();
+  const { demo, act, refresh, openUser, history } = useApp();
   const [type, setType] = useState<'block' | 'mute'>('block');
   const load = useLoad(() => (demo ? Promise.resolve([]) : api.moderations(type)), [type, refresh]);
   return (
@@ -352,6 +408,7 @@ export function ModerationPage() {
               onClick={() =>
                 void act(async () => {
                   await api.unmoderate(m.targetUserId!, type);
+                  history.recordModeration(m.targetUserId!, m.targetDisplayName || m.targetUserId!, `Снято ограничение ${type}`);
                   load.reload();
                 }, 'Ограничение снято')
               }

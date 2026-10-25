@@ -53,6 +53,8 @@ export class PagedData<T extends { id: string }> {
   cancel() {
     this.generation++;
     this.busy = false;
+    if (this.state.refreshing || this.state.moreLoading)
+      this.publish({ refreshing: false, moreLoading: false });
   }
 
   async reset(key: string, loader: (offset: number) => Promise<T[]>, pageSize: number) {

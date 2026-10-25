@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { api, ApiError } from './index';
-import { createProfileData, redactProfileSecrets, safeProfileJson } from './profile-data';
+import {
+  createProfileData,
+  profileFriendAccess,
+  redactProfileSecrets,
+  safeProfileJson,
+} from './profile-data';
 import type { User } from './types';
 
 function fixture(...responses: unknown[]) {
@@ -75,6 +80,79 @@ describe('profile tabs API privacy and contracts', () => {
       ),
     ).rejects.toMatchObject({ status: 403 });
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it('uses the current account-relative relationship rather than treating a stale key as friendship', () => {
+    expect(profileFriendAccess({ isFriend: true })).toBe(true);
+    expect(profileFriendAccess({ friendKey: 'server-friend-key' })).toBe(true);
+    expect(profileFriendAccess({ isFriend: false, friendKey: 'old-friend-key' })).toBe(false);
+    expect(profileFriendAccess({ friendKey: '  ' })).toBe(false);
+    expect(profileFriendAccess({})).toBe(false);
+  });
+
+  it('loads friends-only standard and VRC+ categories for a confirmed friend without exposing private categories', async () => {
+    const { client, request } = fixture(
+      {
+        favoriteGroups: [
+          { id: 'public', name: 'worlds1', visibility: 'public' },
+          { id: 'friends', name: 'worlds2', visibility: 'friends' },
+          { id: 'private', name: 'worlds3', visibility: 'private' },
+        ],
+      },
+      {
+        favoriteGroups: [
+          { id: 'plus', name: 'vrcPlusWorlds1', visibility: 'friends' },
+          { id: 'plus-private', name: 'vrcPlusWorlds2', visibility: 'private' },
+        ],
+      },
+      { favorites: [{ world: { id: 'wrld_friend', name: 'Shared with friends' } }] },
+    );
+    const groups = await client.favoriteGroups('usr_friend', false, true);
+    expect(groups.map((group) => group.id)).toEqual(['public', 'friends', 'plus']);
+    expect(await client.favoriteWorlds('usr_friend', groups[2], false, true)).toMatchObject([
+      { id: 'wrld_friend', name: 'Shared with friends' },
+    ]);
+    expect(request).toHaveBeenLastCalledWith(
+      '/favorites/groups/vrcPlusWorld/vrcPlusWorlds1?ownerId=usr_friend',
+    );
+  });
+
+  it('never probes a friends-only collection without confirmed access or a private collection even for a friend', async () => {
+    const { client, request } = fixture();
+    const group = {
+      id: 'hidden',
+      name: 'worlds1',
+      type: 'world' as const,
+      displayName: 'Hidden',
+      visibility: 'friends',
+    };
+    await expect(client.favoriteWorlds('usr_other', group, false)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(
+      client.favoriteWorlds('usr_friend', { ...group, visibility: 'private' }, false, true),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('propagates a server denial of a friend-visible collection instead of reporting a successful empty result', async () => {
+    const request = vi.fn().mockRejectedValue(new ApiError('Forbidden', 403));
+    const client = createProfileData(request as typeof api.request);
+    await expect(
+      client.favoriteWorlds(
+        'usr_friend',
+        {
+          id: 'friends',
+          name: 'worlds2',
+          type: 'world',
+          displayName: 'Friends',
+          visibility: 'friends',
+        },
+        false,
+        true,
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(request).toHaveBeenCalledTimes(1);
   });
 
   it('lets the owner read their private categories', async () => {

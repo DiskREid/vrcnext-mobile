@@ -116,7 +116,7 @@ export function FriendNetwork() {
     }).catch(() => {});
     return () => { retired = true; generation.current++; void handle?.remove(); document.removeEventListener('visibilitychange', visibility); };
   }, []);
-  useEffect(() => { if (!ctx.online) cancelScan(); }, [ctx.online]);
+  useEffect(() => { if (!ctx.online || ctx.pageActive === false) cancelScan(); }, [ctx.online, ctx.pageActive]);
   useEffect(() => { setLimit(200); resetView(); }, [query, filter]);
 
   const graph = useMemo(() => buildKnownGraph(ctx.user, ctx.friends.data, observations), [ctx.user, ctx.friends.data, observations]);
