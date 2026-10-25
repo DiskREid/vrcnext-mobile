@@ -592,3 +592,117 @@ test('favorite avatars load and search the selected real category instead of eve
   await noHorizontalOverflow(page);
   expect(errors).toEqual([]); expect(network).toEqual([]);
 });
+
+type WorldInstanceFixture = {
+  actions: { type: string; id: string }[];
+  requests: { path: string; method: string; body?: string }[];
+  unexpected: string[];
+  worldId: string;
+  groupId: string;
+  nearId: string;
+  groupFriendId: string;
+  locationA: string;
+  locationB: string;
+  hiddenLocation: string;
+  groupLocation: string;
+  moveFriend: () => void;
+  moveGroupFriend: () => void;
+  restoreGroupFriend: () => void;
+};
+const worldInstanceFixture = (page: Page) => page.evaluate(() => (window as unknown as { __worldInstanceTest: WorldInstanceFixture }).__worldInstanceTest);
+
+test('world instance list groups disclosed friends and opens their real profiles without refetching lists for status changes', async ({ page }, testInfo) => {
+  const errors: string[] = [], network: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
+  await page.goto('/tests/world-instances-harness.html');
+  const world = page.getByRole('dialog', { name: 'Мир', exact: true });
+  await expect(world.getByRole('heading', { name: 'Fixture Harbor', exact: true })).toBeVisible();
+  const region = world.getByRole('region', { name: 'Инстансы мира', exact: true });
+  const rows = region.locator('.world-instance');
+  await expect(rows).toHaveCount(4);
+  const fixture = await worldInstanceFixture(page);
+  const at = (location: string) => region.locator(`[data-location="${location}"]`);
+  const publicA = at(fixture.locationA), publicB = at(fixture.locationB);
+  const hidden = at(fixture.hiddenLocation), group = at(fixture.groupLocation);
+  const originalOrder = await rows.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-location')));
+  expect(originalOrder).toEqual([fixture.locationA, fixture.locationB, fixture.hiddenLocation, fixture.groupLocation]);
+  await expect(publicA.locator('.world-instance-friend')).toHaveCount(2);
+  await expect(publicA.getByText('Друзья · 2', { exact: true })).toBeVisible();
+  await expect(publicA.getByRole('button', { name: 'Открыть профиль Fixture Nearby', exact: true })).toBeVisible();
+  await expect(publicA.getByRole('button', { name: 'Открыть профиль Fixture Pair', exact: true })).toBeVisible();
+  await expect(publicB.getByRole('button', { name: 'Открыть профиль Fixture Other Instance', exact: true })).toBeVisible();
+  await expect(hidden.getByRole('button', { name: 'Открыть профиль Fixture Hidden', exact: true })).toBeVisible();
+  await expect(hidden.getByText('Число игроков не передано', { exact: true })).toBeVisible();
+  await expect(group.getByRole('button', { name: 'Открыть профиль Fixture Group Friend', exact: true })).toBeVisible();
+  for (const excluded of ['Fixture Masked', 'Fixture Other World', 'Fixture Offline'])
+    await expect(region.getByRole('button', { name: `Открыть профиль ${excluded}`, exact: true })).toHaveCount(0);
+  const sizes = await region.locator('.world-instance-friend').evaluateAll((buttons) => buttons.map((button) => {
+    const hit = button.getBoundingClientRect(), avatar = button.querySelector('.avatar')!.getBoundingClientRect();
+    return { width: hit.width, height: hit.height, avatarWidth: avatar.width, avatarHeight: avatar.height };
+  }));
+  expect(sizes).toHaveLength(5);
+  for (const size of sizes) {
+    expect(size.width).toBeGreaterThanOrEqual(44); expect(size.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(size.avatarWidth - size.avatarHeight)).toBeLessThanOrEqual(1);
+  }
+  expect(fixture.requests.map((request) => request.path)).toEqual([`/worlds/${fixture.worldId}`]);
+  await noHorizontalOverflow(page);
+  await region.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `artifacts/regressions/${testInfo.project.name}-world-instance-friends-synthetic-fixture.png` });
+
+  await publicA.getByRole('button', { name: 'Инвайт себе', exact: true }).click();
+  await expect.poll(async () => (await worldInstanceFixture(page)).requests.filter((request) => request.method === 'POST').length).toBe(1);
+  expect((await worldInstanceFixture(page)).requests.find((request) => request.method === 'POST')).toMatchObject({ path: `/instances/${fixture.locationA}/invite`, body: '{}' });
+  const requestsBeforeMove = (await worldInstanceFixture(page)).requests.length;
+  await page.evaluate(() => (window as unknown as { __worldInstanceTest: WorldInstanceFixture }).__worldInstanceTest.moveFriend());
+  await expect(publicA.locator('.world-instance-friend')).toHaveCount(1);
+  await expect(publicB.locator('.world-instance-friend')).toHaveCount(2);
+  const moved = publicB.getByRole('button', { name: 'Открыть профиль Fixture Nearby', exact: true });
+  await expect(moved).toContainText('Не беспокоить');
+  expect(await rows.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-location')))).toEqual(originalOrder);
+  expect((await worldInstanceFixture(page)).requests).toHaveLength(requestsBeforeMove);
+  await moved.click();
+  const profile = page.getByRole('dialog', { name: 'Профиль', exact: true });
+  await expect(profile.getByRole('heading', { name: 'Fixture Nearby', exact: true })).toBeVisible();
+  await expect(world).toHaveCount(0);
+  expect((await worldInstanceFixture(page)).actions).toContainEqual({ type: 'user', id: fixture.nearId });
+  await noHorizontalOverflow(page);
+  expect((await worldInstanceFixture(page)).unexpected).toEqual([]);
+  expect(errors).toEqual([]); expect(network).toEqual([]);
+});
+
+test('group instance friends follow current presence instead of an old roster and open the profile', async ({ page }, testInfo) => {
+  const errors: string[] = [], network: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
+  await page.goto('/tests/world-instances-harness.html');
+  await page.getByRole('dialog', { name: 'Мир', exact: true }).getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await page.getByRole('button', { name: 'Fixture group', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Fixture Group', exact: true });
+  await dialog.getByRole('button', { name: 'Инстансы', exact: true }).click();
+  const row = dialog.locator('.group-instance');
+  await expect(row).toHaveCount(1);
+  await expect(row.getByText('Друзья · 1', { exact: true })).toBeVisible();
+  const friend = row.getByRole('button', { name: 'Открыть профиль Fixture Group Friend', exact: true });
+  await expect(friend).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Открыть профиль Fixture Nearby', exact: true })).toHaveCount(0);
+  await expect(row.locator('button button')).toHaveCount(0);
+  await noHorizontalOverflow(page);
+  const beforeMove = (await worldInstanceFixture(page)).requests.length;
+  await page.evaluate(() => (window as unknown as { __worldInstanceTest: WorldInstanceFixture }).__worldInstanceTest.moveGroupFriend());
+  await expect(friend).toHaveCount(0);
+  await expect(row.getByText('Друзья · 0', { exact: true })).toBeVisible();
+  expect((await worldInstanceFixture(page)).requests).toHaveLength(beforeMove);
+  await page.evaluate(() => (window as unknown as { __worldInstanceTest: WorldInstanceFixture }).__worldInstanceTest.restoreGroupFriend());
+  await expect(friend).toContainText('Заходите');
+  await row.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `artifacts/regressions/${testInfo.project.name}-group-instance-friends-synthetic-fixture.png` });
+  await friend.click();
+  await expect(page.getByRole('dialog', { name: 'Профиль', exact: true }).getByRole('heading', { name: 'Fixture Group Friend', exact: true })).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  const fixture = await worldInstanceFixture(page);
+  expect(fixture.actions).toContainEqual({ type: 'user', id: fixture.groupFriendId });
+  expect(fixture.unexpected).toEqual([]);
+  expect(errors).toEqual([]); expect(network).toEqual([]);
+});

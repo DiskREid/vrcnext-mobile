@@ -1,0 +1,27 @@
+.world-instances { min-width: 0; }
+.world-instance { padding: 16px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.world-instance-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.world-instance-summary { min-width: 0; flex: 1; }
+.world-instance-summary > strong { display: block; font-size: 13px; overflow-wrap: anywhere; }
+.world-instance-summary > small { display: block; margin-top: 6px; }
+.world-instance-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 7px; color: var(--muted); font-size: 11px; }
+.world-instance-friend-count { display: inline-flex; align-items: center; gap: 4px; }
+.world-instance-actions { display: flex; align-items: center; flex-shrink: 0; gap: 4px; }
+.world-instance-actions > button { min-height: 44px; }
+.world-instance-actions > .icon-button { min-width: 44px; }
+.world-instance-friends { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 7px; margin-top: 12px; min-width: 0; }
+.world-instance-friend { display: flex; align-items: center; gap: 10px; text-align: left; min-width: 0; min-height: 52px; padding: 7px; border: 1px solid var(--border); background: transparent; border-radius: 10px; }
+.world-instance-friend:hover, .world-instance-friend:focus-visible { background: var(--surface-hover); }
+.world-instance-friend > .avatar { flex: 0 0 auto; }
+.world-instance-friend-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.world-instance-friend-text > strong { display: block; font-size: 12px; color: var(--accent); }
+.world-instance-friend-text > small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+.group-instance { padding: 10px; min-width: 0; }
+.group-instance-world { width: 100%; text-align: left; min-width: 0; min-height: 44px; }
+.group-instance-world > div { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.group-instance-world > svg { flex: 0 0 auto; }
+.group-instance-friend-count { display: flex; align-items: center; gap: 5px; margin: 8px 7px; }
+@media (max-width: 540px) {
+  .world-instance-header { align-items: stretch; flex-direction: column; gap: 10px; }
+  .world-instance-actions { justify-content: flex-end; }
+}

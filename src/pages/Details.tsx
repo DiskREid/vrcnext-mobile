@@ -19,6 +19,7 @@ import {
 import { api, native } from '../api';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
 import { loadFavoriteGroups } from '../api/favorites';
+import WorldInstances from '../components/WorldInstances';
 import type { User, World, Group, CreateInstanceOptions, FavoriteGroup } from '../api';
 import { useApp, useLoad } from '../state';
 import { demoFriends, demoWorlds, demoGroups } from '../demo';
@@ -543,52 +544,7 @@ export function WorldDetails({ target, onClose }: { target: World | string; onCl
                 </button>
               </div>
             )}
-            <h3 className="spaced-title">
-              Открытые инстансы <span className="muted">{w.instances?.length || 0}</span>
-            </h3>
-            {!w.instances?.length ? (
-              <Empty
-                title="Нет доступных инстансов"
-                text="Можно создать свой и пригласить друзей."
-              />
-            ) : (
-              w.instances.map(([inst, count]) => {
-                const loc = `${id}:${inst}`;
-                return (
-                  <div key={inst} className="instance-row">
-                    <div>
-                      <strong>#{inst.split('~')[0]}</strong>
-                      <p className="muted small">
-                        <Users size={13} />
-                        {count} / {w.capacity} ·{' '}
-                        {inst.includes('region(jp)')
-                          ? 'JP'
-                          : inst.includes('region(eu)')
-                            ? 'EU'
-                            : 'US'}
-                      </p>
-                    </div>
-                    <div className="row">
-                      <button
-                        className="button secondary compact"
-                        onClick={() =>
-                          void ctx.act(() => api.inviteSelf(loc), 'Приглашение отправлено в VRChat')
-                        }
-                      >
-                        Инвайт себе
-                      </button>
-                      <button
-                        className="icon-button"
-                        aria-label="Пригласить друзей"
-                        onClick={() => setInviteTo(loc)}
-                      >
-                        <Send size={17} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+            <WorldInstances world={w} onInviteFriends={setInviteTo} />
             {inviteTo && (
               <div className="inset-panel">
                 <h3>Пригласить друзей</h3>

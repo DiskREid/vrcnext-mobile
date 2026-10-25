@@ -59,7 +59,7 @@ export interface World {
   favorites?: number;
   visits?: number;
   tags?: string[];
-  instances?: [string, number][];
+  instances?: [string, number, Record<string, number>?][];
   releaseStatus?: string;
   unityPackages?: UnityPackage[];
   favoriteId?: string;

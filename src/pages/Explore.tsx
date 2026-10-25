@@ -25,6 +25,9 @@ import { PageScope, useApp, useLoad } from '../state';
 import { usePaged } from '../hooks/usePaged';
 import { clearFavoriteEntityCache, loadFavoriteGroups, loadFavoriteWorlds, loadFavoriteAvatars } from '../api/favorites';
 import { FavoriteCategoryPicker, demoFavoriteGroups } from './Favorites';
+import { InstanceFriends } from '../components/WorldInstances';
+import { disclosedInstanceLocation } from '../data/world-instances';
+import { friendsInInstance, instanceCount } from '../data/instance-location';
 import {
   AvatarImage,
   Badge,
@@ -387,7 +390,8 @@ export function GroupDetail({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { user, demo, act, openWorld } = useApp();
+  const ctx = useApp();
+  const { user, demo, act, openWorld } = ctx;
   const [tab, setTab] = useState('about');
   const [leave, setLeave] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -599,29 +603,26 @@ export function GroupDetail({
                   const instance = record(value),
                     world = record(instance.world);
                   const worldId = text(instance.worldId, text(world.id));
+                  const location = disclosedInstanceLocation(value);
+                  const presentFriends = location ? friendsInInstance(location, ctx.friends.data) : [];
+                  const count = instanceCount(instance.n_users) ?? instanceCount(instance.userCount);
                   return (
-                    <button
-                      className="list-row"
+                    <article
+                      className="group-instance card"
                       key={text(instance.id, String(index))}
-                      onClick={() => {
-                        if (worldId) {
-                          onClose();
-                          openWorld(worldId);
-                        }
-                      }}
+                      data-location={location}
                     >
-                      <Globe2 size={22} />
-                      <div>
-                        <strong>
-                          {text(world.name, text(instance.name, worldId || 'Инстанс группы'))}
-                        </strong>
-                        <p className="muted">
-                          {numeric(instance.n_users)} игроков ·{' '}
-                          {text(instance.region, 'Регион не указан')}
-                        </p>
-                      </div>
-                      <ChevronRight size={18} />
-                    </button>
+                      <button className="list-row group-instance-world" disabled={!worldId} onClick={() => {
+                        if (worldId) { onClose(); openWorld(worldId); }
+                      }}>
+                        <Globe2 size={22} />
+                        <div><strong>{text(world.name, text(instance.name, worldId || 'Инстанс группы'))}</strong>
+                          <p className="muted">{count !== undefined ? `${count} игроков` : 'Число игроков не передано'} · {text(instance.region, 'Регион не указан')}</p>
+                        </div><ChevronRight size={18} />
+                      </button>
+                      <p className="group-instance-friend-count muted small"><Users size={13} />Друзья · {presentFriends.length}</p>
+                      <InstanceFriends friends={presentFriends} onOpenUser={(friend) => { onClose(); ctx.openUser(friend); }} />
+                    </article>
                   );
                 })}
               </div>

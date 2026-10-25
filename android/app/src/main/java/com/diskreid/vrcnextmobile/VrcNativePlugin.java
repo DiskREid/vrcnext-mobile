@@ -50,7 +50,7 @@ import org.json.JSONTokener;
 /** Native-only VRChat transport: no cookies or pipeline tokens cross the WebView boundary. */
 @CapacitorPlugin(name = "VrcNative")
 public class VrcNativePlugin extends Plugin {
-    private static final String USER_AGENT = "Mobile-VRCNext/0.2.1 (https://github.com/DiskREid/vrcnext-mobile/issues)";
+    private static final String USER_AGENT = "Mobile-VRCNext/0.2.2 (https://github.com/DiskREid/vrcnext-mobile/issues)";
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
