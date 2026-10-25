@@ -20,6 +20,7 @@ export interface User {
   userIcon?: string;
   iconUrl?: string;
   profilePicOverride?: string;
+  profilePicOverrideThumbnail?: string;
   currentAvatarImageUrl?: string;
   currentAvatarThumbnailImageUrl?: string;
   currentAvatar?: string;
@@ -81,7 +82,8 @@ export interface Group {
   rules?: string;
   joinState?: string;
   membershipStatus?: string;
-  myMember?: { membershipStatus?: string; roleIds?: string[] };
+  myMember?: { membershipStatus?: string; roleIds?: string[]; mRoleIds?: string[]; permissions?: string[] };
+  roles?: { id: string; name: string; defaultRole?: boolean; permissions?: string[] }[];
   languages?: string[];
   links?: string[];
   galleries?: { id: string; name: string }[];
@@ -143,6 +145,7 @@ export interface Instance {
   ownerId?: string;
   groupAccessType?: string;
   displayName?: string;
+  minimumAvatarPerformance?: string | null;
   world?: World;
 }
 export type FavoriteType = 'friend' | 'world' | 'avatar' | 'vrcPlusWorld';
@@ -249,5 +252,7 @@ export interface CreateInstanceOptions {
   displayName?: string;
   queueEnabled?: boolean;
   ageGate?: boolean;
+  roleIds?: string[];
+  minimumAvatarPerformance?: 'Good' | 'Medium' | 'Poor';
 }
 export type UploadTag = 'gallery' | 'icon' | 'emoji' | 'sticker';

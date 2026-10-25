@@ -217,7 +217,7 @@ function ProfileLocationContent({ user }: { user: User }) {
     <section className="instance-friends" aria-label="Друзья в инстансе">
       <h4>Друзья в инстансе · {friends.length}</h4>
       {friends.length ? <div className="user-presence-list">{friends.map((friend) => <button className="list-row instance-person" key={friend.id} aria-label={`Открыть профиль ${friend.displayName}`} onClick={() => ctx.openUser(friend)}>
-        <AvatarImage name={friend.displayName} src={imageOf(friend)} size={36} status={friend.status} />
+        <AvatarImage name={friend.displayName} src={imageOf(friend)} size={36} user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl} />
         <span><strong>{friend.displayName}</strong>{friend.id === creatorId && <small>Создатель инстанса</small>}</span>
       </button>)}</div> : <p className="muted small">В доступных данных нет друзей с подтверждённым присутствием в этом инстансе.</p>}
     </section>
@@ -275,7 +275,7 @@ function MutualTab({ user }: { user: User }) {
           )}
           {users.map((friend) => (
             <button className="list-row" key={friend.id} onClick={() => ctx.openUser(friend)}>
-              <AvatarImage name={friend.displayName} src={imageOf(friend)} status={friend.status} />
+              <AvatarImage name={friend.displayName} src={imageOf(friend)} user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl} />
               <span>
                 <strong>{friend.displayName}</strong>
                 {friend.statusDescription && <small>{friend.statusDescription}</small>}

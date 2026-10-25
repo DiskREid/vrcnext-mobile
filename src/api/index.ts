@@ -1,6 +1,7 @@
 import { native, isNative } from './native';
 import type { Print } from './prints';
 import { normalizeCalendarEvent, normalizeCalendarPage } from './calendar';
+import { instanceCreationOptions } from './instances';
 import type { NativeBridge, NativeResponse } from './native';
 import type {
   Avatar,
@@ -567,7 +568,7 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
     instance: (location: string) =>
       request<Instance>('/instances/' + instancePathSegment(location)),
     createInstance: (options: CreateInstanceOptions) =>
-      request<Instance>('/instances', 'POST', options),
+      request<Instance>('/instances', 'POST', instanceCreationOptions(options)),
     inviteSelf: (location: string) =>
       request('/instances/' + instancePathSegment(location) + '/invite', 'POST', {}),
     invite: (id: string, location: string, messageSlot?: number) =>

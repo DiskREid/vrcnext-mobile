@@ -13,6 +13,7 @@ import type { Moderation, User } from '../api';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
 import { historyLabels } from '../data/history';
 import { accessibleLocation, presenceLabel } from '../data/locations';
+import { presenceMode } from '../data/presence';
 import { useApp, useLoad } from '../state';
 import SecureImage from '../components/SecureImage';
 import {
@@ -267,8 +268,8 @@ function FriendsList() {
   const items = ids
     .map((id) => byId.get(id)!)
     .filter((friend) => {
-      const online = accessibleLocation(friend.location) || friend.location === 'private';
-      const web = !online && (friend.state === 'active' || friend.state === 'online');
+      const online = presenceMode(friend) === 'game';
+      const web = presenceMode(friend) === 'website';
       return (
         (!query ||
           `${friend.displayName} ${friend.id}`.toLowerCase().includes(query.toLowerCase())) &&
@@ -338,7 +339,7 @@ function FriendsList() {
                   <AvatarImage
                     name={friend.displayName}
                     src={imageOf(friend)}
-                    status={friend.status}
+                    user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl}
                     size={48}
                   />
                   <div>

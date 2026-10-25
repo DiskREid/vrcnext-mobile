@@ -4,6 +4,18 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 public class ImageEndpointTest {
+    @Test public void legacyApiImageAliasesResolveOnlyToTheCanonicalAuthenticatedHost() {
+        assertEquals("https://api.vrchat.cloud/api/1/file/file_abc/1/file",
+                ImageEndpoint.resolve("https://api.vrchat.com/api/1/file/file_abc/1/file").toString());
+        assertEquals("api.vrchat.cloud", ImageEndpoint.resolve("https://vrchat.com/api/1/image/file_abc/1/256").host());
+        assertThrows(IllegalArgumentException.class, () -> ImageEndpoint.resolve("https://vrchat.com/api/1/auth"));
+    }
+    @Test public void binaryContentTypeNeedsAnActualRasterSignature() {
+        byte[] png = {(byte)137,'P','N','G',13,10,26,10,0,0,0,0};
+        assertEquals("image/png", ImageEndpoint.rasterMime(png, "application/octet-stream"));
+        assertThrows(IllegalArgumentException.class, () -> ImageEndpoint.rasterMime("{\"private\":true}".getBytes(java.nio.charset.StandardCharsets.UTF_8), "application/octet-stream"));
+        assertThrows(IllegalArgumentException.class, () -> ImageEndpoint.rasterMime(png, "image/jpeg"));
+    }
     @Test public void allowsOnlyOfficialHttpsImageSources() {
         assertEquals("api.vrchat.cloud", ImageEndpoint.resolve("https://api.vrchat.cloud/api/1/file/file_abc/1/file").host());
         assertEquals("files.vrchat.cloud", ImageEndpoint.resolve("https://files.vrchat.cloud/file/test.png?signature=abc").host());

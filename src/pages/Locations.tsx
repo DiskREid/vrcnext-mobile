@@ -142,7 +142,7 @@ function LocationCard({ group }: { group: FriendLocation }) {
               <AvatarImage
                 src={imageOf(friend)}
                 name={friend.displayName}
-                status={friend.status}
+                user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl}
                 size={38}
               />
               <span>{friend.displayName}</span>

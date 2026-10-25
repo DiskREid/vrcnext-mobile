@@ -1073,7 +1073,7 @@ export function MessengerPage() {
                     name={friend.displayName}
                     src={imageOf(friend)}
                     size={42}
-                    status={friend.status}
+                    user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl}
                   />
                   <div>
                     <strong>{friend.displayName}</strong>

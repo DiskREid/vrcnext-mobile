@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { User, World } from '../api';
 import { useApp } from '../state';
 import { buildWorldInstances } from '../data/world-instances';
+import type { KnownInstance } from '../data/world-instances';
 import { instanceCount } from '../data/instance-location';
 import { AvatarImage, Badge, Empty, imageOf } from './ui';
 import './WorldInstances.css';
@@ -29,15 +30,15 @@ export function InstanceFriends({ friends, onOpenUser }: { friends: User[]; onOp
   return <div className="world-instance-friends" aria-label="Друзья в этом инстансе">
     {friends.map((friend) => <button className="world-instance-friend" key={friend.id}
       aria-label={`Открыть профиль ${friend.displayName}`} onClick={() => (onOpenUser || ctx.openUser)(friend)}>
-      <AvatarImage src={imageOf(friend)} name={friend.displayName} size={36} status={friend.status} />
+      <AvatarImage src={imageOf(friend)} name={friend.displayName} size={36} user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl} />
       <span className="world-instance-friend-text"><strong>{friend.displayName}</strong><small>{statusLabel(friend)}</small></span>
     </button>)}
   </div>;
 }
 
-export default function WorldInstances({ world, onInviteFriends }: { world: World; onInviteFriends: (location: string) => void }) {
+export default function WorldInstances({ world, onInviteFriends, created = [] }: { world: World; onInviteFriends: (location: string) => void; created?: KnownInstance[] }) {
   const ctx = useApp();
-  const rows = useMemo(() => buildWorldInstances(world, ctx.friends.data), [world, ctx.friends.data]);
+  const rows = useMemo(() => buildWorldInstances(world, ctx.friends.data, created), [world, ctx.friends.data, created]);
   const capacity = instanceCount(world.capacity);
   return <section className="world-instances" aria-label="Инстансы мира">
     <h3 className="spaced-title">Инстансы <span className="muted">{rows.length}</span></h3>
@@ -55,6 +56,7 @@ export default function WorldInstances({ world, onInviteFriends }: { world: Worl
                 <span className="world-instance-friend-count"><Users size={13} />Друзья · {row.friends.length}</span>
               </div>
               {row.source === 'friends' && <small className="muted">По местоположению друзей</small>}
+              {row.source === 'created' && <small className="muted">Созданный инстанс</small>}
             </div>
             <div className="world-instance-actions">
               <button className="button secondary compact" onClick={() => void ctx.act(() => api.inviteSelf(row.location), 'Приглашение отправлено в VRChat')}>Инвайт себе</button>

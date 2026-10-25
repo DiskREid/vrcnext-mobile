@@ -50,7 +50,7 @@ export const demoFriends = [
     status: 'active',
     statusDescription: 'На сайте',
     location: 'offline',
-    state: 'online',
+    state: 'active',
     tags: ['system_trust_basic'],
   },
   {

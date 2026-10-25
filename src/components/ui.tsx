@@ -1,4 +1,6 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { User } from '../api/types';
+import { presenceIndicator } from '../data/presence';
 import type { ReactNode } from 'react';
 import SecureImage from './SecureImage';
 import {
@@ -229,28 +231,41 @@ export function AvatarImage({
   name,
   size = 48,
   status,
+  user,
+  fallbackSrc,
 }: {
   src?: string;
   name: string;
   size?: number;
   status?: string;
+  user?: User;
+  fallbackSrc?: string;
 }) {
+  const [failed, setFailed] = useState('');
+  const shown = failed === src && fallbackSrc && fallbackSrc !== src ? fallbackSrc : src;
+  const [hidden, setHidden] = useState('');
   return (
     <span className="avatar" style={{ width: size, height: size }}>
-      {src && (
+      {shown && (
         <SecureImage
-          src={src}
+          src={shown}
           alt=""
           loading="lazy"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
+          retainLoaded
+          maxDimension={256}
+          style={{ opacity: hidden === shown ? 0 : 1 }}
+          onLoad={() => setHidden('')}
+          onLoadError={() => { if (shown === src) setFailed(shown); setHidden(shown); }}
         />
       )}
       <span className="avatar-initial">{name.slice(0, 2).toUpperCase()}</span>
-      {status && <i className={`status-dot status-${status}`} />}
+      {(user || status) && <PresenceIndicator user={user || { id: '', displayName: name, status }} />}
     </span>
   );
+}
+export function PresenceIndicator({ user }: { user: User }) {
+  const presence = presenceIndicator(user);
+  return <i className={`status-dot presence-${presence.color} presence-${presence.mode}`} role="img" aria-label={presence.label} title={presence.label} data-presence={presence.mode} />;
 }
 export function Badge({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <span className={`badge ${className}`}>{children}</span>;
@@ -262,11 +277,15 @@ export function imageOf(user: {
   imageUrl?: string;
   thumbnailImageUrl?: string;
   iconUrl?: string;
+  profilePicOverride?: string;
+  currentAvatarImageUrl?: string;
 }) {
   return (
     user.userIcon ||
     user.profilePicOverrideThumbnail ||
+    user.profilePicOverride ||
     user.currentAvatarThumbnailImageUrl ||
+    user.currentAvatarImageUrl ||
     user.thumbnailImageUrl ||
     user.imageUrl ||
     user.iconUrl ||

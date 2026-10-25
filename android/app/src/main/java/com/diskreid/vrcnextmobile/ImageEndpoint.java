@@ -21,8 +21,19 @@ final class ImageEndpoint {
             String path = ApiEndpoint.decodedPath(url);
             if (!path.startsWith("/api/1/file/") && !path.startsWith("/api/1/image/"))
                 throw new IllegalArgumentException("Not an image API path");
+            // Legacy VRChat image URLs use these aliases. Authenticate only at the canonical API host.
+            if (!url.host().equals("api.vrchat.cloud")) url = url.newBuilder().host("api.vrchat.cloud").build();
         }
         return url;
+    }
+
+    static String rasterMime(byte[] bytes, String declared) {
+        if (hasRasterSignature(bytes, declared)) return declared;
+        if (declared.isEmpty() || declared.equals("application/octet-stream")) {
+            for (String mime : Arrays.asList("image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"))
+                if (hasRasterSignature(bytes, mime)) return mime;
+        }
+        throw new IllegalArgumentException("Not a supported raster image");
     }
 
     static boolean hasRasterSignature(byte[] bytes, String mime) {

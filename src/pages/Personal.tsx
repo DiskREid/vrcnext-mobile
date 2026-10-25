@@ -88,7 +88,7 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
     <>
       <PageHeader eyebrow="ВАШ АККАУНТ" title="Мой профиль" subtitle="Как вас видят в VRChat" />
       <div className="profile-card card">
-        <AvatarImage src={imageOf(user)} name={user.displayName} size={76} status={user.status} />
+        <AvatarImage src={imageOf(user)} name={user.displayName} size={76} user={user} fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl} />
         <div>
           <h2>{user.displayName}</h2>
           <Badge className="rank">{rankOf(user.tags)}</Badge>
@@ -281,7 +281,7 @@ export function SettingsPage() {
         <section className="card settings-section">
           <Info />
           <h2>
-            VRCNext Mobile <Badge>0.2.2</Badge>
+            VRCNext Mobile <Badge>0.2.3</Badge>
           </h2>
           <p className="muted">
             Неофициальная Android-адаптация VRCNext от shinyflvre и участников VRCNext. Не связана с

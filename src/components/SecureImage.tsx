@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import type { ImgHTMLAttributes } from 'react';
 import { isNative, native } from '../api';
-const images = new Map<string, Promise<string>>();
+import { ImagePreviewCache } from '../data/image-cache';
+import { AppContext } from '../state';
+const images = new ImagePreviewCache();
 function isProtectedImage(src: string) {
   try {
     const u = new URL(src);
@@ -27,6 +29,8 @@ export function useSecureImage(
   enabled = true,
   refreshKey: string | number = 0,
   onLoadError?: () => void,
+  maxDimension = 1024,
+  retainLoaded = false,
 ) {
   const protectedImage = !!src && isNative && isProtectedImage(src);
   const [image, setImage] = useState<{ src: string; data: string }>();
@@ -34,25 +38,12 @@ export function useSecureImage(
   failure.current = onLoadError;
   useEffect(() => {
     if (!enabled) {
-      setImage(undefined);
+      if (!retainLoaded) setImage(undefined);
       return;
     }
     if (!src || !protectedImage) return;
     let live = true;
-    let pending = images.get(src);
-    if (!pending) {
-      pending = native.loadImage({ url: src }).then((r) => {
-        // Keep large animated sources only in visible views; bound the shared JS cache.
-        if (r.dataUrl.length > 400_000 && images.get(src) === pending) images.delete(src);
-        return r.dataUrl;
-      });
-      images.set(src, pending);
-      if (images.size > 24) images.delete(images.keys().next().value!);
-      const key = src;
-      pending.catch(() => {
-        if (images.get(key) === pending) images.delete(key);
-      });
-    }
+    const pending = images.load(`${maxDimension}:${src}`, () => native.loadImage({ url: src, maxDimension }).then((result) => result.dataUrl), () => live);
     pending
       .then((data) => {
         if (live) setImage({ src, data });
@@ -66,8 +57,8 @@ export function useSecureImage(
     return () => {
       live = false;
     };
-  }, [src, enabled, protectedImage, refreshKey]);
-  return !protectedImage ? src : enabled && image?.src === src ? image.data : undefined;
+  }, [src, enabled, protectedImage, refreshKey, maxDimension, retainLoaded]);
+  return !protectedImage ? src : (enabled || retainLoaded) && image?.src === src ? image.data : undefined;
 }
 export function clearImageCache() {
   images.clear();
@@ -77,17 +68,34 @@ export default function SecureImage({
   loading = 'lazy',
   refreshKey = 0,
   onLoadError,
+  retainLoaded = false,
+  maxDimension = 1024,
   ...props
 }: ImgHTMLAttributes<HTMLImageElement> & {
-  /** An explicit retry re-requests failed media; no background retry loop. */
+  /** Failed visible media gets one bounded retry; refreshKey supports an explicit retry. */
   refreshKey?: string | number;
   onLoadError?: () => void;
+  retainLoaded?: boolean;
+  maxDimension?: number;
 }) {
   const ref = useRef<HTMLImageElement>(null);
+  const active = useContext(AppContext)?.pageActive !== false;
   const [visible, setVisible] = useState(loading === 'eager');
+  const [attempt, setAttempt] = useState(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const failures = useRef(0);
+  const errorCallback = useRef(onLoadError); errorCallback.current = onLoadError;
+  useEffect(() => { failures.current = 0; setAttempt(0); clearTimeout(timer.current); return () => clearTimeout(timer.current); }, [src, refreshKey]);
+  const failed = () => {
+    errorCallback.current?.();
+    if (!visible || failures.current >= 1) return;
+    failures.current++;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setAttempt((value) => value + 1), 3000);
+  };
   useEffect(() => {
     const element = ref.current;
-    if (!element) return;
+    if (!element || !active) return;
     if (loading === 'eager') {
       setVisible(true);
       return;
@@ -98,23 +106,25 @@ export default function SecureImage({
     }
     const observer = new IntersectionObserver(
       (entries) => {
-        setVisible(entries.some((e) => e.isIntersecting));
+        const inView = entries.some((e) => e.isIntersecting);
+        setVisible((previous) => retainLoaded ? previous || inView : inView);
+        if (retainLoaded && inView) observer.disconnect();
       },
       { rootMargin: '240px' },
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [loading, src, refreshKey]);
-  const resolved = useSecureImage(src, visible, refreshKey, onLoadError);
+  }, [loading, src, refreshKey, retainLoaded, attempt, active]);
+  const resolved = useSecureImage(src, visible && active, `${refreshKey}:${attempt}`, failed, maxDimension, retainLoaded);
   return (
     <img
-      key={`${src}:${refreshKey}`}
+      key={`${src}:${refreshKey}:${attempt}`}
       ref={ref}
       {...props}
       src={resolved || undefined}
       loading={loading}
       onError={(event) => {
-        onLoadError?.();
+        failed();
         props.onError?.(event);
       }}
     />

@@ -124,7 +124,7 @@ function FavoriteCard({ entry, revision, onManage, onAvatar }: { entry: Favorite
   };
   return <article className={`card favorite-card ${entry.type}`}>
     <button className="favorite-open" onClick={open} disabled={entry.type === 'avatar' && !entity}>
-      {entry.type === 'friend' ? <AvatarImage src={entity ? imageOf(entity) : undefined} name={name} size={56} status={liveFriend?.status} /> : <div className="favorite-cover"><SecureImage src={entity ? imageOf(entity) : undefined} alt="" /></div>}
+      {entry.type === 'friend' ? <AvatarImage src={entity ? imageOf(entity) : undefined} name={name} size={56} user={liveFriend || (entity as User | undefined)} fallbackSrc={(entity as User | undefined)?.currentAvatarThumbnailImageUrl} /> : <div className="favorite-cover"><SecureImage src={entity ? imageOf(entity) : undefined} alt="" /></div>}
       <div className="favorite-card-text"><h3>{name}</h3>{load.loading && !entity ? <span className="muted small">Загружаем карточку…</span> : entry.type === 'friend' && entity ? <><p>{(entity as User).statusDescription || statusName((entity as User).status)}</p><span className="muted small">{(entity as User).location || 'Местоположение недоступно'}</span></> : <p>{author || 'Автор не указан'}</p>}</div>
     </button>
     {load.error && !liveFriend && <div className="favorite-card-error" role="alert">{load.error}<button className="text-button" onClick={load.reload}>Повторить</button></div>}

@@ -29,7 +29,8 @@ export function patchFriends(users: User[], event: PipelineEvent): User[] {
   if (typeof c.location === 'string') next.location = c.location;
   if (typeof c.worldId === 'string') next.worldId = c.worldId;
   if (event.type === 'friend-offline') {
-    next.state = 'offline'; next.location = 'offline'; next.status = 'offline';
+    next.state = 'offline'; next.location = 'offline';
+    delete next.worldId; delete next.instanceId;
   } else if (event.type === 'friend-online' || event.type === 'friend-location') {
     next.state = 'online';
     // Presence is known; the user's chosen status is not supplied by every event.
@@ -37,7 +38,10 @@ export function patchFriends(users: User[], event: PipelineEvent): User[] {
   } else if (event.type === 'friend-active') {
     next.state = 'active';
     if (next.status === 'offline') next.status = undefined;
-    if (!next.location?.startsWith('wrld_')) next.location = '';
+    // An old in-game location must not turn website presence back into a game dot.
+    const freshLocation = typeof c.location === 'string' ? c.location : partial.location;
+    next.location = freshLocation || '';
+    if (!freshLocation) { delete next.worldId; delete next.instanceId; }
   }
   if (event.type === 'friend-add') next.isFriend = true;
   if (!old) return [...users, next];

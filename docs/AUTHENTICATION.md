@@ -1,4 +1,4 @@
-# Авторизация в VRCNext Mobile 0.2.2
+# Авторизация в VRCNext Mobile 0.2.3
 
 ## Исправление Email OTP после0.1.0
 

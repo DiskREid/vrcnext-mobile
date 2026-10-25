@@ -1,5 +1,5 @@
 import SecureImage, { useSecureImage } from '../components/SecureImage';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Users,
   Globe2,
@@ -20,7 +20,12 @@ import { api, native } from '../api';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
 import { loadFavoriteGroups } from '../api/favorites';
 import WorldInstances from '../components/WorldInstances';
-import type { User, World, Group, CreateInstanceOptions, FavoriteGroup } from '../api';
+import InstanceCreator from '../components/InstanceCreator';
+import InstanceInviteDialog from '../components/InstanceInviteDialog';
+import type { KnownInstance } from '../data/world-instances';
+import { instanceCount } from '../data/instance-location';
+import { overlayLiveUser, presenceIndicator } from '../data/presence';
+import type { User, World, FavoriteGroup } from '../api';
 import { useApp, useLoad } from '../state';
 import { demoFriends, demoWorlds, demoGroups } from '../demo';
 import {
@@ -31,6 +36,7 @@ import {
 import {
   Modal,
   AvatarImage,
+  PresenceIndicator,
   Loading,
   ErrorState,
   Badge,
@@ -139,7 +145,10 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
         : api.userProfile(id).then((value) => readPublicProfile(value, id)),
     [id],
   );
-  const u = load.data && mergePublicProfile(load.data, profile.data);
+  const liveUser = isSelf ? ctx.user : ctx.friends.data.find((friend) => friend.id === id);
+  const baseline = useRef<{ profile?: User; friend?: User }>({});
+  if (baseline.current.profile !== load.data) baseline.current = { profile: load.data, friend: liveUser };
+  const u = load.data && overlayLiveUser(mergePublicProfile(load.data, profile.data), baseline.current.friend, liveUser);
   const banner = useSecureImage(u?.profileBannerUrl);
   const [tab, setTab] = useState('profile'),
     [note, setNote] = useState(''),
@@ -171,7 +180,7 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
               }
             />
             <div className="profile-identity">
-              <AvatarImage src={imageOf(u)} name={u.displayName} size={84} status={u.status} />
+              <AvatarImage src={imageOf(u)} name={u.displayName} size={84} user={u} fallbackSrc={u.currentAvatarThumbnailImageUrl || u.currentAvatarImageUrl} />
               <div>
                 <h2>{u.displayName}</h2>
                 <div className="chips">
@@ -181,8 +190,8 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
               </div>
             </div>
             <p className="status-line">
-              <i className={`status-dot status-${u.status}`} />
-              {statusName(u.status)} {u.pronouns && `· ${u.pronouns}`}
+              <PresenceIndicator user={u} />
+              {presenceIndicator(u).label} {u.pronouns && `· ${u.pronouns}`}
             </p>
             {u.statusDescription && <p className="status-description">{u.statusDescription}</p>}
             <div className="detail-actions">
@@ -333,8 +342,11 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
   );
 }
 export function WorldDetails({ target, onClose }: { target: World | string; onClose: () => void }) {
-  const ctx = useApp(),
-    id = typeof target === 'string' ? target : target.id;
+  const id = typeof target === 'string' ? target : target.id;
+  return <WorldDetailsContent key={id} id={id} onClose={onClose} />;
+}
+function WorldDetailsContent({ id, onClose }: { id: string; onClose: () => void }) {
+  const ctx = useApp();
   const world = useLoad(
     () =>
       ctx.demo
@@ -342,86 +354,20 @@ export function WorldDetails({ target, onClose }: { target: World | string; onCl
         : api.world(id),
     [id, ctx.refresh],
   );
-  const [fav, setFav] = useState(false),
-    [create, setCreate] = useState(false),
-    [type, setType] = useState<CreateInstanceOptions['type']>('friends'),
-    [region, setRegion] = useState<CreateInstanceOptions['region']>('eu'),
-    [group, setGroup] = useState(''),
-    [access, setAccess] = useState<'public' | 'plus' | 'members'>('members'),
-    [canRequest, setCanRequest] = useState(false),
-    [busy, setBusy] = useState(false),
-    [inviteTo, setInviteTo] = useState(''),
-    [selected, setSelected] = useState<string[]>([]),
-    [progress, setProgress] = useState('');
-  const groups = useLoad(
-    () =>
-      create
-        ? ctx.demo
-          ? Promise.resolve(demoGroups)
-          : api.groups(ctx.user.id)
-        : Promise.resolve([]),
-    [create],
-  );
-  const friends = useLoad(
-    () =>
-      inviteTo
-        ? ctx.demo
-          ? Promise.resolve(demoFriends)
-          : api.allOnlineFriends()
-        : Promise.resolve([]),
-    [inviteTo],
-  );
+  const [fav, setFav] = useState(false), [create, setCreate] = useState(false);
+  const [invitation, setInvitation] = useState<{ mode: 'self' | 'friends'; location?: string }>();
+  const [createdInstances, setCreatedInstances] = useState<KnownInstance[]>([]);
   const w = world.data;
-  const createInstance = () =>
-    void ctx.act(async () => {
-      setBusy(true);
-      try {
-        const instance = await api.createInstance({
-          worldId: id,
-          type,
-          region,
-          ...(type === 'group'
-            ? { ownerId: group, groupAccessType: access }
-            : type === 'public'
-              ? {}
-              : { ownerId: ctx.user.id }),
-          ...(type === 'private' ? { canRequestInvite: canRequest } : {}),
-        });
-        const raw = instance.location || instance.id || instance.instanceId;
-        if (!raw) throw new Error('VRChat не вернул адрес созданного инстанса.');
-        const loc = raw.includes(':') ? raw : `${id}:${raw}`;
-        await api.inviteSelf(loc);
-        setCreate(false);
-      } finally {
-        setBusy(false);
-      }
-    }, 'Инстанс создан, приглашение отправлено');
-  const multiInvite = () =>
-    void ctx.act(async () => {
-      setBusy(true);
-      let done = 0;
-      try {
-        for (const f of selected) {
-          await api.invite(f, inviteTo);
-          done++;
-          setProgress(`${done} / ${selected.length}`);
-          if (done < selected.length) await new Promise((r) => setTimeout(r, 1500));
-        }
-        setInviteTo('');
-        setSelected([]);
-      } finally {
-        setBusy(false);
-      }
-    }, 'Приглашения отправлены');
   return (
     <Modal title="Мир" onClose={onClose} wide>
       {world.loading && !w ? (
         <Loading />
-      ) : world.error ? (
+      ) : world.error && !w ? (
         <ErrorState error={world.error} retry={world.reload} />
       ) : (
         w && (
           <>
+            {world.error && <ErrorState error={world.error} retry={world.reload} />}
             <div className="world-detail-cover">
               <SecureImage src={w.imageUrl || w.thumbnailImageUrl} alt="" />
               <div className="cover-gradient" />
@@ -463,6 +409,8 @@ export function WorldDetails({ target, onClose }: { target: World | string; onCl
                 .map((t) => <Badge key={t}>{t.replace('author_tag_', '')}</Badge>)}
             </div>
             <div className="detail-actions">
+              <button className="button primary" onClick={() => setInvitation({ mode: 'self' })}><Send size={16} />Пригласить себя</button>
+              <button className="button secondary" onClick={() => setInvitation({ mode: 'friends' })}><Users size={16} />Пригласить друзей</button>
               <button className="button primary" onClick={() => setCreate(!create)}>
                 Создать инстанс
               </button>
@@ -470,124 +418,11 @@ export function WorldDetails({ target, onClose }: { target: World | string; onCl
                 <Heart size={17} />В избранное
               </button>
             </div>
-            {fav && <FavoritePicker id={id} type="world" onClose={() => setFav(false)} />}{' '}
-            {create && (
-              <div className="inset-panel form-stack">
-                <h3>Новый инстанс</h3>
-                <label className="field">
-                  Доступ
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value as CreateInstanceOptions['type'])}
-                  >
-                    <option value="public">Public</option>
-                    <option value="hidden">Friends+</option>
-                    <option value="friends">Friends</option>
-                    <option value="private">Invite</option>
-                    <option value="group">Group</option>
-                  </select>
-                </label>
-                <label className="field">
-                  Регион
-                  <select
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value as CreateInstanceOptions['region'])}
-                  >
-                    <option value="eu">Европа</option>
-                    <option value="us">США, запад</option>
-                    <option value="use">США, восток</option>
-                    <option value="jp">Япония</option>
-                  </select>
-                </label>
-                {type === 'private' && (
-                  <label className="check-row">
-                    <input
-                      type="checkbox"
-                      checked={canRequest}
-                      onChange={(e) => setCanRequest(e.target.checked)}
-                    />
-                    Разрешить запросы приглашений (Invite+)
-                  </label>
-                )}
-                {type === 'group' && (
-                  <>
-                    <label className="field">
-                      Группа
-                      <select value={group} onChange={(e) => setGroup(e.target.value)}>
-                        <option value="">Выберите группу</option>
-                        {groups.data?.map((g) => (
-                          <option key={g.id} value={g.groupId || g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      Доступ группы
-                      <select
-                        value={access}
-                        onChange={(e) => setAccess(e.target.value as typeof access)}
-                      >
-                        <option value="members">Только участники</option>
-                        <option value="plus">Group+</option>
-                        <option value="public">Group Public</option>
-                      </select>
-                    </label>
-                  </>
-                )}
-                <button
-                  disabled={busy || (type === 'group' && !group)}
-                  className="button primary"
-                  onClick={createInstance}
-                >
-                  Создать и пригласить себя
-                </button>
-              </div>
-            )}
-            <WorldInstances world={w} onInviteFriends={setInviteTo} />
-            {inviteTo && (
-              <div className="inset-panel">
-                <h3>Пригласить друзей</h3>
-                <p className="muted small">Приглашения отправляются последовательно с паузой.</p>
-                {friends.loading ? (
-                  <Loading />
-                ) : friends.error ? (
-                  <ErrorState error={friends.error} retry={friends.reload} />
-                ) : (
-                  friends.data?.map((f) => (
-                    <label className="check-row" key={f.id}>
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(f.id)}
-                        onChange={(e) =>
-                          setSelected((v) =>
-                            e.target.checked ? [...v, f.id] : v.filter((x) => x !== f.id),
-                          )
-                        }
-                      />
-                      <AvatarImage name={f.displayName} src={imageOf(f)} size={32} />
-                      {f.displayName}
-                    </label>
-                  ))
-                )}
-                <div className="detail-actions">
-                  <button
-                    className="button secondary"
-                    disabled={busy}
-                    onClick={() => setInviteTo('')}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    className="button primary"
-                    disabled={!selected.length || busy}
-                    onClick={multiInvite}
-                  >
-                    {busy ? progress || 'Отправляем…' : `Пригласить (${selected.length})`}
-                  </button>
-                </div>
-              </div>
-            )}
+            {fav && <FavoritePicker id={id} type="world" onClose={() => setFav(false)} />}
+            {create && <InstanceCreator world={w} onClose={() => setCreate(false)} onCreated={(instance, location) => setCreatedInstances((old) => [...old.filter((entry) => entry.location !== location), { location, count: instanceCount(instance.n_users) ?? instanceCount(instance.userCount) }])} />}
+            <WorldInstances world={w} created={createdInstances} onInviteFriends={(location) => setInvitation({ mode: 'friends', location })} />
+            {invitation && <InstanceInviteDialog world={w} created={createdInstances} mode={invitation.mode} initialLocation={invitation.location} onClose={() => setInvitation(undefined)} />}
+
           </>
         )
       )}

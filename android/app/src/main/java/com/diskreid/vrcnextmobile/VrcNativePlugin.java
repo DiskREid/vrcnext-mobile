@@ -50,7 +50,7 @@ import org.json.JSONTokener;
 /** Native-only VRChat transport: no cookies or pipeline tokens cross the WebView boundary. */
 @CapacitorPlugin(name = "VrcNative")
 public class VrcNativePlugin extends Plugin {
-    private static final String USER_AGENT = "Mobile-VRCNext/0.2.2 (https://github.com/DiskREid/vrcnext-mobile/issues)";
+    private static final String USER_AGENT = "Mobile-VRCNext/0.2.3 (https://github.com/DiskREid/vrcnext-mobile/issues)";
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -292,7 +292,11 @@ public class VrcNativePlugin extends Plugin {
         try { source = ImageEndpoint.resolve(call.getString("url", "")); }
         catch (Exception invalid) { reject(call, "This image source is not supported", "INVALID_IMAGE_URL"); return; }
         final int generation = sessionGeneration.get();
-        final String cacheKey = generation + ":" + source;
+        final int maxDimension = call.getInt("maxDimension", 1024);
+        if (maxDimension != 128 && maxDimension != 256 && maxDimension != 512 && maxDimension != 1024) {
+            reject(call, "Unsupported preview size", "INVALID_IMAGE_SIZE"); return;
+        }
+        final String cacheKey = generation + ":" + maxDimension + ":" + source;
         String cached = imageCache.get(cacheKey);
         if (cached != null) { resolve(call, new JSObject().put("dataUrl", cached)); return; }
         submit(imageIo, call, () -> {
@@ -335,7 +339,7 @@ public class VrcNativePlugin extends Plugin {
                         if (body.contentLength() > limit || body.source().request(limit + 1L)) throw new IOException();
                         String mime = response.header("Content-Type", "").split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
                         byte[] bytes = body.bytes();
-                        if (!ImageEndpoint.hasRasterSignature(bytes, mime)) throw new IOException();
+                        mime = ImageEndpoint.rasterMime(bytes, mime);
                         android.graphics.BitmapFactory.Options dimensions = new android.graphics.BitmapFactory.Options();
                         dimensions.inJustDecodeBounds = true;
                         android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, dimensions);
@@ -346,7 +350,7 @@ public class VrcNativePlugin extends Plugin {
                             // Sample before decode so large photos never allocate their full-resolution bitmap.
                             int longest = Math.max(dimensions.outWidth, dimensions.outHeight);
                             int sample = 1;
-                            while (longest / (sample * 2) >= 1024) sample *= 2;
+                            while (longest / (sample * 2) >= maxDimension) sample *= 2;
                             dimensions.inJustDecodeBounds = false;
                             dimensions.inSampleSize = sample;
                             dimensions.inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888;
@@ -357,9 +361,9 @@ public class VrcNativePlugin extends Plugin {
                                 if (decoded == null) throw new IOException();
                                 longest = Math.max(decoded.getWidth(), decoded.getHeight());
                                 preview = decoded;
-                                if (longest > 1024) {
-                                    int width = Math.max(1, (int) Math.round(decoded.getWidth() * (1024.0 / longest)));
-                                    int height = Math.max(1, (int) Math.round(decoded.getHeight() * (1024.0 / longest)));
+                                if (longest > maxDimension) {
+                                    int width = Math.max(1, (int) Math.round(decoded.getWidth() * ((double) maxDimension / longest)));
+                                    int height = Math.max(1, (int) Math.round(decoded.getHeight() * ((double) maxDimension / longest)));
                                     preview = android.graphics.Bitmap.createScaledBitmap(decoded, width, height, true);
                                 }
                                 boolean alpha = preview.hasAlpha();

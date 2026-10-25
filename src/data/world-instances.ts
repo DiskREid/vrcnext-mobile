@@ -7,7 +7,7 @@ export interface WorldInstanceRow {
   instanceId: string;
   count?: number;
   friends: User[];
-  source: 'api' | 'friends';
+  source: 'api' | 'friends' | 'created';
   type: string;
   region?: string;
 }
@@ -49,7 +49,8 @@ export function disclosedInstanceLocation(instance: Instance): string | undefine
 }
 
 /** Merge actual listed instances with disclosed friend locations without fetching every instance. */
-export function buildWorldInstances(world: Pick<World, 'id' | 'instances'>, friends: User[]): WorldInstanceRow[] {
+export interface KnownInstance { location: string; count?: number; }
+export function buildWorldInstances(world: Pick<World, 'id' | 'instances'>, friends: User[], created: KnownInstance[] = []): WorldInstanceRow[] {
   if (typeof world.id !== 'string' || !/^wrld_[a-zA-Z0-9-]+$/.test(world.id)) return [];
   const rows = new Map<string, WorldInstanceRow>();
   const makeRow = (location: string, source: WorldInstanceRow['source'], count?: number): WorldInstanceRow => ({
@@ -69,6 +70,10 @@ export function buildWorldInstances(world: Pick<World, 'id' | 'instances'>, frie
     const previous = rows.get(location);
     if (!previous) rows.set(location, makeRow(location, 'api', count));
     else if (count !== undefined) previous.count = count;
+  }
+  for (const instance of created) {
+    const location = worldLocation(world.id, instance.location);
+    if (location && !rows.has(location)) rows.set(location, makeRow(location, 'created', instanceCount(instance.count)));
   }
   // Resolve duplicate IDs before matching, so a fresh private/offline row removes old evidence.
   const latest = new Map<string, User>();

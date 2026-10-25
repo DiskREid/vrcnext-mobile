@@ -600,6 +600,7 @@ type WorldInstanceFixture = {
   worldId: string;
   groupId: string;
   nearId: string;
+  pairId: string;
   groupFriendId: string;
   locationA: string;
   locationB: string;
@@ -608,6 +609,12 @@ type WorldInstanceFixture = {
   moveFriend: () => void;
   moveGroupFriend: () => void;
   restoreGroupFriend: () => void;
+  failSelfInviteNext?: boolean;
+  failRecipientId?: string;
+  createPermissions?: string[];
+  ignoreAvatarRestriction?: boolean;
+  failWorldRefresh?: boolean;
+  refresh: () => void;
 };
 const worldInstanceFixture = (page: Page) => page.evaluate(() => (window as unknown as { __worldInstanceTest: WorldInstanceFixture }).__worldInstanceTest);
 
@@ -616,6 +623,7 @@ test('world instance list groups disclosed friends and opens their real profiles
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
   await page.goto('/tests/world-instances-harness.html');
+  await expect(page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('heading',{name:'Fixture Harbor',exact:true})).toBeVisible();
   const world = page.getByRole('dialog', { name: 'Мир', exact: true });
   await expect(world.getByRole('heading', { name: 'Fixture Harbor', exact: true })).toBeVisible();
   const region = world.getByRole('region', { name: 'Инстансы мира', exact: true });
@@ -677,6 +685,7 @@ test('group instance friends follow current presence instead of an old roster an
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
   await page.goto('/tests/world-instances-harness.html');
+  await expect(page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('heading',{name:'Fixture Harbor',exact:true})).toBeVisible();
   await page.getByRole('dialog', { name: 'Мир', exact: true }).getByRole('button', { name: 'Закрыть', exact: true }).click();
   await page.getByRole('button', { name: 'Fixture group', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Fixture Group', exact: true });
@@ -705,4 +714,178 @@ test('group instance friends follow current presence instead of an old roster an
   expect(fixture.actions).toContainEqual({ type: 'user', id: fixture.groupFriendId });
   expect(fixture.unexpected).toEqual([]);
   expect(errors).toEqual([]); expect(network).toEqual([]);
+});
+
+test('world info sends self and friend invitations without a running game and preserves partial results', async ({ page }) => {
+  await page.goto('/tests/world-instances-harness.html');
+  await expect(page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('heading',{name:'Fixture Harbor',exact:true})).toBeVisible();
+  const world=page.getByRole('dialog',{name:'Мир',exact:true});
+  await world.getByRole('button',{name:'Пригласить себя',exact:true}).click();
+  let dialog=page.getByRole('dialog',{name:'Пригласить себя',exact:true});
+  const fixture=await worldInstanceFixture(page);
+  await dialog.getByLabel('Инстанс для приглашения').selectOption(fixture.locationA);
+  await dialog.getByRole('button',{name:'Отправить приглашение себе',exact:true}).click();
+  await expect(dialog.getByRole('status')).toHaveText('Приглашение себе отправлено');
+  await dialog.getByRole('button',{name:'Закрыть',exact:true}).click();
+  await world.getByRole('button',{name:'Пригласить друзей',exact:true}).click();
+  dialog=page.getByRole('dialog',{name:'Пригласить друзей',exact:true});
+  await dialog.getByLabel('Инстанс для приглашения').selectOption(fixture.locationA);
+  await dialog.getByRole('checkbox',{name:/Fixture Nearby/}).check();
+  await dialog.getByRole('checkbox',{name:/Fixture Pair/}).check();
+  await page.evaluate(()=>{const f=(window as unknown as {__worldInstanceTest:WorldInstanceFixture}).__worldInstanceTest;f.failRecipientId=f.nearId;});
+  await dialog.getByRole('button',{name:'Пригласить (2)',exact:true}).click();
+  await expect(dialog.getByRole('status')).toHaveText('Отправлено: 1 из 2');
+  await expect(dialog.getByRole('alert')).toContainText('Fixture recipient denied');
+  await expect(dialog.getByRole('checkbox',{name:/Fixture Pair/})).toBeDisabled();
+  await expect(dialog.getByRole('checkbox',{name:/Fixture Nearby/})).toBeChecked();
+  const requests=(await worldInstanceFixture(page)).requests.filter(r=>r.method==='POST');
+  expect(requests).toHaveLength(3);
+  expect(requests[0].path).toBe(`/instances/${fixture.locationA}/invite`);
+  expect(requests.slice(1).map(r=>r.path)).toEqual([`/invite/${fixture.nearId}`,`/invite/${fixture.pairId}`]);
+  expect(JSON.parse(requests[2].body!)).toMatchObject({instanceId:fixture.locationA,worldId:fixture.worldId});
+  await noHorizontalOverflow(page);
+});
+
+test('group creation sends avatar restriction and full group location, then retries only a failed self invitation',async({page},testInfo)=>{
+  await page.goto('/tests/world-instances-harness.html');
+  await expect(page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('heading',{name:'Fixture Harbor',exact:true})).toBeVisible();
+  const world=page.getByRole('dialog',{name:'Мир',exact:true});
+  await world.getByRole('button',{name:'Создать инстанс',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Новый инстанс',exact:true});
+  await dialog.getByRole('combobox',{name:'Доступ',exact:true}).selectOption('group');
+  const fixture=await worldInstanceFixture(page);
+  await dialog.getByRole('combobox',{name:'Группа',exact:true}).selectOption(fixture.groupId);
+  await dialog.getByLabel('Ограничение аватаров',{exact:false}).selectOption('Good');
+  await dialog.getByRole('checkbox',{name:'Fixture Hosts',exact:true}).check();
+  await dialog.getByLabel('Название инстанса',{exact:true}).fill('Mobile Friends');
+  await dialog.getByRole('checkbox',{name:'Очередь на вход',exact:true}).check();
+  await noHorizontalOverflow(page);
+  await page.screenshot({path:`artifacts/regressions/${testInfo.project.name}-group-creation-synthetic-fixture.png`});
+  await page.evaluate(()=>{(window as unknown as {__worldInstanceTest:WorldInstanceFixture}).__worldInstanceTest.failSelfInviteNext=true;});
+  await dialog.getByRole('button',{name:'Создать и пригласить себя',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('Инстанс уже создан');
+  let requests=(await worldInstanceFixture(page)).requests;
+  const creates=requests.filter(r=>r.path==='/instances'&&r.method==='POST');
+  expect(creates).toHaveLength(1);
+  expect(JSON.parse(creates[0].body!)).toEqual({worldId:fixture.worldId,type:'group',region:'eu',ownerId:fixture.groupId,groupAccessType:'members',queueEnabled:true,minimumAvatarPerformance:'Good',roleIds:['grol_host'],displayName:'Mobile Friends'});
+  const invitePath=requests.find(r=>r.method==='POST'&&r.path.endsWith('/invite'))!.path;
+  expect(invitePath).toContain(`:900~group(${fixture.groupId})~groupAccessType(members)`);
+  expect(invitePath).not.toContain('%3A');
+  await dialog.getByRole('button',{name:'Пригласить себя в созданный инстанс',exact:true}).click();
+  await expect(dialog.getByRole('button',{name:'Приглашение отправлено',exact:true})).toBeDisabled();
+  requests=(await worldInstanceFixture(page)).requests;
+  expect(requests.filter(r=>r.path==='/instances'&&r.method==='POST')).toHaveLength(1);
+  expect(requests.filter(r=>r.path===invitePath&&r.method==='POST')).toHaveLength(2);
+  await dialog.getByRole('button',{name:'Вернуться к миру',exact:true}).click();
+  await expect(world.getByRole('article',{name:'Инстанс #900',exact:true})).toBeVisible();
+  await noHorizontalOverflow(page);
+});
+
+test('group creator disables unsupported membership permissions before creating',async({page})=>{
+  await page.goto('/tests/world-instances-harness.html');
+  await expect(page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('heading',{name:'Fixture Harbor',exact:true})).toBeVisible();
+  await page.evaluate(()=>{(window as unknown as {__worldInstanceTest:WorldInstanceFixture}).__worldInstanceTest.createPermissions=[];});
+  await page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('button',{name:'Создать инстанс',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Новый инстанс',exact:true});
+  await dialog.getByRole('combobox',{name:'Доступ',exact:true}).selectOption('group');
+  await dialog.getByRole('combobox',{name:'Группа',exact:true}).selectOption((await worldInstanceFixture(page)).groupId);
+  await expect(dialog.getByRole('alert')).toContainText('нет прав');
+  await expect(dialog.getByRole('button',{name:'Создать и пригласить себя',exact:true})).toBeDisabled();
+  expect((await worldInstanceFixture(page)).requests.filter(r=>r.method==='POST')).toEqual([]);
+});
+
+type PresenceImageFixture={requests:{path:string}[];images:{url:string;maxDimension:number}[];update:(mode:string)=>void};
+test('profile distinguishes gray offline, website ring and game status, including live changes',async({page},testInfo)=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/tests/presence-images-harness.html');
+  const dialog=page.getByRole('dialog',{name:'Профиль',exact:true});
+  await expect(dialog.getByRole('heading',{name:'Presence Fixture',exact:true})).toBeVisible();
+  const dot=dialog.locator('.profile-identity .status-dot');
+  await expect(dot).toHaveAttribute('data-presence','offline');await expect(dot).toHaveClass(/presence-offline/);
+  await page.evaluate(()=>(window as unknown as {__presenceImageTest:PresenceImageFixture}).__presenceImageTest.update('website'));
+  await expect(dot).toHaveAttribute('data-presence','website');await expect(dot).toHaveClass(/presence-busy/);
+  expect(await dot.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await dot.evaluate(el=>getComputedStyle(el).boxShadow)).not.toBe('none');
+  await expect(dialog.locator('.status-line')).toContainText('На сайте');
+  await page.screenshot({path:`artifacts/regressions/${testInfo.project.name}-website-presence-synthetic-fixture.png`});
+  await page.evaluate(()=>(window as unknown as {__presenceImageTest:PresenceImageFixture}).__presenceImageTest.update('game'));
+  await expect(dot).toHaveAttribute('data-presence','game');await expect(dot).toHaveClass(/presence-ask/);
+  await page.evaluate(()=>(window as unknown as {__presenceImageTest:PresenceImageFixture}).__presenceImageTest.update('offline'));
+  await expect(dot).toHaveAttribute('data-presence','offline');await expect(dot).toHaveClass(/presence-offline/);
+  await noHorizontalOverflow(page);expect(errors).toEqual([]);
+});
+
+test('native avatar previews recover after a transient failure, use fallback and survive scroll and URL changes',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  const network:string[]=[];page.on('request',r=>{if(/api\.vrchat\.cloud/.test(r.url()))network.push(r.url());});
+  await page.goto('/tests/presence-images-harness.html?images=1');
+  const image=page.getByRole('region',{name:'Восстановление аватарки'}).locator('img');
+  await expect.poll(()=>image.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>0)).toBe(true);
+  await expect(image).toHaveCSS('opacity','1');await expect(image).not.toHaveCSS('display','none');
+  const fallback=page.getByRole('region',{name:'Резервная аватарка'}).locator('img');
+  await expect.poll(()=>fallback.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>0)).toBe(true);
+  await expect(fallback).toHaveCSS('opacity','1');
+  const original=await image.getAttribute('src');
+  const before=await page.evaluate(()=>(window as unknown as {__presenceImageTest:PresenceImageFixture}).__presenceImageTest.images);
+  expect(before.filter(r=>r.url.includes('file_retry'))).toHaveLength(2);
+  expect(before.every(r=>r.maxDimension===256)).toBe(true);
+  await page.locator('.main-content').evaluate(el=>el.scrollTo({top:1400,behavior:'instant'}));
+  await expect(image).toHaveAttribute('src',original!);
+  await page.locator('.main-content').evaluate(el=>el.scrollTo({top:0,behavior:'instant'}));
+  await expect(image).toHaveCSS('opacity','1');
+  await page.getByRole('button',{name:'Новый URL аватарки',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as unknown as {__presenceImageTest:PresenceImageFixture}).__presenceImageTest.images.some(r=>r.url.includes('file_new')))).toBe(true);
+  await expect.poll(()=>image.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>0)).toBe(true);
+  await expect(image).toHaveCSS('opacity','1');
+  await noHorizontalOverflow(page);expect(errors).toEqual([]);expect(network).toEqual([]);
+});
+
+test('a group restriction ignored by the server does not trigger an automatic self invite or duplicate creation',async({page})=>{
+  await page.goto('/tests/world-instances-harness.html');
+  await expect(page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('heading',{name:'Fixture Harbor',exact:true})).toBeVisible();
+  await page.evaluate(()=>{(window as unknown as {__worldInstanceTest:WorldInstanceFixture}).__worldInstanceTest.ignoreAvatarRestriction=true;});
+  await page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('button',{name:'Создать инстанс',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Новый инстанс',exact:true});
+  await dialog.getByRole('combobox',{name:'Доступ',exact:true}).selectOption('group');
+  await dialog.getByRole('combobox',{name:'Группа',exact:true}).selectOption((await worldInstanceFixture(page)).groupId);
+  await dialog.getByLabel('Ограничение аватаров',{exact:false}).selectOption('Good');
+  await dialog.getByRole('button',{name:'Создать и пригласить себя',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('не подтвердил выбранное ограничение');
+  await expect(dialog.getByRole('button',{name:'Пригласить себя в созданный инстанс',exact:true})).toBeDisabled();
+  const requests=(await worldInstanceFixture(page)).requests;
+  expect(requests.filter(r=>r.path==='/instances'&&r.method==='POST')).toHaveLength(1);
+  expect(requests.filter(r=>r.path.endsWith('/invite')&&r.method==='POST')).toEqual([]);
+});
+
+test('a failed world refresh preserves a created instance and retries its invite without creating again',async({page})=>{
+  await page.goto('/tests/world-instances-harness.html');
+  await expect(page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('heading',{name:'Fixture Harbor',exact:true})).toBeVisible();
+  const world=page.getByRole('dialog',{name:'Мир',exact:true});
+  await world.getByRole('button',{name:'Создать инстанс',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Новый инстанс',exact:true});
+  await dialog.getByRole('combobox',{name:'Доступ',exact:true}).selectOption('group');
+  await dialog.getByRole('combobox',{name:'Группа',exact:true}).selectOption((await worldInstanceFixture(page)).groupId);
+  await page.evaluate(()=>{(window as unknown as {__worldInstanceTest:WorldInstanceFixture}).__worldInstanceTest.failSelfInviteNext=true;});
+  await dialog.getByRole('button',{name:'Создать и пригласить себя',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('Инстанс уже создан');
+  await page.evaluate(()=>{const f=(window as unknown as {__worldInstanceTest:WorldInstanceFixture}).__worldInstanceTest;f.failWorldRefresh=true;f.refresh();});
+  await expect(world.getByText('Fixture world refresh failure',{exact:true})).toBeVisible();
+  await expect(dialog.getByRole('heading',{name:'Инстанс создан',exact:true})).toBeVisible();
+  await dialog.getByRole('button',{name:'Пригласить себя в созданный инстанс',exact:true}).click();
+  await expect(dialog.getByRole('button',{name:'Приглашение отправлено',exact:true})).toBeDisabled();
+  expect((await worldInstanceFixture(page)).requests.filter(r=>r.path==='/instances'&&r.method==='POST')).toHaveLength(1);
+});
+
+test('switching from group to a normal instance does not send or claim the old avatar restriction',async({page})=>{
+  await page.goto('/tests/world-instances-harness.html');
+  await page.getByRole('dialog',{name:'Мир',exact:true}).getByRole('button',{name:'Создать инстанс',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Новый инстанс',exact:true});
+  await dialog.getByRole('combobox',{name:'Доступ',exact:true}).selectOption('group');
+  await dialog.getByLabel('Ограничение аватаров',{exact:false}).selectOption('Good');
+  await dialog.getByRole('combobox',{name:'Доступ',exact:true}).selectOption('friends');
+  await dialog.getByRole('button',{name:'Только создать',exact:true}).click();
+  await expect(dialog.getByRole('heading',{name:'Инстанс создан',exact:true})).toBeVisible();
+  await expect(dialog.getByText(/Ограничение аватаров:/)).toHaveCount(0);
+  const body=JSON.parse((await worldInstanceFixture(page)).requests.find(r=>r.path==='/instances'&&r.method==='POST')!.body!);
+  expect(body.type).toBe('friends');expect(body).not.toHaveProperty('minimumAvatarPerformance');expect(body).not.toHaveProperty('groupAccessType');
 });

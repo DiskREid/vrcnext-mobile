@@ -46,6 +46,7 @@ import { useObservation } from './data/observation';
 import { useCalendarSync } from './data/calendar-sync';
 import { parseCalendarLink } from './api/calendar';
 import { presenceLabel } from './data/locations';
+import { presenceMode } from './data/presence';
 import { reconcilePage } from './hooks/paged-data';
 import { pipelineActivity } from './data/session-activity';
 import Feed from './pages/Feed';
@@ -60,6 +61,7 @@ import {
   PageHeader,
   Section,
   AvatarImage,
+  PresenceIndicator,
   imageOf,
   Badge,
   MoreButton,
@@ -421,7 +423,7 @@ export default function App() {
                 src={imageOf(user)}
                 name={user.displayName}
                 size={38}
-                status={user.status}
+                user={user} fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl}
               />
               <div>
                 <strong>{user.displayName}</strong>
@@ -677,7 +679,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
           <div className="friends-strip">
             {data.data.slice(0, 7).map((f) => (
               <button className="friend-bubble" key={f.id} onClick={() => ctx.openUser(f)}>
-                <AvatarImage src={imageOf(f)} name={f.displayName} size={58} status={f.status} />
+                <AvatarImage src={imageOf(f)} name={f.displayName} size={58} user={f} fallbackSrc={f.currentAvatarThumbnailImageUrl || f.currentAvatarImageUrl} />
                 <strong>{f.displayName}</strong>
                 <span>
                   {f.location?.startsWith('wrld_')
@@ -803,9 +805,9 @@ function FriendsPage() {
     (f) =>
       f.displayName.toLowerCase().includes(query.toLowerCase()) &&
       (filter === 'all' ||
-        (filter === 'online' && (f.location === 'private' || f.location?.startsWith('wrld_'))) ||
-        (filter === 'web' && (f.state === 'online' || f.state === 'active') && f.location !== 'private' && !f.location?.startsWith('wrld_')) ||
-        (filter === 'offline' && !f.location?.startsWith('wrld_') && f.location !== 'private' && f.state !== 'online' && f.state !== 'active')),
+        (filter === 'online' && presenceMode(f) === 'game') ||
+        (filter === 'web' && presenceMode(f) === 'website') ||
+        (filter === 'offline' && ['offline', 'unknown'].includes(presenceMode(f)))),
   );
   return (
     <>
@@ -855,12 +857,12 @@ function FriendsPage() {
         <div className="friend-grid">
           {items.map((f) => (
             <button className="friend-card card" key={f.id} onClick={() => ctx.openUser(f)}>
-              <AvatarImage name={f.displayName} src={imageOf(f)} size={54} status={f.status} />
+              <AvatarImage name={f.displayName} src={imageOf(f)} size={54} user={f} fallbackSrc={f.currentAvatarThumbnailImageUrl || f.currentAvatarImageUrl} />
               <div className="friend-card-text">
                 <h3>{f.displayName}</h3>
                 <p>{f.statusDescription || statusName(f.status)}</p>
                 <span className="friend-location">
-                  <i className={`status-dot status-${f.status}`} />
+                  <PresenceIndicator user={f} />
                   {presenceLabel(f)}
                 </span>
               </div>
@@ -1201,7 +1203,7 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
         subtitle="Аккаунт, события и ваши коллекции"
       />
       <button className="card more-profile" onClick={() => navigate('profile')}>
-        <AvatarImage name={user.displayName} src={imageOf(user)} size={60} status={user.status} />
+        <AvatarImage name={user.displayName} src={imageOf(user)} size={60} user={user} fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl} />
         <div>
           <h2>{user.displayName}</h2>
           <p className="muted">{demo ? 'Демонстрационный аккаунт' : statusName(user.status)}</p>
