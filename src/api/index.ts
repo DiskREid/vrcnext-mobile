@@ -2,6 +2,7 @@ import { native, isNative } from './native';
 import type { Print } from './prints';
 import { normalizeCalendarEvent, normalizeCalendarPage } from './calendar';
 import { instanceCreationOptions } from './instances';
+import { normalizeFriendPresence } from './friends';
 import type { NativeBridge, NativeResponse } from './native';
 import type {
   Avatar,
@@ -490,13 +491,18 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
       authenticatedUserId = undefined;
       return { serverLoggedOut };
     },
-    friends: (offline = false, offset = 0) =>
-      list<User>('/auth/user/friends' + query({ offline, n: 100, offset })),
+    friends: async (offline = false, offset = 0) =>
+      (await list<User>('/auth/user/friends' + query({ offline, n: 100, offset })))
+        .map((user) => normalizeFriendPresence(user, offline)),
     allOnlineFriends: () => allPages<User>((offset) => client.friends(false, offset)),
     async allFriends(): Promise<User[]> {
       const online = await allPages<User>((offset) => client.friends(false, offset));
       const offline = await allPages<User>((offset) => client.friends(true, offset));
-      return Array.from(new Map([...online, ...offline].map((user) => [user.id, user])).values());
+      // The two paginated snapshots may overlap when someone changes presence.
+      // Keep the online/website row instead of replacing it with an offline duplicate.
+      const unique = new Map<string, User>();
+      for (const user of [...online, ...offline]) if (!unique.has(user.id)) unique.set(user.id, user);
+      return [...unique.values()];
     },
     user: (id: string) => request<User>('/users/' + segment(id)),
     userProfile: (id: string) => request<Record<string, unknown>>('/profile/' + segment(id)),

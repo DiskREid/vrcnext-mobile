@@ -10,6 +10,8 @@ import {
   unwrapList,
 } from './index';
 import type { NativeBridge, NativeResponse } from './native';
+import { presenceIndicator } from '../data/presence';
+import { presenceLabel } from '../data/locations';
 
 function fixture(responses: NativeResponse[] = []) {
   const bridge = {
@@ -324,6 +326,47 @@ describe('response and endpoint behavior', () => {
       '/auth/user/friends?offline=false&n=100&offset=100',
       '/auth/user/friends?offline=true&n=100&offset=0',
     ]);
+  });
+  it('recognizes website friends from the online bucket without a state field', async () => {
+    const limited = { id: 'usr_website', displayName: 'Website', location: 'offline', status: 'ask me' };
+    const { client } = fixture([success([limited])]);
+    const [user] = await client.friends(false);
+    expect(user.state).toBe('active');
+    expect(presenceIndicator(user)).toMatchObject({ mode: 'website', color: 'ask' });
+    expect(presenceLabel(user)).toBe('На сайте / в приложении');
+    expect(limited).not.toHaveProperty('state');
+  });
+  it('keeps truly offline friends gray despite a selected status or stale instance fields', async () => {
+    const { client } = fixture([success([
+      { id: 'usr_offline', displayName: 'Offline', location: 'offline', status: 'busy' },
+      { id: 'usr_stale', displayName: 'Stale', location: 'private', worldId: 'wrld_old', instanceId: '1', status: 'join me' },
+    ])]);
+    for (const user of await client.friends(true)) {
+      expect(presenceIndicator(user)).toMatchObject({ mode: 'offline', color: 'offline' });
+      expect(presenceLabel(user)).toBe('Не в сети');
+      expect(user).not.toHaveProperty('worldId');
+      expect(user).not.toHaveProperty('instanceId');
+    }
+  });
+  it('normalizes online-only friends with disclosed, private, traveling and empty locations', async () => {
+    const { client } = fixture([success(['wrld_test:1', 'private', 'traveling', ''].map((location, i) => ({
+      id: 'usr_' + i, displayName: 'Friend ' + i, location, status: 'active',
+    })))]);
+    const users = await client.allOnlineFriends();
+    expect(users.map((user) => presenceIndicator(user).mode)).toEqual(['game', 'game', 'game', 'website']);
+  });
+  it('retains the online or website snapshot when the offline page repeats an ID', async () => {
+    const { client } = fixture([
+      success([{ id: 'usr_same', displayName: 'Website', location: 'offline', status: 'busy' }]),
+      success([
+        { id: 'usr_same', displayName: 'Stale offline copy', location: 'offline', status: 'busy' },
+        { id: 'usr_other', displayName: 'Offline', location: 'offline', status: 'ask me' },
+      ]),
+    ]);
+    const users = await client.allFriends();
+    expect(users.map((user) => user.id)).toEqual(['usr_same', 'usr_other']);
+    expect(users[0]).toMatchObject({ displayName: 'Website', state: 'active', status: 'busy' });
+    expect(users[1]).toMatchObject({ state: 'offline', status: 'ask me' });
   });
   it('uses the current profile endpoint for bio and old endpoint only for user fields', async () => {
     const { bridge, client } = fixture([

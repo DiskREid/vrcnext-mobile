@@ -1,6 +1,92 @@
 import { test, expect } from '@playwright/test';
 import type { Page, TestInfo } from '@playwright/test';
 
+type FriendPresenceFixture={requests:{path:string;method:string}[];unexpected:string[];connected:boolean;held:boolean;holdRefresh:()=>void;releaseRefresh:()=>void;emit:(mode:'website'|'game'|'offline')=>void};
+async function friendPresenceFixture(page:Page){return page.evaluate(()=>(window as unknown as {__friendPresenceTest:FriendPresenceFixture}).__friendPresenceTest);}
+async function openPresenceFriends(page:Page){
+  await page.goto('/tests/presence-friends-harness.html');
+  await expect(page.getByRole('heading',{name:'Привет, Synthetic Self ✦',exact:true})).toBeVisible();
+  await navigate(page,'Друзья');
+  await expect(page.locator('.friend-card')).toHaveCount(3);
+  await expect.poll(async()=>(await friendPresenceFixture(page)).connected).toBe(true);
+}
+
+test('limited friend responses classify website presence before profile loading and keep offline friends gray',async({page},testInfo)=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  const network:string[]=[];page.on('request',request=>{if(/(?:api|pipeline)\.vrchat\.(?:cloud|com)/.test(request.url()))network.push(request.url());});
+  await openPresenceFriends(page);
+  const website=page.locator('.friend-card').filter({has:page.getByRole('heading',{name:'Synthetic Website Friend',exact:true})});
+  const game=page.locator('.friend-card').filter({has:page.getByRole('heading',{name:'Synthetic Game Friend',exact:true})});
+  const offline=page.locator('.friend-card').filter({has:page.getByRole('heading',{name:'Synthetic Offline Friend',exact:true})});
+  await expect(website.locator('.friend-location')).toContainText('На сайте');
+  await expect(website.locator('.status-dot').first()).toHaveAttribute('data-presence','website');
+  await expect(game.locator('.status-dot').first()).toHaveAttribute('data-presence','game');
+  await expect(offline.locator('.status-dot').first()).toHaveAttribute('data-presence','offline');
+  await expect(offline.locator('.status-dot').first()).toHaveClass(/presence-offline/);
+  expect((await friendPresenceFixture(page)).requests.some(request=>/^\/users\/[^/]+$/.test(request.path))).toBe(false);
+  await page.getByRole('button',{name:'На сайте',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveCount(1);
+  await expect(website).toBeVisible();
+  await page.screenshot({path:`artifacts/regressions/${testInfo.project.name}-website-friends-synthetic-fixture.png`});
+  await website.click();
+  const dialog=page.getByRole('dialog',{name:'Профиль',exact:true});
+  await expect(dialog.getByRole('heading',{name:'Synthetic Website Friend',exact:true})).toBeVisible();
+  await expect(dialog.locator('.status-line')).toContainText('На сайте');
+  await expect(dialog.locator('.profile-identity .status-dot')).toHaveAttribute('data-presence','website');
+  await dialog.getByRole('button',{name:'Закрыть',exact:true}).click();
+  await page.getByRole('button',{name:'В VRChat',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveCount(1);await expect(game).toBeVisible();
+  await page.getByRole('button',{name:'Не в сети',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveCount(1);await expect(offline).toBeVisible();
+  await offline.click();
+  await expect(dialog.getByRole('heading',{name:'Synthetic Offline Friend',exact:true})).toBeVisible();
+  await expect(dialog.locator('.status-line')).toContainText('Не в сети');
+  await expect(dialog.locator('.profile-identity .status-dot')).toHaveAttribute('data-presence','offline');
+  await noHorizontalOverflow(page);expect(errors).toEqual([]);expect(network).toEqual([]);
+  expect((await friendPresenceFixture(page)).unexpected).toEqual([]);
+});
+
+test('live friend presence agrees between the full profile and filters and survives an older refresh response',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await openPresenceFriends(page);
+  const website=page.locator('.friend-card').filter({has:page.getByRole('heading',{name:'Synthetic Website Friend',exact:true})});
+  await website.click();
+  const dialog=page.getByRole('dialog',{name:'Профиль',exact:true});
+  await expect(dialog.getByRole('heading',{name:'Synthetic Website Friend',exact:true})).toBeVisible();
+  const dot=dialog.locator('.profile-identity .status-dot');
+  await expect(dot).toHaveAttribute('data-presence','website');
+  await page.evaluate(()=>(window as unknown as {__friendPresenceTest:FriendPresenceFixture}).__friendPresenceTest.emit('game'));
+  await expect(dot).toHaveAttribute('data-presence','game');
+  await dialog.getByRole('button',{name:'Закрыть',exact:true}).click();
+  await page.getByRole('button',{name:'На сайте',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveCount(0);
+  await page.evaluate(()=>(window as unknown as {__friendPresenceTest:FriendPresenceFixture}).__friendPresenceTest.emit('website'));
+  await expect(page.locator('.friend-card')).toHaveCount(1);await expect(website).toBeVisible();
+  await website.click();
+  await expect(dialog.getByRole('heading',{name:'Synthetic Website Friend',exact:true})).toBeVisible();
+  await expect(dot).toHaveAttribute('data-presence','website');
+  await page.evaluate(()=>(window as unknown as {__friendPresenceTest:FriendPresenceFixture}).__friendPresenceTest.emit('offline'));
+  await expect(dot).toHaveAttribute('data-presence','offline');
+  await expect(dot).toHaveClass(/presence-offline/);
+  await dialog.getByRole('button',{name:'Закрыть',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveCount(0);
+  await page.getByRole('button',{name:'Не в сети',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveCount(2);
+  await expect(website.locator('.status-dot').first()).toHaveAttribute('data-presence','offline');
+  // A REST response begun before the latest socket event must not restore obsolete website presence.
+  await page.evaluate(()=>(window as unknown as {__friendPresenceTest:FriendPresenceFixture}).__friendPresenceTest.holdRefresh());
+  await page.getByRole('button',{name:'Обновить данные',exact:true}).click();
+  await expect.poll(async()=>(await friendPresenceFixture(page)).held).toBe(true);
+  await page.evaluate(()=>(window as unknown as {__friendPresenceTest:FriendPresenceFixture}).__friendPresenceTest.emit('offline'));
+  await page.evaluate(()=>(window as unknown as {__friendPresenceTest:FriendPresenceFixture}).__friendPresenceTest.releaseRefresh());
+  await expect.poll(async()=>(await friendPresenceFixture(page)).held).toBe(false);
+  await expect(page.locator('.friend-card')).toHaveCount(2);
+  await expect(website.locator('.status-dot').first()).toHaveAttribute('data-presence','offline');
+  await page.getByRole('button',{name:'На сайте',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveCount(0);
+  await noHorizontalOverflow(page);expect(errors).toEqual([]);expect((await friendPresenceFixture(page)).unexpected).toEqual([]);
+});
+
 async function navigate(page: Page, name: string) {
   await page
     .locator('nav[aria-label="Основная навигация"]:visible')
