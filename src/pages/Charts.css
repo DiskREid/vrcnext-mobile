@@ -1,0 +1,56 @@
+.charts-panel[hidden] { display: none; }
+.chart-date-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 22px 0 15px; }
+.chart-date-controls .field { margin: 0; min-width: 135px; max-width: 100%; }
+.chart-date-controls input { width: 100%; min-height: 42px; color-scheme: dark; }
+.chart-date-controls > .icon-button { margin-bottom: 1px; }
+.chart-observation-note { line-height: 1.7; margin: 0 0 20px; }
+.chart-metrics { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin: 18px 0 22px; }
+.chart-metrics > span { display: flex; gap: 7px; align-items: center; color: var(--muted); font-size: 12px; }
+.chart-metrics svg { color: var(--accent); flex-shrink: 0; }
+.chart-metrics strong { color: var(--text); font-size: 14px; }
+.chart-zoom-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 18px 0 8px; }
+.chart-zoom-controls > label { flex: 1; min-width: 130px; max-width: 250px; font-size: 11px; color: var(--muted); }
+.chart-zoom-controls input { display: block; width: 100%; accent-color: var(--accent); min-height: 28px; }
+.chart-gesture-note { margin: 6px 0 15px; font-size: 10px; }
+.instance-chart-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); touch-action: none; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: #52516c transparent; }
+.instance-chart-canvas { min-width: 100%; padding: 14px 18px 16px 12px; }
+.instance-chart-axis, .instance-chart-row { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; min-width: 0; }
+.instance-chart-axis { margin: 0 0 10px; font-size: 9px; color: var(--muted); height: 27px; }
+.instance-chart-axis > div { position: relative; height: 27px; }
+.instance-chart-axis time { position: absolute; transform: translateX(-50%); top: 4px; }
+.instance-chart-axis time:first-child { transform: none; }
+.instance-chart-axis time:last-child { transform: translateX(-100%); }
+.instance-chart-row { min-height: 66px; align-items: center; border-top: 1px solid var(--border); padding: 10px 0; }
+.instance-chart-label { min-width: 0; }
+.instance-chart-label > button { display: block; text-align: left; max-width: 100%; overflow-wrap: anywhere; font-size: 11px; }
+.instance-chart-label > small { display: block; font-size: 9px; line-height: 1.6; color: var(--muted); margin-top: 4px; }
+.instance-chart-track { width: 100%; height: 42px; overflow: visible; }
+.timeline-bar { display: block; width: 100%; min-width: 0; min-height: 44px; background: transparent; border: 0; border-radius: 6px; padding: 0; }
+.instance-grid-line { stroke: #ffffff0c; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.instance-chart-track [role='button'] { cursor: pointer; }
+.instance-chart-track [role='button']:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.chart-world-error { color: #e9abaa; font-size: 10px; overflow-wrap: anywhere; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-top: 8px; }
+.chart-world-error .text-button { font-size: 10px; }
+.chart-location-id { overflow-wrap: anywhere; }
+.chart-details { display: grid; gap: 12px; margin: 0; }
+.chart-details > div { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 1.2fr); gap: 12px; font-size: 12px; }
+.chart-details dt { color: var(--muted); }
+.chart-details dd { margin: 0; overflow-wrap: anywhere; }
+.chart-companions { max-height: 340px; overflow-y: auto; }
+.chart-person { display: flex; gap: 12px; align-items: center; justify-content: space-between; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--border); background: transparent; padding: 12px 0; }
+.chart-person > span:first-child { min-width: 0; flex: 1; }
+.chart-person > span:last-child { flex-shrink: 0; font-size: 11px; color: var(--accent); }
+.chart-person strong { font-size: 12px; display: block; overflow-wrap: anywhere; }
+.chart-person small { font-size: 10px; display: block; color: var(--muted); margin-top: 5px; overflow-wrap: anywhere; }
+.chart-analytics-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; margin: 20px 0; align-items: start; }
+.chart-ranking { padding: 19px; min-width: 0; }
+.chart-ranking h2 { font-size: 15px; margin: 0 0 17px; }
+.chart-ranking > .segmented { margin: 0 0 12px; }
+.chart-ranking-card { margin: 14px 0; padding: 0 0 15px; border-bottom: 1px solid var(--border); min-width: 0; }
+.chart-ranking-card > button { text-align: left; display: block; font-size: 12px; overflow-wrap: anywhere; }
+.chart-ranking-card > span { display: block; margin: 6px 0; }
+.chart-ranking-track { height: 5px; border-radius: 6px; overflow: hidden; background: var(--bg); margin-top: 10px; }
+.chart-ranking-track i { display: block; height: 100%; border-radius: inherit; }
+.chart-ranking-person { align-items: flex-start; }
+@media(max-width: 640px) { .chart-analytics-grid { grid-template-columns: minmax(0,1fr); } .instance-chart-axis, .instance-chart-row { grid-template-columns: 100px minmax(0,1fr); gap: 10px; } .instance-chart-canvas { padding-left: 10px; padding-right: 12px; } .chart-person > span:last-child { max-width: 95px; text-align: right; } }
+@media(max-width: 370px) { .chart-date-controls { gap: 5px; } .chart-date-controls .field { min-width: 125px; } .chart-date-controls > .button { padding-left: 9px; padding-right: 9px; } .chart-zoom-controls > label { max-width: 175px; } }

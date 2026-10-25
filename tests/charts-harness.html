@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chart test fixture only</title></head>
+<body><div id="root"></div><script type="module">
+// Isolated synthetic test data. This HTML is never part of the production bundle or stored history.
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import ChartsPage from '/src/pages/Charts.tsx';
+import { AppProvider } from '/src/state.tsx';
+import { demoUser, demoFriends } from '/src/demo.ts';
+import { friendStatistics } from '/src/data/game-history.ts';
+import '/src/styles.css';
+window.__chartTest = { actions: [] };
+const at = (hour, minute=0) => new Date(2026, 9, 25, hour, minute).toISOString();
+const visits = [
+  { id:'test_visit_1',sessionId:'test_session',location:'wrld_demo1:fixture1',worldId:'wrld_demo1',start:at(10),lastObserved:at(11),end:at(11),reason:'location-change',source:'api',participants:[{userId:demoFriends[0].id,displayName:demoFriends[0].displayName,start:at(10,15),lastObserved:at(10,45),end:at(10,45)}]},
+  { id:'test_visit_2',sessionId:'test_session',location:'wrld_demo2:fixture2',worldId:'wrld_demo2',start:at(12),lastObserved:at(12,30),end:at(12,30),reason:'observation-gap',source:'api',participants:[]},
+];
+const noop = () => {};
+const action = (type) => (value) => window.__chartTest.actions.push({type,id:typeof value==='string'?value:value.id});
+const history = {events:[],visits,sessions:[{id:'test_session',start:at(10),lastObserved:at(12,30),end:at(12,30)}],loading:false,error:'',observePipeline:noop,observeProfile:noop,seedUsers:noop,recordModeration:noop,recordFriendAction:noop,retry:noop,clear:async()=>{},pause:noop,observeSession:noop,friendStats:(id)=>friendStatistics(visits,id)};
+const state = {user:demoUser,onUserUpdated:noop,demo:true,online:true,refresh:0,notificationsRefresh:0,friends:{data:demoFriends,loading:false,refreshing:false,error:'',apply:noop,reload:noop},history,observation:{status:'demo',error:'',lastSync:at(12,30),refresh:noop},notify:noop,act:async()=>undefined,openUser:action('user'),openWorld:action('world'),openGroup:action('group'),onRefresh:noop,logout:noop,activity:[]};
+createRoot(document.getElementById('root')).render(React.createElement(AppProvider,{value:state},React.createElement('main',{className:'main-content'},React.createElement(ChartsPage))));
+</script></body></html>

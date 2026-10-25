@@ -49,6 +49,7 @@ import FavoritesPage from './pages/Favorites';
 import Locations from './pages/Locations';
 import Social from './pages/Social';
 import GameLogPage from './pages/GameLog';
+import ChartsPage from './pages/Charts';
 import { clearFavoriteEntityCache } from './api/favorites';
 import PullRefresh from './components/PullRefresh';
 import {
@@ -505,6 +506,8 @@ export default function App() {
               <InventoryPage />
             ) : screen === 'messenger' ? (
               <MessengerPage />
+            ) : screen === 'charts' ? (
+              <ChartsPage />
             ) : screen === 'gameLog' ? (
               <GameLogPage />
             ) : screen === 'social' ? (
@@ -1090,6 +1093,7 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
     icon: ComponentType<{ size?: number }>;
     color: string;
   }[] = [
+    { id: 'charts', title: 'Диаграммы', text: 'Время, встречи и известные связи', icon: Activity, color: 'purple' },
     { id: 'gameLog', title: 'Журнал игры', text: 'Наблюдения миров и встреч', icon: Radio, color: 'green' },
     { id: 'feed', title: 'Лента', text: 'История наблюдаемых событий', icon: Activity, color: 'purple' },
     { id: 'locations', title: 'Friends Locations', text: 'Друзья по мирам и инстансам', icon: MapPin, color: 'green' },

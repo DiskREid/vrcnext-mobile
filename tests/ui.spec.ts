@@ -334,3 +334,60 @@ test('IndexedDB upgrades old activity without losing records and restores visits
   });
   expect(restored).toEqual({ activity: ['fixture_activity'], visits: ['fixture_visit'], sessions: ['fixture_session'], other: {visits: [], sessions: []}, cleared: {visits: [], sessions: []} });
 });
+
+test('timeline renders known intervals, opens encounter details and keeps unknown gaps out of totals', async ({ page }) => {
+  const errors: string[] = [], network: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
+  await page.goto('/tests/charts-harness.html');
+  await expect(page.getByRole('heading', { name: 'Диаграммы', exact: true })).toBeVisible();
+  await page.getByLabel('Дата диаграммы', { exact: true }).fill('2026-10-25');
+  await expect(page.locator('.instance-chart-row')).toHaveCount(2);
+  await expect(page.locator('.chart-metrics').getByText('1 ч 30 мин', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Увеличить масштаб времени', exact: true }).click();
+  await expect(page.getByLabel('Масштаб времени', { exact: true })).not.toHaveValue('1');
+  await page.getByRole('button', { name: 'Весь день', exact: true }).click();
+  await page.getByRole('button', { name: /^Подробности посещения wrld_demo1/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Подробности посещения', exact: true });
+  await expect(dialog.getByText('30 мин', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Открыть мир', exact: true }).click();
+  expect(await page.evaluate(() => (window as unknown as {__chartTest:{actions:unknown[]}}).__chartTest.actions)).toContainEqual({type:'world',id:'wrld_demo1'});
+  await page.getByRole('button', { name: 'Аналитика', exact: true }).click();
+  await expect(page.locator('.chart-metrics:visible').getByText('1 ч 30 мин', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Совместные встречи', exact: true })).toBeVisible();
+  await noHorizontalOverflow(page);
+  expect(errors).toEqual([]); expect(network).toEqual([]);
+});
+
+test('known friend network supports zoom, two-finger gestures and profile navigation without invented mutuals', async ({ page }) => {
+  const errors: string[] = [], network: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
+  await demo(page);
+  await navigate(page, 'Ещё');
+  await page.getByRole('button', { name: /^Диаграммы Время, встречи/ }).click();
+  await page.getByRole('button', { name: 'Mutual Friend Network', exact: true }).click();
+  const graph = page.getByRole('img', { name: 'Граф общих друзей', exact: true });
+  await expect(graph).toBeVisible();
+  await expect(graph.locator('.network-node')).toHaveCount(7);
+  const scene = graph.locator('.network-scene');
+  const original = await scene.getAttribute('transform');
+  await page.getByRole('button', { name: 'Увеличить граф', exact: true }).click();
+  await expect(scene).not.toHaveAttribute('transform', original!);
+  await page.getByRole('button', { name: 'Сбросить граф', exact: true }).click();
+  await expect(scene).toHaveAttribute('transform', original!);
+  await graph.evaluate((svg) => {
+    const box = svg.getBoundingClientRect();
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    const point = (type: string, id: number, px: number, py: number) => svg.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: id, pointerType: 'touch', clientX: px, clientY: py, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    point('pointerdown', 41, x - 30, y); point('pointerdown', 42, x + 30, y);
+    point('pointermove', 41, x - 70, y); point('pointermove', 42, x + 70, y);
+    point('pointerup', 41, x - 70, y); point('pointerup', 42, x + 70, y);
+  });
+  await expect(scene).not.toHaveAttribute('transform', original!);
+  await page.getByRole('button', { name: 'Сбросить граф', exact: true }).click();
+  await graph.getByRole('button', { name: 'Открыть профиль Luna', exact: true }).press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Профиль', exact: true }).getByRole('heading', { name: 'Luna', exact: true })).toBeVisible();
+  await noHorizontalOverflow(page);
+  expect(errors).toEqual([]); expect(network).toEqual([]);
+});
