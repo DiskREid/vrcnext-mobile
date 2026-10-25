@@ -42,6 +42,7 @@ export function useSecureImage(
       return;
     }
     if (!src || !protectedImage) return;
+    if (retainLoaded && image?.src === src && image.data) return;
     let live = true;
     const pending = images.load(`${maxDimension}:${src}`, () => native.loadImage({ url: src, maxDimension }).then((result) => result.dataUrl), () => live);
     pending
@@ -107,8 +108,8 @@ export default function SecureImage({
     const observer = new IntersectionObserver(
       (entries) => {
         const inView = entries.some((e) => e.isIntersecting);
-        setVisible((previous) => retainLoaded ? previous || inView : inView);
-        if (retainLoaded && inView) observer.disconnect();
+        // Retention keeps decoded bytes, not an obsolete demand for an offscreen download.
+        setVisible(inView);
       },
       { rootMargin: '240px' },
     );

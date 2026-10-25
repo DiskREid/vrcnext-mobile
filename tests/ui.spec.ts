@@ -833,6 +833,7 @@ test('native avatar previews recover after a transient failure, use fallback and
   await expect(image).toHaveAttribute('src',original!);
   await page.locator('.main-content').evaluate(el=>el.scrollTo({top:0,behavior:'instant'}));
   await expect(image).toHaveCSS('opacity','1');
+  expect((await page.evaluate(()=>(window as unknown as {__presenceImageTest:PresenceImageFixture}).__presenceImageTest.images)).filter(r=>r.url.includes('file_retry'))).toHaveLength(2);
   await page.getByRole('button',{name:'Новый URL аватарки',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as unknown as {__presenceImageTest:PresenceImageFixture}).__presenceImageTest.images.some(r=>r.url.includes('file_new')))).toBe(true);
   await expect.poll(()=>image.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>0)).toBe(true);

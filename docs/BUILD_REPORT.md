@@ -1,8 +1,8 @@
 # Проверка сборки0.2.3
 
-APK: `releases/v0.2.3/VRCNext-Mobile-0.2.3.apk`, 4,717,929 байт.
+APK: `releases/v0.2.3/VRCNext-Mobile-0.2.3.apk`, 4,717,917 байт.
 Пакет `com.diskreid.vrcnextmobile`, versionCode6, Android8/API26+, WebView109+,
-target API35. SHA256: `269801d778976820e114c9db8a880b92184b685433d0261da4bca8b7b72426dc`.
+target API35. SHA256: `b7040d04c6a7a6428fae732c040e2fcc0729e2c78feda2712e39d1d9d4b761c3`.
 
 Подписанная тестовая debug-сборка. APK Signature Scheme v2 проверена;
 сертификат SHA256 `da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94`
