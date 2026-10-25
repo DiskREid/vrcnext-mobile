@@ -5,7 +5,11 @@ import type { ObservationState } from './data/observation';
 import type { CalendarSync } from './data/calendar-sync';
 import type { ReactNode } from 'react';
 import type { User, World, Group, CalendarEvent } from './api';
-export type Activity = { id: string; title: string; detail: string; time: string };
+export type Activity = {
+  id: string; title: string; detail: string; time: string;
+  userId?: string; displayName?: string;
+  beforeLocation?: string; location?: string; worldId?: string;
+};
 export type AppState = {
   user: User;
   onUserUpdated: (user: User) => void;

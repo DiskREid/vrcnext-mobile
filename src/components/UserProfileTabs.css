@@ -101,6 +101,16 @@
 .user-location .detail-actions {
   margin-top: 14px;
 }
+.instance-creator,
+.instance-friends { margin-top: 16px; }
+.instance-creator h4,
+.instance-friends h4 { margin: 0 0 8px; font-size: 13px; }
+.instance-person { width: 100%; min-width: 0; text-align: left; gap: 10px; }
+.instance-person > span:not(.avatar) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.instance-person > .avatar { flex: 0 0 auto; }
+.instance-person strong { font-size: 13px; }
+.instance-person small { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+.instance-person > svg { flex-shrink: 0; }
 .user-presence-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -112,7 +122,7 @@
 .user-profile-panel[hidden] {
   display: none;
 }
-.user-profile-panel .list-row > span {
+.user-profile-panel .list-row > span:not(.avatar) {
   flex: 1;
   min-width: 0;
 }

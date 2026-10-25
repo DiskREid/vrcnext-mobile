@@ -4,6 +4,7 @@ import { LockKeyhole, LogOut, Info, Palette, Clock, ExternalLink, Check } from '
 import { api } from '../api';
 import { isNative, native } from '../api/native';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
+import { ActivityWorldChange } from '../components/ActivityLinks';
 import type { User, ProfileUpdate } from '../api';
 import { useApp, useLoad } from '../state';
 import {
@@ -280,7 +281,7 @@ export function SettingsPage() {
         <section className="card settings-section">
           <Info />
           <h2>
-            VRCNext Mobile <Badge>0.2.0</Badge>
+            VRCNext Mobile <Badge>0.2.1</Badge>
           </h2>
           <p className="muted">
             Неофициальная Android-адаптация VRCNext от shinyflvre и участников VRCNext. Не связана с
@@ -333,7 +334,7 @@ function License() {
   );
 }
 export function TimelinePage() {
-  const { activity } = useApp();
+  const { activity, openUser } = useApp();
   return (
     <>
       <PageHeader
@@ -360,7 +361,10 @@ export function TimelinePage() {
               <span className="timeline-point" />
               <div>
                 <strong>{a.title}</strong>
-                <p className="muted">{a.detail}</p>
+                {a.userId && <button className="text-button" aria-label={`Открыть профиль ${a.displayName || a.userId}`} onClick={() => openUser(a.userId!)}>{a.displayName || a.userId}</button>}
+                {a.location !== undefined || a.beforeLocation !== undefined || a.worldId
+                  ? <ActivityWorldChange before={a.beforeLocation} after={a.location} worldId={a.worldId}/>
+                  : a.detail && a.detail !== a.displayName && <p className="muted">{a.detail}</p>}
                 <time>
                   {new Date(a.time).toLocaleTimeString('ru', {
                     hour: '2-digit',

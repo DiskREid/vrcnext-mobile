@@ -470,3 +470,125 @@ test('known friend network supports zoom, two-finger gestures and profile naviga
   await noHorizontalOverflow(page);
   expect(errors).toEqual([]); expect(network).toEqual([]);
 });
+
+type RegressionState = {
+  actions: { type: string; id: string }[];
+  requests: { path: string; method: string }[];
+  worldA: string;
+  worldB: string;
+  friendId: string;
+  ownerId: string;
+  location: string;
+};
+const regressionState = (page: Page) => page.evaluate(() => (window as unknown as { __regressionTest: RegressionState }).__regressionTest);
+
+test('current instance resolves literal-colon URL and exposes creator and exact-location friends independently of instance access', async ({ page }) => {
+  const errors: string[] = [], network: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
+  await page.goto('/tests/regressions-harness.html');
+  const region = page.getByRole('region', { name: 'Текущий инстанс', exact: true });
+  await expect(region.getByRole('button', { name: 'Открыть мир Fixture Forest', exact: true })).toBeVisible();
+  await expect(region).toContainText(/2\s*\/\s*20/);
+  await expect(region.getByText('PC: 1', { exact: true })).toBeVisible();
+  await expect(region.getByText('Android: 1', { exact: true })).toBeVisible();
+  // Exercise the actual profile-panel ancestor: its generic list rules must not stretch avatars.
+  const avatarSizes = await region.locator('.instance-person > .avatar').evaluateAll((avatars) => avatars.map((avatar) => {
+    const box = avatar.getBoundingClientRect();
+    return { width: box.width, height: box.height };
+  }));
+  expect(avatarSizes).toHaveLength(2);
+  for (const size of avatarSizes) {
+    expect(size.width).toBeGreaterThanOrEqual(36);
+    expect(Math.abs(size.width - size.height)).toBeLessThanOrEqual(1);
+  }
+  const creator = region.getByLabel('Создатель инстанса', { exact: true });
+  await creator.getByRole('button', { name: 'Открыть профиль Fixture Creator', exact: true }).click();
+  const friends = region.getByLabel('Друзья в инстансе', { exact: true });
+  await expect(friends.getByRole('button')).toHaveCount(1);
+  await friends.getByRole('button', { name: 'Открыть профиль Fixture Friend', exact: true }).click();
+  await expect(region.getByText('Fixture Elsewhere', { exact: true })).toHaveCount(0);
+  await expect(region.getByText('Fixture Same World Other Instance', { exact: true })).toHaveCount(0);
+  let recorded = await regressionState(page);
+  expect(recorded.actions).toContainEqual({ type: 'user', id: recorded.ownerId });
+  expect(recorded.actions).toContainEqual({ type: 'user', id: recorded.friendId });
+  const instanceRequests = recorded.requests.filter((request) => request.path.startsWith('/instances/'));
+  expect(instanceRequests).toHaveLength(1);
+  expect(instanceRequests[0].path).toBe(`/instances/${recorded.worldB}:${encodeURIComponent(recorded.location.split(':')[1])}`);
+  expect(instanceRequests[0].path).not.toContain('%3A');
+  await noHorizontalOverflow(page);
+
+  await page.getByRole('button', { name: 'Fixture unavailable', exact: true }).click();
+  await expect(region.getByText('Fixture instance access unavailable', { exact: true })).toBeVisible();
+  await expect(region.getByRole('button', { name: 'Открыть мир Fixture Forest', exact: true })).toBeVisible();
+  await expect(region.getByLabel('Создатель инстанса', { exact: true }).getByRole('button', { name: 'Открыть профиль Fixture Creator', exact: true })).toBeVisible();
+  await expect(region.getByLabel('Друзья в инстансе', { exact: true }).getByRole('button', { name: 'Открыть профиль Fixture Friend', exact: true })).toBeVisible();
+  await noHorizontalOverflow(page);
+  recorded = await regressionState(page);
+  const requestsBeforePrivate = recorded.requests.length;
+  await page.getByRole('button', { name: 'Fixture private', exact: true }).click();
+  await expect(page.getByText('Пользователь скрыл местоположение.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Текущий инстанс', exact: true })).toHaveCount(0);
+  expect((await regressionState(page)).requests).toHaveLength(requestsBeforePrivate);
+  expect(errors).toEqual([]); expect(network).toEqual([]);
+});
+
+test('saved and session activity open real profiles and named source and destination worlds', async ({ page }) => {
+  const errors: string[] = [], network: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
+  await page.goto('/tests/regressions-harness.html');
+  for (const view of ['feed', 'timeline']) {
+    await page.getByRole('button', { name: `Fixture ${view}`, exact: true }).click();
+    const change = page.getByLabel('Изменение местоположения', { exact: true });
+    await expect(change.getByText('Было', { exact: true })).toBeVisible();
+    await expect(change.getByText('Стало', { exact: true })).toBeVisible();
+    await change.getByRole('button', { name: 'Открыть мир Fixture Moon', exact: true }).click();
+    await change.getByRole('button', { name: 'Открыть мир Fixture Forest', exact: true }).click();
+    await page.getByRole('button', { name: 'Открыть профиль Fixture Friend', exact: true }).click();
+    const recorded = await regressionState(page);
+    expect(recorded.actions).toContainEqual({ type: 'user', id: recorded.friendId });
+    expect(recorded.actions).toContainEqual({ type: 'world', id: recorded.worldA });
+    expect(recorded.actions).toContainEqual({ type: 'world', id: recorded.worldB });
+    await noHorizontalOverflow(page);
+  }
+  expect(errors).toEqual([]); expect(network).toEqual([]);
+});
+
+test('favorite avatars load and search the selected real category instead of every category', async ({ page }) => {
+  const errors: string[] = [], network: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => { if (/(?:api|pipeline)\.vrchat\.(?:cloud|com)|avtrdb\.com/.test(request.url())) network.push(request.url()); });
+  await page.goto('/tests/regressions-harness.html');
+  await page.getByRole('button', { name: 'Fixture avatars', exact: true }).click();
+  await page.getByRole('button', { name: 'Избранные', exact: true }).click();
+  const category = page.getByLabel('Коллекция избранного', { exact: true });
+  await expect(category).toBeVisible();
+  await expect(category.getByRole('option', { name: 'Fixture Animals', exact: true })).toHaveCount(1);
+  await expect(category.getByRole('option', { name: 'Fixture Robots', exact: true })).toHaveCount(1);
+  const cards = page.locator('.explore-avatar-grid:visible .avatar-card');
+  await expect(cards).toHaveCount(2);
+  await category.selectOption('avatars2');
+  await expect(cards).toHaveCount(1);
+  await expect(cards.getByRole('heading', { name: 'Fixture Cat', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fixture Fox', exact: true })).toHaveCount(0);
+  const query = page.getByRole('searchbox', { name: 'Поиск в избранных аватарах или avtr_…', exact: true });
+  await query.fill('Alpha');
+  await expect(cards).toHaveCount(0);
+  await query.fill('Beta');
+  await expect(cards).toHaveCount(1);
+  await category.selectOption('avatars1');
+  await expect(cards).toHaveCount(0);
+  await query.fill('');
+  await expect(cards).toHaveCount(1);
+  await expect(cards.getByRole('heading', { name: 'Fixture Fox', exact: true })).toBeVisible();
+  const countBeforeRefresh = (await regressionState(page)).requests.length;
+  await page.getByRole('button', { name: 'Обновить аватары', exact: true }).click();
+  await expect(cards).toHaveCount(1);
+  await expect(category).toHaveValue('avatars1');
+  await expect.poll(async () => (await regressionState(page)).requests.slice(countBeforeRefresh).filter((request) => request.path.startsWith('/avatars/favorites')).length).toBeGreaterThan(0);
+  const reloaded = (await regressionState(page)).requests.slice(countBeforeRefresh).filter((request) => request.path.startsWith('/avatars/favorites'));
+  expect(reloaded.every((request) => new URL(request.path, 'https://fixture.invalid').searchParams.get('tag') === 'avatars1')).toBe(true);
+  await noHorizontalOverflow(page);
+  expect(errors).toEqual([]); expect(network).toEqual([]);
+});

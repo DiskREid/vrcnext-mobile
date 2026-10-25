@@ -4,6 +4,15 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 public class ApiEndpointTest {
+    @Test public void preservesLiteralInstanceDelimiterAndDisclosedAccessTags() {
+        String location = "wrld_4432ea9b-729c-46e3-8eaf-846aa0a37fdd:456~hidden(usr_123)~region(eu)~nonce(abc)";
+        okhttp3.HttpUrl url = ApiEndpoint.resolve("/instances/" + location);
+        assertEquals("/api/1/instances/" + location, url.encodedPath());
+        assertEquals("https://api.vrchat.cloud/api/1/instances/" + location, url.toString());
+        assertEquals("/api/1/instances/" + location + "/invite",
+                ApiEndpoint.resolve("/instances/" + location + "/invite").encodedPath());
+        assertEquals("api.vrchat.cloud", url.host());
+    }
     @Test public void preservesEncodedSearchWithoutChangingOrigin() {
         okhttp3.HttpUrl url = ApiEndpoint.resolve("/worlds?search=cats%20%26%20dogs&n=20");
         assertEquals("https", url.scheme());

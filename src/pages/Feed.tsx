@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Activity, ArrowUpRight, Globe2 } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { useApp } from '../state';
 import { historyLabels } from '../data/history';
 import type { HistoryEvent, HistoryKind } from '../data/history';
+import { ActivityWorldChange } from '../components/ActivityLinks';
 import { AvatarImage, Badge, Empty, ErrorState, imageOf, Loading, PageHeader, SearchField, Segmented } from '../components/ui';
 import './Feed.css';
 
@@ -20,9 +21,11 @@ export function HistoryRows({ events, limit = 100 }: { events:HistoryEvent[];lim
           <div className="history-body">
             <div className="history-heading"><button className="text-button" onClick={()=>ctx.openUser(event.userId)}>{event.displayName}</button><time dateTime={event.time}>{new Date(event.time).toLocaleString('ru',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time></div>
             <Badge>{historyLabels[event.kind]}</Badge>
-            <p className="preserve-lines">{event.detail}</p>
+            {(event.kind==='world' || event.kind==='instance') && (event.before!==undefined || event.after!==undefined || event.location!==undefined || event.worldId)
+              ? <ActivityWorldChange before={event.before} after={event.after ?? event.location} worldId={event.worldId}/>
+              : <p className="preserve-lines">{event.detail}</p>}
             {event.kind==='bio' && <details><summary>Изменения Bio</summary><p className="muted small">Было</p><p className="preserve-lines">{event.before || 'Пусто'}</p><p className="muted small">Стало</p><p className="preserve-lines">{event.after || 'Пусто'}</p></details>}
-            {event.worldId && <button className="text-button" onClick={()=>ctx.openWorld(event.worldId!)}><Globe2 size={14}/>Открыть мир<ArrowUpRight size={13}/></button>}
+            {event.worldId && event.kind!=='world' && event.kind!=='instance' && <ActivityWorldChange worldId={event.worldId}/>}
             {event.source==='profile' && <span className="muted small">Замечено при просмотре профиля</span>}
           </div>
         </article>;

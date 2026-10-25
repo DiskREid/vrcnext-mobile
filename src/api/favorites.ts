@@ -125,12 +125,14 @@ export async function loadFavoriteGroups(ownerId: string, type: FavoriteType): P
 export type FavoriteWorldRecord = World & { favoriteGroupNames: string[] };
 export type FavoriteAvatarRecord = Avatar & { favoriteGroupNames: string[] };
 const snapshots = new Map<string, { time: number; promise: Promise<(FavoriteWorldRecord | FavoriteAvatarRecord)[]> }>();
-async function loadMetadata(ownerId: string, type: 'world' | 'avatar', force: boolean, knownGroups?: FavoriteGroup[]) {
-  const key = `${ownerId}:${type}`;
+async function loadMetadata(ownerId: string, type: 'world' | 'avatar', force: boolean, knownGroups?: FavoriteGroup[], category = '') {
+  const key = JSON.stringify([ownerId, type, category]);
   const previous = snapshots.get(key);
   if (!force && previous && Date.now() - previous.time < 120000) return previous.promise;
   const promise = (async () => {
-    const groups = knownGroups || await loadFavoriteGroups(ownerId, type);
+    const available = knownGroups || await loadFavoriteGroups(ownerId, type);
+    const groups = category ? available.filter((group) => group.name === category) : available;
+    if (category && !groups.length) throw new ApiError('Выбранная коллекция недоступна. Обновите список коллекций.');
     // An untagged query can be limited to the first/default collection on API versions.
     const data = await Promise.all(groups.map(async (group) => ({ name: group.name, values: await favoriteApi.metadata(type, group.name) })));
     const merged = new Map<string, FavoriteWorldRecord | FavoriteAvatarRecord>();
@@ -147,7 +149,7 @@ async function loadMetadata(ownerId: string, type: 'world' | 'avatar', force: bo
   return promise;
 }
 export const loadFavoriteWorlds = (ownerId: string, force = false, knownGroups?: FavoriteGroup[]) => loadMetadata(ownerId, 'world', force, knownGroups) as Promise<FavoriteWorldRecord[]>;
-export const loadFavoriteAvatars = (ownerId: string, force = false, knownGroups?: FavoriteGroup[]) => loadMetadata(ownerId, 'avatar', force, knownGroups) as Promise<FavoriteAvatarRecord[]>;
+export const loadFavoriteAvatars = (ownerId: string, force = false, knownGroups?: FavoriteGroup[], category = '') => loadMetadata(ownerId, 'avatar', force, knownGroups, category) as Promise<FavoriteAvatarRecord[]>;
 
 // Metadata is resolved only for visible cards; errors are never cached as empty data.
 const entities = new Map<string, { time: number; promise: Promise<FavoriteEntity> }>();

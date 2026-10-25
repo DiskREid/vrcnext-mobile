@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Location and favorites regression fixture only</title></head>
+<body><div id="root"></div><script type="module">
+// Explicitly synthetic test data. This entry is never bundled into production or saved as user history.
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import '/src/styles.css';
+const { api, createApi } = await import('/src/api/index.ts');
+const picture = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const worldA = 'wrld_11111111-1111-4111-8111-111111111111';
+const worldB = 'wrld_22222222-2222-4222-8222-222222222222';
+const selfId = 'usr_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const friendId = 'usr_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const ownerId = 'usr_cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const otherId = 'usr_dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const location = `${worldB}:7342~hidden(${ownerId})~region(eu)`;
+const beforeLocation = `${worldA}:821~region(eu)`;
+const world = (id) => ({id,name:id===worldA?'Fixture Moon':'Fixture Forest',imageUrl:picture,thumbnailImageUrl:picture,capacity:20});
+const user = {id:selfId,displayName:'Fixture Self',location:'offline',status:'active',tags:[]};
+// The target has only worldId + instanceId, matching a current API response without location.
+const target = {id:friendId,displayName:'Fixture Friend',worldId:worldB,instanceId:location.split(':')[1],status:'active',tags:[]};
+const friends = [
+ {...target,location},
+ {id:otherId,displayName:'Fixture Elsewhere',location:beforeLocation,status:'active',tags:[]},
+ {id:'usr_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',displayName:'Fixture Same World Other Instance',location:`${worldB}:999`,status:'active',tags:[]},
+];
+const avatars = [
+ {id:'avtr_11111111-1111-4111-8111-111111111111',name:'Fixture Fox',authorId:ownerId,authorName:'Author Alpha',imageUrl:picture,thumbnailImageUrl:picture},
+ {id:'avtr_22222222-2222-4222-8222-222222222222',name:'Fixture Cat',authorId:otherId,authorName:'Author Beta',imageUrl:picture,thumbnailImageUrl:picture},
+];
+window.__regressionTest = {actions:[],requests:[],failInstance:false,worldA,worldB,selfId,friendId,ownerId,location};
+const transport = {
+ async request(options) {
+  window.__regressionTest.requests.push({path:options.path,method:options.method||'GET'});
+  const url = new URL(options.path,'https://fixture.invalid');
+  if(url.pathname.startsWith('/instances/')) {
+   // Model VRChat's literal-colon route delimiter. Encoding the whole location is the regression.
+   if(!url.pathname.startsWith(`/instances/${worldB}:`))return {status:400,data:{error:{message:'Malformed URL'}}};
+   if(window.__regressionTest.failInstance)return {status:403,data:{error:{message:'Fixture instance access unavailable'}}};
+   return {status:200,data:{id:location,location,worldId:worldB,type:'hidden',hidden:ownerId,n_users:2,capacity:20,region:'eu',platforms:{standalonewindows:1,android:1},world:world(worldB)}};
+  }
+  if(url.pathname.startsWith('/worlds/'))return {status:200,data:world(decodeURIComponent(url.pathname.slice('/worlds/'.length)))};
+  if(url.pathname===`/users/${ownerId}`)return {status:200,data:{id:ownerId,displayName:'Fixture Creator',status:'active',currentAvatarThumbnailImageUrl:picture}};
+  if(url.pathname==='/favorites/groups/avatar')return {status:200,data:{favoriteGroups:[{id:'fvgrp_fixture1',type:'avatar',name:'avatars1',displayName:'Fixture Animals',visibility:'private'},{id:'fvgrp_fixture2',type:'avatar',name:'avatars2',displayName:'Fixture Robots',visibility:'private'}]}};
+  if(url.pathname==='/avatars/favorites') {
+   const tag=url.searchParams.get('tag');
+   return {status:200,data:tag==='avatars1'?[avatars[0]]:tag==='avatars2'?[avatars[1]]:avatars};
+  }
+  if(url.pathname==='/avatars')return {status:200,data:[]};
+  return {status:500,data:{error:{message:'Unexpected synthetic fixture route '+options.path}}};
+ },
+ sessionState:async()=>({hasAuth:false}),clearSession:async()=>{},disconnectPipeline:async()=>{},
+};
+// Load consumers after installing the fake transport so request closures use the actual API client.
+Object.assign(api,createApi(transport));
+const { AppProvider } = await import('/src/state.tsx');
+const { ProfileLocation } = await import('/src/components/UserProfileTabs.tsx');
+const { default: Explore } = await import('/src/pages/Explore.tsx');
+const { HistoryRows } = await import('/src/pages/Feed.tsx');
+const { TimelinePage } = await import('/src/pages/Personal.tsx');
+const { clearFavoriteEntityCache } = await import('/src/api/favorites.ts');
+const noop=()=>{};
+const action=(type)=>(value)=>window.__regressionTest.actions.push({type,id:typeof value==='string'?value:value.id});
+const event={id:'fixture-world-change',kind:'world',userId:friendId,displayName:'Fixture Friend',time:'2026-10-25T10:00:00.000Z',detail:beforeLocation+' → '+location,before:beforeLocation,after:location,location,worldId:worldB,source:'pipeline'};
+const activity={id:'fixture-session-world-change',title:'Друг сменил мир',detail:'Fixture Friend',time:event.time,userId:friendId,displayName:'Fixture Friend',beforeLocation,location,worldId:worldB};
+const history={events:[event],visits:[],sessions:[],loading:false,error:'',observePipeline:noop,observeProfile:noop,seedUsers:noop,recordModeration:noop,recordFriendAction:noop,retry:noop,clear:async()=>{},pause:noop,observeSession:noop,friendStats:()=>({encounters:0,totalMs:0})};
+const state={user,onUserUpdated:noop,demo:false,online:true,refresh:0,pageActive:true,notificationsRefresh:0,friends:{data:friends,loading:false,refreshing:false,error:'',apply:noop,reload:noop},history,calendarSync:{events:[],reminders:[],loading:false,error:'',refresh:noop,dismissReminder:noop},observation:{status:'active',error:'',refresh:noop},notify:noop,act:async()=>undefined,openUser:action('user'),openWorld:action('world'),openGroup:action('group'),openCalendarEvent:action('calendar'),onRefresh:noop,logout:noop,activity:[activity]};
+function Fixture() {
+ const [view,setView]=React.useState('instance');
+ const [revision,setRevision]=React.useState(0);
+ const select=(next)=>{clearFavoriteEntityCache();setView(next);setRevision(value=>value+1);};
+ return React.createElement(AppProvider,{value:state},React.createElement('div',{className:'app-shell'},React.createElement('div',{className:'workspace'},
+  React.createElement('div',{className:'toolbar',style:{padding:'8px',flexWrap:'wrap'}},['instance','feed','timeline','avatars','unavailable','private'].map(name=>React.createElement('button',{className:'button secondary compact',key:name,onClick:()=>{window.__regressionTest.failInstance=name==='unavailable';select(name);}},'Fixture '+name))),
+  React.createElement('main',{className:'main-content'},
+   view==='avatars'?React.createElement(Explore,{key:revision,initialTab:'avatars'}):
+   view==='feed'?React.createElement(HistoryRows,{key:revision,events:[event]}):
+   view==='timeline'?React.createElement(TimelinePage,{key:revision}):
+   React.createElement('div',{className:'user-profile-panel'},React.createElement(ProfileLocation,{key:revision,user:view==='private'?{...target,location:'private'}:target}))
+  )
+ )));
+}
+createRoot(document.getElementById('root')).render(React.createElement(Fixture));
+</script></body></html>

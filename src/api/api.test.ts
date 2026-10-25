@@ -22,6 +22,29 @@ function fixture(responses: NativeResponse[] = []) {
 }
 const success = (data: unknown): NativeResponse => ({ status: 200, data });
 
+describe('instance URL routes', () => {
+  it('keeps the literal colon separator for instance details and self invitations', async () => {
+    const location = 'wrld_4432ea9b-729c-46e3-8eaf-846aa0a37fdd:456~hidden(usr_123)~region(eu)~nonce(abc)';
+    const { client, bridge } = fixture([success({ id: location }), success({})]);
+    await client.instance(location);
+    await client.inviteSelf(location);
+    expect(vi.mocked(bridge.request).mock.calls.map(([request]) => request.path)).toEqual([
+      '/instances/' + location,
+      '/instances/' + location + '/invite',
+    ]);
+  });
+  it('encodes individual instance values without changing the structural delimiter', async () => {
+    const location = 'wrld_test:456~nonce(a+b)';
+    const { client, bridge } = fixture([success({})]);
+    await client.instance(location);
+    expect(bridge.request).toHaveBeenCalledWith({ path: '/instances/wrld_test:456~nonce(a%2Bb)', method: 'GET' });
+    for (const invalid of ['private', 'offline', 'wrld_test:private', 'wrld_test:offline', 'wrld_test:traveling', 'wrld_test:123/../auth', 'wrld_test:123?query=1', 'wrld_test:123#fragment', 'wrld_test:123:456']) {
+      expect(() => client.instance(invalid)).toThrow('Нет доступного инстанса');
+    }
+    expect(bridge.request).toHaveBeenCalledOnce();
+  });
+});
+
 describe('calendar actions use server state', () => {
   it('posts a follow change once and reads nested actual subscription state', async () => {
     const { client, bridge } = fixture([success({ id: 'cal_real', ownerId: 'grp_real', userInterest: { isFollowing: true } })]);

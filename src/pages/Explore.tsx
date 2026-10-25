@@ -23,7 +23,7 @@ import type { Avatar, Group, World, FavoriteType, GroupPost, VrcFile } from '../
 import { demoAvatars, demoGroups, demoWorlds } from '../demo';
 import { PageScope, useApp, useLoad } from '../state';
 import { usePaged } from '../hooks/usePaged';
-import { clearFavoriteEntityCache, loadFavoriteGroups, loadFavoriteWorlds } from '../api/favorites';
+import { clearFavoriteEntityCache, loadFavoriteGroups, loadFavoriteWorlds, loadFavoriteAvatars } from '../api/favorites';
 import { FavoriteCategoryPicker, demoFavoriteGroups } from './Favorites';
 import {
   AvatarImage,
@@ -768,20 +768,28 @@ function Avatars() {
   const [selected, setSelected] = useState<Avatar>();
   const [collections, setCollections] = useState(false);
   const [lookup, setLookup] = useState(false);
+  const [category, setCategory] = useState('');
+  const categories = useLoad(() => mode !== 'favorites' ? Promise.resolve([]) : demo ? Promise.resolve(demoFavoriteGroups('avatar')) : loadFavoriteGroups(user.id, 'avatar'), [mode, demo, user.id, refresh]);
   const search = useDebounced(query).toLowerCase();
   const page = usePaged<Avatar>(
     async (offset) => {
+      if (mode === 'favorites') {
+        const all = demo
+          ? demoAvatars.map((avatar, index) => ({ ...avatar, favoriteGroupNames: [demoFavoriteGroups('avatar')[index % 2].name] }))
+          : await loadFavoriteAvatars(user.id, false, categories.data?.length ? categories.data : undefined, category);
+        return all.filter((avatar) => (!category || avatar.favoriteGroupNames.includes(category)) && `${avatar.name} ${avatar.authorName || ''} ${avatar.id}`.toLocaleLowerCase().includes(search)).slice(offset, offset + 50);
+      }
       if (demo) return offset ? [] : demoAvatars;
       if (mode === 'public')
         return search ? api.searchPublicAvatars(query.trim(), Math.floor(offset / 20)) : [];
       return api.avatars(mode, offset);
     },
-    [demo, user.id, mode, mode === 'public' ? search : ''],
+    [demo, user.id, mode, mode === 'public' || mode === 'favorites' ? search : '', mode === 'favorites' ? category : ''],
     mode === 'public' ? 20 : 50,
     refresh,
   );
   const filtered =
-    mode === 'public'
+    mode === 'public' || mode === 'favorites'
       ? page.items
       : page.items.filter((avatar) => avatar.name.toLowerCase().includes(search));
   async function lookupById() {
@@ -812,13 +820,15 @@ function Avatars() {
           placeholder={
             mode === 'public'
               ? 'Название аватара в публичной базе'
-              : 'Поиск в загруженных аватарах или avtr_…'
+              : mode === 'favorites'
+                ? 'Поиск в избранных аватарах или avtr_…'
+                : 'Поиск в загруженных аватарах или avtr_…'
           }
         />
         <button
           className="icon-button"
           aria-label="Обновить аватары"
-          onClick={page.reload}
+          onClick={() => { if (mode === 'favorites') { clearFavoriteEntityCache(); categories.reload(); } page.reload(); }}
           disabled={page.loading || page.refreshing || page.moreLoading}
           aria-busy={page.refreshing}
         >
@@ -840,6 +850,10 @@ function Avatars() {
           Коллекции
         </button>
       </div>
+      {mode === 'favorites' && <>
+        <FavoriteCategoryPicker groups={categories.data || []} value={category} onChange={setCategory} />
+        {categories.error && <ErrorState error={categories.error} retry={categories.reload} />}
+      </>}
       {mode === 'public' && (
         <p className="muted small">
           Поиск в публичной базе avtrdb.com. Поисковый запрос передаётся её оператору.
@@ -855,7 +869,7 @@ function Avatars() {
           {lookup ? 'Ищем…' : 'Открыть аватар по ID'}
         </button>
       )}
-      {page.loading ? (
+      {page.loading || (mode === 'favorites' && categories.loading) ? (
         <Loading />
       ) : (
         <>
@@ -869,12 +883,12 @@ function Avatars() {
                     ? 'Найдите новый образ'
                     : mode === 'mine'
                       ? 'Ваш гардероб'
-                      : 'Избранных аватаров пока нет'
+                      : category ? 'В этой коллекции пока нет аватаров' : 'Избранных аватаров пока нет'
               }
               text={
                 mode === 'public'
                   ? 'Введите название, чтобы найти аватар в публичной базе.'
-                  : search
+                  : search && mode !== 'favorites'
                     ? 'Поиск выполняется по уже загруженным карточкам. Загрузите следующую страницу или вставьте ID аватара.'
                     : mode === 'mine'
                       ? 'Здесь появятся загруженные вами аватары. Другой аватар можно открыть по его ID.'

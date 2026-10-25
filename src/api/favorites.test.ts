@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './index';
-import { createFavoritesClient, FavoriteMoveError, favoriteApi, loadFavoriteWorlds, loadFavoriteGroups, clearFavoriteEntityCache } from './favorites';
+import { createFavoritesClient, FavoriteMoveError, favoriteApi, loadFavoriteWorlds, loadFavoriteAvatars, loadFavoriteGroups, clearFavoriteEntityCache } from './favorites';
 import type { Favorite } from './types';
 
 const original: Favorite = { id: 'fvrt_record', favoriteId: 'wrld_target', type: 'world', tags: ['worlds1', 'worlds3'] };
@@ -49,6 +49,42 @@ describe('all favorite categories and complete lists', () => {
     expect(metadata).toHaveBeenCalledWith('world','vrcPlusWorld_3');
     expect(worlds).toHaveLength(9);
     expect(worlds.find((w)=>w.id==='wrld_shared')?.favoriteGroupNames).toHaveLength(8);
+  });
+  it('loads favorite avatar pages with the exact selected category tag', async () => {
+    const rows = Array.from({length:100}, (_,index) => ({id:`avtr_${index}`,name:`Avatar ${index}`}));
+    const {client,request} = fixture([rows,[{id:'avtr_last',name:'Last avatar'}]]);
+    expect(await client.metadata('avatar','avatars6')).toHaveLength(101);
+    expect(request.mock.calls).toEqual([
+      ['/avatars/favorites?tag=avatars6&n=100&offset=0'],
+      ['/avatars/favorites?tag=avatars6&n=100&offset=100'],
+    ]);
+  });
+  it('keeps all-avatar and selected-category snapshots separate and fetches only the selected tag', async () => {
+    const groups = [{type:'avatar' as const,name:'avatars1',displayName:'First'}, {type:'avatar' as const,name:'avatars2',displayName:'Second'}];
+    const metadata = vi.spyOn(favoriteApi,'metadata').mockImplementation(async (_type,tag) => [{id:`avtr_${tag}`,name:tag!}]);
+    const all = await loadFavoriteAvatars('usr_avatar_collections',false,groups);
+    expect(all.map((avatar)=>avatar.favoriteGroupNames)).toEqual([['avatars1'],['avatars2']]);
+    metadata.mockClear();
+    const second = await loadFavoriteAvatars('usr_avatar_collections',false,groups,'avatars2');
+    expect(metadata).toHaveBeenCalledExactlyOnceWith('avatar','avatars2');
+    expect(second).toMatchObject([{id:'avtr_avatars2',favoriteGroupNames:['avatars2']}]);
+    metadata.mockClear();
+    expect(await loadFavoriteAvatars('usr_avatar_collections',false,groups,'avatars2')).toBe(second);
+    expect(metadata).not.toHaveBeenCalled();
+    expect(await loadFavoriteAvatars('usr_avatar_collections',false,groups)).toBe(all);
+  });
+  it('does not replace an unavailable avatar category with all collections', async () => {
+    const groups = [{type:'avatar' as const,name:'avatars1',displayName:'First'}];
+    const metadata = vi.spyOn(favoriteApi,'metadata');
+    await expect(loadFavoriteAvatars('usr_avatar_category_missing',false,groups,'avatars9')).rejects.toThrow('Выбранная коллекция недоступна');
+    expect(metadata).not.toHaveBeenCalled();
+  });
+  it('retains every proven avatar category when an avatar belongs to multiple collections', async () => {
+    const groups = [{type:'avatar' as const,name:'avatars1',displayName:'First'}, {type:'avatar' as const,name:'avatars2',displayName:'Second'}];
+    vi.spyOn(favoriteApi,'metadata').mockResolvedValue([{id:'avtr_shared',name:'Shared avatar'}]);
+    const result = await loadFavoriteAvatars('usr_shared_avatar',true,groups);
+    expect(result).toHaveLength(1);
+    expect(result[0].favoriteGroupNames).toEqual(['avatars1','avatars2']);
   });
   it('retains ordinary favorites for a non-subscriber but does not conceal rate limits on optional VRC+', async () => {
     const ordinary={type:'world' as const,name:'worlds1',displayName:'First'};

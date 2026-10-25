@@ -253,9 +253,16 @@ function phasedAuthError(
   );
 }
 function requireLocation(location: string) {
-  if (!/^wrld_[a-zA-Z0-9-]+:[a-zA-Z0-9~_().+\-]+$/.test(location))
+  if (!/^wrld_[a-zA-Z0-9-]+:[a-zA-Z0-9~_().+\-]+$/.test(location)
+      || ['private', 'offline', 'traveling'].includes(location.slice(location.indexOf(':') + 1).split('~')[0]))
     throw new ApiError('Нет доступного инстанса. Откройте мир и выберите инстанс.');
   return location;
+}
+/** VRChat routes parse the literal worldId:instanceId delimiter before decoding segments. */
+function instancePathSegment(location: string) {
+  const full = requireLocation(location);
+  const delimiter = full.indexOf(':');
+  return segment(full.slice(0, delimiter)) + ':' + segment(full.slice(delimiter + 1));
 }
 
 /** All network I/O uses the native transport; browser preview never accepts account credentials. */
@@ -558,11 +565,11 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
     world: (id: string) => request<World>('/worlds/' + segment(id)),
     recentWorlds: () => list<World>('/instances/recent'),
     instance: (location: string) =>
-      request<Instance>('/instances/' + segment(requireLocation(location))),
+      request<Instance>('/instances/' + instancePathSegment(location)),
     createInstance: (options: CreateInstanceOptions) =>
       request<Instance>('/instances', 'POST', options),
     inviteSelf: (location: string) =>
-      request('/instances/' + segment(requireLocation(location)) + '/invite', 'POST', {}),
+      request('/instances/' + instancePathSegment(location) + '/invite', 'POST', {}),
     invite: (id: string, location: string, messageSlot?: number) =>
       request('/invite/' + segment(id), 'POST', {
         instanceId: requireLocation(location),

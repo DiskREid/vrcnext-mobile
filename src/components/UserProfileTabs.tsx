@@ -25,7 +25,8 @@ import {
 import type { JsonRecord, ProfileFavoriteGroup } from '../api/profile-data';
 import { useApp, useLoad } from '../state';
 import { usePaged } from '../hooks/usePaged';
-import { accessibleLocation, instanceType } from '../data/locations';
+import { disclosedUserLocation, instanceType } from '../data/locations';
+import { friendsInInstance, instanceCount, instanceCreator, instanceGroup } from '../data/instance-location';
 import { demoAvatars, demoFriends, demoGroups, demoWorlds } from '../demo';
 import { AvatarDetail } from '../pages/Explore';
 import { HistoryRows } from '../pages/Feed';
@@ -142,141 +143,89 @@ export function ProfileInformation({ user, profile }: { user: User; profile?: Js
   );
 }
 
-function ProfileLocation({ user }: { user: User }) {
-  const ctx = useApp(),
-    location = user.location;
+/** The instance card keeps disclosed owner/friend evidence visible even if metadata fails. */
+export function ProfileLocation({ user }: { user: User }) {
+  const location = disclosedUserLocation(user);
+  return <ProfileLocationContent key={`${user.id}:${location || user.location || 'unknown'}`} user={user} />;
+}
+
+function ProfileLocationContent({ user }: { user: User }) {
+  const ctx = useApp();
+  const location = disclosedUserLocation(user);
+  const worldId = location?.split(':')[0];
   const load = useLoad(async () => {
-    if (!accessibleLocation(location)) return null;
-    if (ctx.demo)
-      return {
-        instance: { type: 'public', n_users: 18 },
-        world: demoWorlds.find((world) => world.id === location.split(':')[0]) || demoWorlds[0],
-      };
-    const instance = await api.instance(location);
-    const world = instance.world || (await api.world(location.split(':')[0]));
-    return { instance, world };
-  }, [location, ctx.demo]);
-  if (!accessibleLocation(location))
-    return user.location === 'private' ? (
-      <p className="muted small">Пользователь скрыл местоположение. Данные инстанса недоступны.</p>
-    ) : null;
-  const data = load.data,
-    instance = asRecord(data?.instance);
-  const friends = ctx.friends.data.filter((friend) => friend.location === location);
-  const ownerId =
-    asString(instance.creatorId) ||
-    asString(instance.ownerId) ||
-    asString(instance.private) ||
-    asString(instance.friends) ||
-    asString(instance.hidden);
-  const count =
-    typeof instance.n_users === 'number'
-      ? instance.n_users
-      : typeof instance.userCount === 'number'
-        ? instance.userCount
-        : undefined;
+    if (!location) return undefined;
+    if (ctx.demo) return { type: 'public', n_users: 18 };
+    const value = await api.instance(location);
+    if (!value || typeof value !== 'object') throw new Error('VRChat не передал сведения об этом инстансе.');
+    return value;
+  }, [location, ctx.demo, ctx.refresh]);
+  const worldLoad = useLoad(async () => {
+    if (!worldId) return undefined;
+    if (ctx.demo) return demoWorlds.find((world) => world.id === worldId);
+    return api.world(worldId);
+  }, [worldId, ctx.demo]);
+  const instance = asRecord(load.data);
+  const instanceWorld = asRecord(instance.world);
+  const world = instanceWorld.id === worldId && typeof instanceWorld.name === 'string'
+    ? instanceWorld as unknown as World : worldLoad.data;
+  const creatorId = location ? instanceCreator(location, instance) : undefined;
+  const groupId = location ? instanceGroup(location, instance) : undefined;
+  const knownCreator = creatorId === user.id ? user : creatorId === ctx.user.id ? ctx.user
+    : ctx.friends.data.find((friend) => friend.id === creatorId);
+  const creatorLoad = useLoad(async () => {
+    if (!creatorId || knownCreator) return knownCreator;
+    if (ctx.demo) return demoFriends.find((friend) => friend.id === creatorId);
+    return api.user(creatorId);
+  }, [creatorId, knownCreator, ctx.demo]);
+  const creator = creatorLoad.data?.id === creatorId ? creatorLoad.data : knownCreator;
+  if (!location) return user.location === 'private' || user.instanceId === 'private' ? (
+    <p className="muted small">Пользователь скрыл местоположение. Данные инстанса недоступны.</p>
+  ) : null;
+  const friends = friendsInInstance(location, ctx.friends.data, user, instance);
+  const count = instanceCount(instance.n_users) ?? instanceCount(instance.userCount);
+  const capacity = instanceCount(instance.capacity) ?? instanceCount(instance.recommendedCapacity) ?? instanceCount(world?.capacity);
   const platformCounts = Object.entries(asRecord(instance.platforms)).filter(
-    ([key, count]) =>
-      ['standalonewindows', 'android', 'ios'].includes(key) &&
-      typeof count === 'number' &&
-      count >= 0,
+    ([key, value]) => ['standalonewindows', 'android', 'ios'].includes(key) && instanceCount(value) !== undefined,
   );
-  return (
-    <section className="inset-panel user-location">
-      <h3>
-        <Globe2 size={17} /> Местоположение
-      </h3>
-      {load.error && <ErrorState error={load.error} retry={load.reload} />}
-      {load.loading && !data ? (
-        <Loading />
-      ) : (
-        data && (
-          <>
-            <button className="user-location-world" onClick={() => ctx.openWorld(data.world)}>
-              <SecureImage src={imageOf(data.world)} alt="" />
-              <span>
-                <strong>{data.world.name}</strong>
-                <small>
-                  {instanceType(
-                    location,
-                    asString(instance.type),
-                    asString(instance.groupAccessType),
-                  )}
-                  {count !== undefined ? ` · ${count} участников` : ''}
-                </small>
-              </span>
-              <ExternalLink size={16} />
-            </button>
-            <dl className="user-metadata">
-              <Metadata label="Инстанс">
-                <span className="id-text">{location.split(':')[1]}</span>
-              </Metadata>
-              {ownerId && (
-                <Metadata label={instance.creatorId ? 'Создатель' : 'Владелец'}>
-                  {ownerId.startsWith('usr_') ? (
-                    <button className="text-button id-text" onClick={() => ctx.openUser(ownerId)}>
-                      {ctx.friends.data.find((friend) => friend.id === ownerId)?.displayName ||
-                        ownerId}
-                    </button>
-                  ) : (
-                    <span className="id-text">{ownerId}</span>
-                  )}
-                </Metadata>
-              )}
-              {platformCounts.length > 0 && (
-                <Metadata label="Платформы">
-                  {platformCounts.map(([key, count]) => (
-                    <Badge key={key}>
-                      {{ standalonewindows: 'PC', android: 'Android', ios: 'iOS' }[key]}:{' '}
-                      {String(count)}
-                    </Badge>
-                  ))}
-                </Metadata>
-              )}
-            </dl>
-            {friends.length > 0 && (
-              <>
-                <p className="muted small">Друзья в этом инстансе: {friends.length}</p>
-                <div className="user-presence-list">
-                  {friends.map((friend) => (
-                    <button
-                      className="list-row"
-                      key={friend.id}
-                      onClick={() => ctx.openUser(friend)}
-                    >
-                      <AvatarImage name={friend.displayName} src={imageOf(friend)} size={36} />
-                      <span>{friend.displayName}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )
-      )}
-      <div className="detail-actions">
-        <button
-          className="button secondary compact"
-          onClick={() =>
-            void ctx.act(() => api.inviteSelf(location), 'Приглашение себе отправлено')
-          }
-        >
-          <Send size={15} />
-          Пригласить себя
-        </button>
-        {user.id !== ctx.user.id && (
-          <button
-            className="button secondary compact"
-            onClick={() =>
-              void ctx.act(() => api.requestInvite(user.id), 'Запрос приглашения отправлен')
-            }
-          >
-            Попросить инвайт
-          </button>
-        )}
-      </div>
+  return <section className="inset-panel user-location" aria-label="Текущий инстанс">
+    <h3><Globe2 size={17} /> Текущий инстанс</h3>
+    <button className="user-location-world" aria-label={`Открыть мир ${world?.name || worldId}`} onClick={() => ctx.openWorld(world || worldId!)}>
+      {world && <SecureImage src={imageOf(world)} alt="" />}
+      <span><strong>{world?.name || worldId}</strong><small>{instanceType(location, asString(instance.type), asString(instance.groupAccessType))}
+        {count !== undefined ? ` · ${count}${capacity !== undefined ? `/${capacity}` : ''} участников` : ''}
+      </small></span><ExternalLink size={16} />
+    </button>
+    {load.loading && !load.data && <p className="muted small" role="status">Загружаем сведения инстанса…</p>}
+    {load.error && <ErrorState error={load.error} retry={load.reload} />}
+    {!world && worldLoad.error && <ErrorState error={worldLoad.error} retry={worldLoad.reload} />}
+    <dl className="user-metadata">
+      {asString(instance.displayName) && <Metadata label="Название">{asString(instance.displayName)}</Metadata>}
+      <Metadata label="Инстанс"><span className="id-text">{location.slice(location.indexOf(':') + 1)}</span></Metadata>
+      {(asString(instance.region) || asString(instance.photonRegion)) && <Metadata label="Регион">{asString(instance.region) || asString(instance.photonRegion)}</Metadata>}
+      {groupId && <Metadata label="Группа-владелец"><button className="text-button id-text" onClick={() => ctx.openGroup({ id: groupId, name: groupId })}>{groupId}</button></Metadata>}
+      {platformCounts.length > 0 && <Metadata label="Платформы">{platformCounts.map(([key, value]) => <Badge key={key}>{{ standalonewindows: 'PC', android: 'Android', ios: 'iOS' }[key]}: {String(value)}</Badge>)}</Metadata>}
+    </dl>
+    <section className="instance-creator" aria-label="Создатель инстанса">
+      <h4>Создатель инстанса</h4>
+      {creatorId ? <button className="list-row instance-person" aria-label={`Открыть профиль ${creator?.displayName || creatorId}`} onClick={() => ctx.openUser(creator || creatorId)}>
+        <AvatarImage name={creator?.displayName || creatorId} src={creator ? imageOf(creator) : undefined} size={38} />
+        <span><strong>{creator?.displayName || creatorId}</strong><small>Создатель инстанса</small></span><ExternalLink size={14} />
+      </button> : <p className="muted small">VRChat не передал создателя этого инстанса.</p>}
+      {creatorLoad.error && <p className="muted small">Не удалось загрузить профиль создателя. <button className="text-button" onClick={creatorLoad.reload}>Повторить</button></p>}
     </section>
-  );
+    <section className="instance-friends" aria-label="Друзья в инстансе">
+      <h4>Друзья в инстансе · {friends.length}</h4>
+      {friends.length ? <div className="user-presence-list">{friends.map((friend) => <button className="list-row instance-person" key={friend.id} aria-label={`Открыть профиль ${friend.displayName}`} onClick={() => ctx.openUser(friend)}>
+        <AvatarImage name={friend.displayName} src={imageOf(friend)} size={36} status={friend.status} />
+        <span><strong>{friend.displayName}</strong>{friend.id === creatorId && <small>Создатель инстанса</small>}</span>
+      </button>)}</div> : <p className="muted small">В доступных данных нет друзей с подтверждённым присутствием в этом инстансе.</p>}
+    </section>
+    <div className="detail-actions">
+      <button className="button secondary compact" onClick={() => void ctx.act(() => api.inviteSelf(location), 'Приглашение себе отправлено')}><Send size={15} />Пригласить себя</button>
+      {user.id !== ctx.user.id && <button className="button secondary compact" onClick={() => void ctx.act(() => api.requestInvite(user.id), 'Запрос приглашения отправлен')}>Попросить инвайт</button>}
+    </div>
+  </section>;
 }
 
 function LoadMore({

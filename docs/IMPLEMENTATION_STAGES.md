@@ -151,3 +151,24 @@ V1/legacy страниц до объединения ID; современный 
 прошли. Инструментальные startup/screen-protection тесты скомпилированы, но на
 устройстве не выполнялись. Все16 production web assets побайтово сверены внутри
 APK. Подпись совпадает с опубликованной0.1.1. Подробности и ограничения — BUILD_REPORT.md.
+
+
+## Исправления0.2.1 после проверки пользователем
+
+Исправлен URL инстанса: буквальное двоеточие между worldId и instanceId сохраняется
+в REST-маршруте. Карточка инстанса теперь независимо показывает мир, доступного
+создателя и подтверждённых друзей; групповая принадлежность не выдаётся за
+пользователя-создателя. Добавлен выбор категории аватаров в Explore с реальным
+запросом выбранного tag. Активность, Лента и Activity профиля открывают профиль
+и оба мира перехода, загружают настоящие названия видимых строк.
+
+Основные файлы: `src/api/index.ts`, `src/api/favorites.ts`, `src/pages/Explore.tsx`,
+`src/components/UserProfileTabs.tsx/.css`, `src/data/locations.ts`,
+`src/data/instance-location.ts`, `src/components/ActivityLinks.tsx/.css`,
+`src/data/activity-worlds.ts`, `src/data/session-activity.ts`, `src/pages/Feed.tsx`,
+`src/pages/Personal.tsx`, `src/App.tsx`, `src/state.tsx`.
+
+Итог:222 Vitest,24 Playwright в двух ориентациях,26 JUnit; Lint0ошибок/9предупреждений,
+TypeScript/Vite, Android APK и v2 signature прошли. После CSS-исправления аватарок
+UI-прогон повторён целиком. Старые APK не изменялись; подпись обновления совпадает
+с0.2.0. Подробности: `FIXES_0.2.1.md`, `BUILD_REPORT.md`.

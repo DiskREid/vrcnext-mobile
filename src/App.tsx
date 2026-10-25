@@ -47,6 +47,7 @@ import { useCalendarSync } from './data/calendar-sync';
 import { parseCalendarLink } from './api/calendar';
 import { presenceLabel } from './data/locations';
 import { reconcilePage } from './hooks/paged-data';
+import { pipelineActivity } from './data/session-activity';
 import Feed from './pages/Feed';
 import FavoritesPage from './pages/Favorites';
 import Locations from './pages/Locations';
@@ -138,9 +139,9 @@ export default function App() {
     setToast(text);
     toastTimer.current = setTimeout(() => setToast(''), 5000);
   };
-  const record = (title: string, detail = '') =>
+  const record = (title: string, detail = '', targets: Partial<Pick<ActivityItem, 'userId' | 'displayName' | 'beforeLocation' | 'location' | 'worldId'>> = {}) =>
     setActivity((a) =>
-      [{ id: crypto.randomUUID(), title, detail, time: new Date().toISOString() }, ...a].slice(
+      [{ id: crypto.randomUUID(), title, detail, time: new Date().toISOString(), ...targets }, ...a].slice(
         0,
         200,
       ),
@@ -242,24 +243,11 @@ export default function App() {
     const reg = async () => {
       const h = await native.addListener('pipeline', (event) => {
         if (!live) return;
-        const userId = String(event.content.userId || '');
-        const labels: Record<string, string> = {
-          'friend-online': 'Друг в VRChat',
-          'friend-offline': 'Друг вышел',
-          'friend-active': 'Друг на сайте',
-          'friend-location': 'Друг сменил мир',
-          'friend-update': 'Профиль друга обновлён',
-          notification: 'Новое уведомление',
-        };
-        const label = labels[event.type];
-        if (label)
-          record(
-            label,
-            String(
-              (event.content.user as Record<string, unknown> | undefined)?.displayName || userId,
-            ),
-          );
         const latest = pipelineSnapshot.current;
+        if (latest.user) {
+          const item = pipelineActivity(event, latest.friends.data, latest.user);
+          if (item) record(item.title, item.detail, item);
+        }
         if (latest.user) latest.history.observePipeline(event, latest.friends.data, latest.user);
         latest.friends.apply(event);
         if (event.type === 'user-update' && latest.user) {

@@ -10,13 +10,23 @@ export interface FriendLocation {
 
 /** Only complete, disclosed instance locations prove that two friends share an instance. */
 export function accessibleLocation(value?: string): value is string {
-  return !!value && /^wrld_[a-zA-Z0-9-]+:[a-zA-Z0-9~_().+\-]+$/.test(value);
+  return !!value && /^wrld_[a-zA-Z0-9-]+:[a-zA-Z0-9~_().+\-]+$/.test(value)
+    && !['private', 'offline', 'traveling'].includes(value.slice(value.indexOf(':') + 1).split('~')[0]);
+}
+
+/** Only compose fields disclosed by the same user response; explicit privacy values win. */
+export function disclosedUserLocation(user: Pick<User, 'location' | 'worldId' | 'instanceId'>): string | undefined {
+  if (user.location !== undefined) return accessibleLocation(user.location) ? user.location : undefined;
+  if (typeof user.worldId !== 'string' || !/^wrld_[a-zA-Z0-9-]+$/.test(user.worldId)
+    || typeof user.instanceId !== 'string') return;
+  const location = `${user.worldId}:${user.instanceId}`;
+  return accessibleLocation(location) ? location : undefined;
 }
 
 export function groupFriendLocations(friends: User[]): FriendLocation[] {
   const groups = new Map<string, FriendLocation>();
   for (const friend of friends) {
-    const location = friend.location;
+    const location = disclosedUserLocation(friend) || friend.location;
     const accessible = accessibleLocation(location);
     if (!accessible && location !== 'private') continue;
     // A hidden location is not a shared instance ID. Never infer a relationship from it.
@@ -65,7 +75,7 @@ export function instanceType(
 }
 
 export function presenceLabel(user: User): string {
-  if (accessibleLocation(user.location)) return 'В VRChat';
+  if (disclosedUserLocation(user)) return 'В VRChat';
   if (user.location === 'private') return 'В приватном мире';
   if (user.state === 'active' || user.state === 'online') return 'На сайте / в приложении';
   return 'Не в сети';
