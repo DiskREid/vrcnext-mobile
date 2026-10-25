@@ -44,7 +44,6 @@ function safeLink(link: string) {
     return false;
   }
 }
-type FriendStatistics = { encounters: number; totalMs: number; lastMeeting?: string };
 function FriendDetail({ friend, onClose }: { friend: User; onClose: () => void }) {
   const ctx = useApp();
   const [confirm, setConfirm] = useState(false);
@@ -68,9 +67,7 @@ function FriendDetail({ friend, onClose }: { friend: User; onClose: () => void }
       ctx.history.observeProfile(load.data.user);
     }
   }, [load.data, ctx.demo, ctx.history]);
-  const stats = (
-    ctx.history as unknown as { friendStats?: (id: string) => FriendStatistics }
-  ).friendStats?.(friend.id);
+  const stats = ctx.history.friendStats(friend.id);
   async function remove() {
     await ctx.act(async () => {
       setBusy(true);
@@ -155,7 +152,9 @@ function FriendDetail({ friend, onClose }: { friend: User; onClose: () => void }
           <dd>
             {stats?.totalMs
               ? `${Math.floor(stats.totalMs / 60_000)} мин наблюдений`
-              : 'Нет наблюдений'}
+              : stats.encounters
+                ? 'Недостаточно наблюдений для оценки времени'
+                : 'Нет наблюдений'}
           </dd>
         </div>
         <div>

@@ -42,11 +42,13 @@ import type { Activity as ActivityItem } from './state';
 import { demoUser, demoWorlds, demoEvents } from './demo';
 import { useFriends } from './data/friends';
 import { useHistory } from './data/history';
+import { useObservation } from './data/observation';
 import { presenceLabel } from './data/locations';
 import Feed from './pages/Feed';
 import FavoritesPage from './pages/Favorites';
 import Locations from './pages/Locations';
 import Social from './pages/Social';
+import GameLogPage from './pages/GameLog';
 import { clearFavoriteEntityCache } from './api/favorites';
 import PullRefresh from './components/PullRefresh';
 import {
@@ -116,6 +118,7 @@ export default function App() {
     pipelineConnected = useRef(false);
   const friends = useFriends(user?.id, demo, revision);
   const history = useHistory(user?.id, demo);
+  const observation = useObservation(user, demo, online, pipeline === 'connected', friends, history, setUser);
   const pipelineSnapshot = useRef({friends, user, history});
   pipelineSnapshot.current = {friends, user, history};
   useEffect(() => { history.seedUsers(friends.data); }, [friends.data, history.seedUsers]);
@@ -234,6 +237,14 @@ export default function App() {
         const latest = pipelineSnapshot.current;
         if (latest.user) latest.history.observePipeline(event, latest.friends.data, latest.user);
         latest.friends.apply(event);
+        if (event.type === 'user-update' && latest.user) {
+          const partial = event.content.user as Partial<User> | undefined;
+          const id = String(event.content.userId || partial?.id || '');
+          if (partial && id === latest.user.id) {
+            setUser((current) => current ? { ...current, ...partial, id: current.id } : current);
+            if (typeof partial.location === 'string') latest.history.observeSession({ ...partial, id, displayName: partial.displayName || latest.user.displayName }, latest.friends.refreshing ? [] : latest.friends.data, 'pipeline');
+          }
+        }
         if (event.type.startsWith('notification')) setNotificationsRefresh((v) => v + 1);
       });
       if (!live) {
@@ -242,7 +253,7 @@ export default function App() {
       }
       handles.push(h);
       const c = await native.addListener('connection', (event) => {
-        if (live) { setPipeline(event.state); if (event.state !== 'connected') pipelineSnapshot.current.history.pause(); }
+        if (live) { setPipeline(event.state); if (event.state !== 'connected') pipelineSnapshot.current.history.pause(); else if (pipelineConnected.current) pipelineSnapshot.current.friends.reload(); }
       });
       if (!live) {
         await c.remove();
@@ -325,6 +336,7 @@ export default function App() {
         refresh: revision,
         friends,
         history,
+        observation,
         notificationsRefresh,
         notify,
         act,
@@ -493,6 +505,8 @@ export default function App() {
               <InventoryPage />
             ) : screen === 'messenger' ? (
               <MessengerPage />
+            ) : screen === 'gameLog' ? (
+              <GameLogPage />
             ) : screen === 'social' ? (
               <Social />
             ) : screen === 'favorites' ? (
@@ -1076,6 +1090,7 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
     icon: ComponentType<{ size?: number }>;
     color: string;
   }[] = [
+    { id: 'gameLog', title: 'Журнал игры', text: 'Наблюдения миров и встреч', icon: Radio, color: 'green' },
     { id: 'feed', title: 'Лента', text: 'История наблюдаемых событий', icon: Activity, color: 'purple' },
     { id: 'locations', title: 'Friends Locations', text: 'Друзья по мирам и инстансам', icon: MapPin, color: 'green' },
     { id: 'favorites', title: 'Избранное', text: 'Друзья, миры и аватары', icon: Star, color: 'peach' },

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { FriendState } from './data/friends';
 import type { HistoryState } from './data/history';
+import type { ObservationState } from './data/observation';
 import type { ReactNode } from 'react';
 import type { User, World, Group } from './api';
 export type Activity = { id: string; title: string; detail: string; time: string };
@@ -12,6 +13,7 @@ export type AppState = {
   refresh: number;
   friends: FriendState;
   history: HistoryState;
+  observation: ObservationState;
   notificationsRefresh: number;
   notify: (text: string) => void;
   act: <T>(operation: () => Promise<T>, success?: string) => Promise<T | undefined>;

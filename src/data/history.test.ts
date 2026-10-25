@@ -75,7 +75,7 @@ describe('durable account history journal',()=>{
   it('merges events received while IndexedDB is being opened rather than replacing them',async()=>{
     let completeRead!:(events:HistoryEvent[])=>void;
     const memory=new MemoryHistoryStore();
-    const storage:HistoryStore={read:()=>new Promise((resolve)=>{completeRead=resolve;}),append:(...args)=>memory.append(...args),clear:(...args)=>memory.clear(...args)};
+    const storage:HistoryStore={readGame:async()=>({visits:[],sessions:[]}),saveGame:async()=>{},read:()=>new Promise((resolve)=>{completeRead=resolve;}),append:(...args)=>memory.append(...args),clear:(...args)=>memory.clear(...args)};
     const journal=new HistoryJournal('usr_one',storage);
     const loading=journal.load();journal.append([sample('live')]);
     completeRead([sample('stored')]);await loading;await journal.flush();
@@ -84,7 +84,7 @@ describe('durable account history journal',()=>{
   it('reports a failed durable write, keeps the pending events, and retries with identical IDs',async()=>{
     let blocked=true;
     const memory=new MemoryHistoryStore();
-    const storage:HistoryStore={read:(...args)=>memory.read(...args),append:async(...args)=>{if(blocked)throw new Error('Storage full');await memory.append(...args);},clear:(...args)=>memory.clear(...args)};
+    const storage:HistoryStore={readGame:async()=>({visits:[],sessions:[]}),saveGame:async()=>{},read:(...args)=>memory.read(...args),append:async(...args)=>{if(blocked)throw new Error('Storage full');await memory.append(...args);},clear:(...args)=>memory.clear(...args)};
     const journal=new HistoryJournal('usr_one',storage);
     journal.append([sample()]);await Promise.resolve();await Promise.resolve();
     expect(journal.state.error).toContain('Storage full');expect(journal.state.events).toHaveLength(1);
@@ -92,7 +92,7 @@ describe('durable account history journal',()=>{
     expect(journal.state.error).toBe('');expect(await memory.read('usr_one')).toEqual([sample()]);
   });
   it('does not hide a read failure when an unrelated write succeeds',async()=>{
-    const storage:HistoryStore={read:async()=>{throw new Error('Read unavailable');},append:async()=>{},clear:async()=>{}};
+    const storage:HistoryStore={readGame:async()=>({visits:[],sessions:[]}),saveGame:async()=>{},read:async()=>{throw new Error('Read unavailable');},append:async()=>{},clear:async()=>{}};
     const journal=new HistoryJournal('usr_one',storage);await journal.load();
     journal.append([sample()]);await Promise.resolve();await Promise.resolve();
     expect(journal.state.error).toContain('Read unavailable');

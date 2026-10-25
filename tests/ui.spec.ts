@@ -279,6 +279,58 @@ test('new feed, locations, favorites and Social use real empty states or explici
   await expect(page.getByRole('button', { name: 'Подробности Luna', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Подробности Luna', exact: true }).click();
   await noHorizontalOverflow(page);
+  await navigate(page, 'Ещё');
+  await page.getByRole('button', { name: /^Журнал игры Наблюдения миров/ }).click();
+  await expect(page.getByRole('heading', { name: 'Журнал игры', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Посещения ещё не наблюдались', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Сессии', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Игровых сессий пока нет', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Видео', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Источник видео недоступен', exact: true })).toBeVisible();
+  await noHorizontalOverflow(page);
   expect(errors).toEqual([]);
   expect(network).toEqual([]);
+});
+
+test('IndexedDB upgrades old activity without losing records and restores visits per account', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const old = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('vrcnext-mobile-history', 1);
+      request.onupgradeneeded = () => {
+        const events = request.result.createObjectStore('events', { keyPath: ['account', 'id'] });
+        events.createIndex('accountTime', ['account', 'time']);
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = old.transaction('events', 'readwrite');
+      tx.objectStore('events').put({ account: 'usr_ui_migration', id: 'fixture_activity', time: '2026-10-25T10:00:00.000Z', kind: 'online', userId: 'usr_ui_friend', displayName: 'Test fixture', detail: 'Synthetic test fixture', source: 'pipeline' });
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error);
+    });
+    old.close();
+  });
+  const saved = await page.evaluate(async () => {
+    const { IndexedHistoryStore } = await import('/src/data/history-storage.ts');
+    const store = new IndexedHistoryStore();
+    const before = await store.read('usr_ui_migration');
+    await store.saveGame('usr_ui_migration', {
+      visits: [{ id: 'fixture_visit', sessionId: 'fixture_session', location: 'wrld_fixture:1', worldId: 'wrld_fixture', start: '2026-10-25T10:00:00.000Z', lastObserved: '2026-10-25T10:02:00.000Z', end: '2026-10-25T10:02:00.000Z', reason: 'observation-gap', source: 'api', participants: [] }],
+      sessions: [{ id: 'fixture_session', start: '2026-10-25T10:00:00.000Z', lastObserved: '2026-10-25T10:02:00.000Z', end: '2026-10-25T10:02:00.000Z' }],
+    });
+    return before.map((event) => event.id);
+  });
+  expect(saved).toEqual(['fixture_activity']);
+  await page.reload();
+  const restored = await page.evaluate(async () => {
+    const { IndexedHistoryStore } = await import('/src/data/history-storage.ts');
+    const store = new IndexedHistoryStore();
+    const activity = await store.read('usr_ui_migration');
+    const game = await store.readGame('usr_ui_migration');
+    const other = await store.readGame('usr_ui_other');
+    await store.clear('usr_ui_migration');
+    return { activity: activity.map((event) => event.id), visits: game.visits.map((visit) => visit.id), sessions: game.sessions.map((session) => session.id), other, cleared: await store.readGame('usr_ui_migration') };
+  });
+  expect(restored).toEqual({ activity: ['fixture_activity'], visits: ['fixture_visit'], sessions: ['fixture_session'], other: {visits: [], sessions: []}, cleared: {visits: [], sessions: []} });
 });

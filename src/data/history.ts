@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PipelineEvent, User } from '../api';
 import { IndexedHistoryStore, MemoryHistoryStore } from './history-storage';
 import type { HistoryStore } from './history-storage';
+import { closeInterrupted, friendStatistics, GameObserver } from './game-history';
+import type { GameData, GameSession, GameVisit, ObservationSource } from './game-history';
 
 export type HistoryKind = 'online' | 'offline' | 'world' | 'instance' | 'status' | 'avatar' | 'bio'
   | 'friend-add' | 'friend-remove' | 'name' | 'trust' | 'profile' | 'moderation';
@@ -141,28 +143,45 @@ export class HistoryObserver {
 function sortEvents(events: HistoryEvent[]) {
   return [...new Map(events.map((event) => [event.id,event])).values()].sort((a,b) => b.time.localeCompare(a.time) || b.id.localeCompare(a.id));
 }
-type JournalState = { events:HistoryEvent[];loading:boolean;error:string };
-/** Serial durable writes; events received while opening the DB are merged, never overwritten. */
+type JournalState = { events:HistoryEvent[]; visits:GameVisit[]; sessions:GameSession[]; loading:boolean; error:string };
+function mergeGame<T extends {id:string;start:string}>(...parts:T[][]):T[] {
+  return [...new Map(parts.flat().map((value)=>[value.id,value])).values()].sort((a,b)=>b.start.localeCompare(a.start)||b.id.localeCompare(a.id));
+}
+/** Serial durable writes; live samples received while opening the DB are merged, never overwritten. */
 export class HistoryJournal {
   readonly observer = new HistoryObserver();
-  state:JournalState = {events:[],loading:true,error:''};
+  state:JournalState = {events:[],visits:[],sessions:[],loading:true,error:''};
   private listeners = new Set<(state:JournalState)=>void>();
   private queue:HistoryEvent[] = [];
+  private gameQueue:GameData[] = [];
   private writing = false;
+  private gameWriting = false;
+  private clearing = false;
   private generation = 0;
   private readError='';
   private writeError='';
-  constructor(readonly account:string,private store:HistoryStore) {}
+  private gameReadError='';
+  private gameWriteError='';
+  constructor(readonly account:string,private store:HistoryStore,readonly game = new GameObserver()) {}
   subscribe(listener:(state:JournalState)=>void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private publish(change:Partial<JournalState>) { this.state={...this.state,...change};for(const listener of this.listeners) listener(this.state); }
+  private errors() {return [this.readError,this.writeError,this.gameReadError,this.gameWriteError].filter(Boolean).join(' ');}
   async load() {
+    if(this.clearing)return;
     const current = ++this.generation;
-    this.readError='';this.publish({loading:true,error:this.writeError});
-    try {
-      const stored=await this.store.read(this.account);
-      if (current===this.generation) this.publish({events:sortEvents([...stored,...this.state.events])});
-    } catch(error) { if(current===this.generation){this.readError=error instanceof Error?error.message:'Не удалось загрузить историю.';this.publish({error:[this.readError,this.writeError].filter(Boolean).join(' ')});} }
-    finally { if(current===this.generation)this.publish({loading:false}); }
+    this.readError='';this.gameReadError='';this.publish({loading:true,error:this.errors()});
+    const [events,game]=await Promise.allSettled([this.store.read(this.account),this.store.readGame(this.account)]);
+    if(current!==this.generation)return;
+    if(events.status==='fulfilled')this.publish({events:sortEvents([...events.value,...this.state.events])});
+    else this.readError=events.reason instanceof Error?events.reason.message:'Не удалось загрузить историю.';
+    if(game.status==='fulfilled') {
+      // A previous process cannot still be observing. Keep rows, close at their last sample and save the repair.
+      const knownVisits=new Set(this.state.visits.map((visit)=>visit.id)),knownSessions=new Set(this.state.sessions.map((session)=>session.id));
+      const interrupted=closeInterrupted({visits:game.value.visits.filter((visit)=>!knownVisits.has(visit.id)),sessions:game.value.sessions.filter((session)=>!knownSessions.has(session.id))},this.game.activeVisit,this.game.activeSession);
+      this.publish({visits:mergeGame(game.value.visits,interrupted.visits,this.state.visits),sessions:mergeGame(game.value.sessions,interrupted.sessions,this.state.sessions)});
+      if(interrupted.visits.length||interrupted.sessions.length){this.gameQueue.push(interrupted);void this.flushGame();}
+    } else this.gameReadError=game.reason instanceof Error?game.reason.message:'Не удалось загрузить журнал посещений.';
+    this.publish({loading:false,error:this.errors()});
   }
   append(events:HistoryEvent[]) {
     if(!events.length)return;
@@ -170,8 +189,16 @@ export class HistoryJournal {
     this.publish({events:sortEvents([...events,...this.state.events])});
     void this.flush();
   }
+  observeSession(self:User,friends:User[],source:ObservationSource) {this.updateGame(this.game.observe(self,friends,source));}
+  pause() {this.observer.pause();this.updateGame(this.game.pause());}
+  private updateGame(data:GameData) {
+    if(!data.visits.length&&!data.sessions.length)return;
+    this.gameQueue.push(data);
+    this.publish({visits:mergeGame(this.state.visits,data.visits),sessions:mergeGame(this.state.sessions,data.sessions)});
+    void this.flushGame();
+  }
   async flush() {
-    if(this.writing)return;
+    if(this.writing||this.clearing)return;
     this.writing=true;
     try {
       while(this.queue.length) {
@@ -179,37 +206,77 @@ export class HistoryJournal {
         await this.store.append(this.account,pending);
         this.queue.splice(0,pending.length);
       }
-      this.writeError='';this.publish({error:this.readError});
-    } catch(error) { this.writeError=error instanceof Error?error.message:'События пока не сохранены. Повторите попытку.';this.publish({error:[this.readError,this.writeError].filter(Boolean).join(' ')}); }
+      this.writeError='';this.publish({error:this.errors()});
+    } catch(error) {this.writeError=error instanceof Error?error.message:'События пока не сохранены. Повторите попытку.';this.publish({error:this.errors()});}
     finally {this.writing=false;}
   }
+  async flushGame() {
+    if(this.gameWriting||this.clearing)return;
+    this.gameWriting=true;
+    try {
+      while(this.gameQueue.length) {
+        const count=this.gameQueue.length;
+        const pending=this.gameQueue.slice();
+        await this.store.saveGame(this.account,{visits:mergeGame(...pending.map((data)=>data.visits)),sessions:mergeGame(...pending.map((data)=>data.sessions))});
+        // Do not remove samples appended while the transaction was in progress, even for the same visit ID.
+        this.gameQueue.splice(0,count);
+      }
+      this.gameWriteError='';this.publish({error:this.errors()});
+    }catch(error){this.gameWriteError=error instanceof Error?error.message:'Посещения пока не сохранены. Повторите попытку.';this.publish({error:this.errors()});}
+    finally{this.gameWriting=false;}
+  }
   async clear() {
-    if(this.writing)throw new Error('Дождитесь сохранения последних событий.');
-    await this.store.clear(this.account);
-    this.generation++;this.queue=[];this.readError='';this.writeError='';this.observer.pause();this.publish({events:[],loading:false,error:''});
+    if(this.writing||this.gameWriting||this.clearing)throw new Error('Дождитесь сохранения последних событий.');
+    const oldEvents=new Set(this.state.events.map((event)=>event.id));
+    const oldVisits=new Set(this.state.visits.map((visit)=>visit.id));
+    const oldSessions=new Set(this.state.sessions.map((session)=>session.id));
+    const previousQueue=this.queue,previousGameQueue=this.gameQueue;
+    this.clearing=true;this.generation++;this.queue=[];this.gameQueue=[];
+    // Future samples belong to a new observation period, even while the deletion is pending.
+    this.observer.pause();const interrupted=this.game.pause();
+    try {
+      await this.store.clear(this.account);
+      this.readError='';this.writeError='';this.gameReadError='';this.gameWriteError='';
+      this.publish({
+        events:this.state.events.filter((event)=>!oldEvents.has(event.id)),
+        visits:this.state.visits.filter((visit)=>!oldVisits.has(visit.id)),
+        sessions:this.state.sessions.filter((session)=>!oldSessions.has(session.id)),
+        loading:false,error:'',
+      });
+    } catch(error) {
+      this.queue=[...previousQueue,...this.queue];this.gameQueue=[...previousGameQueue,...this.gameQueue];
+      this.updateGame(interrupted);
+      this.publish({loading:false});
+      throw error;
+    } finally {
+      this.clearing=false;
+      void this.flush();void this.flushGame();
+    }
   }
 }
 const realStorage = new IndexedHistoryStore();
 export function useHistory(account:string|undefined,demo:boolean) {
   const journal = useMemo(() => account ? new HistoryJournal(account,demo?new MemoryHistoryStore():realStorage) : undefined,[account,demo]);
-  const [state,setState] = useState<JournalState>({events:[],loading:false,error:''});
+  const [state,setState] = useState<JournalState>({events:[],visits:[],sessions:[],loading:false,error:''});
   useEffect(() => {
-    if(!journal) {setState({events:[],loading:false,error:''});return;}
+    if(!journal) {setState({events:[],visits:[],sessions:[],loading:false,error:''});return;}
     setState(journal.state);
     const unsubscribe=journal.subscribe(setState);
     void journal.load();
-    return unsubscribe;
+    return () => { unsubscribe(); journal.pause(); };
   },[journal]);
   const observePipeline=useCallback((event:PipelineEvent,friends:User[],self:User) => { if(journal)journal.append(journal.observer.observePipeline(event,friends,self)); },[journal]);
   const observeProfile=useCallback((user:User) => { if(journal)journal.append(journal.observer.observeProfile(user)); },[journal]);
   const seedUsers=useCallback((users:User[])=>journal?.observer.seedUsers(users),[journal]);
   const recordModeration=useCallback((id:string,name:string,action:string)=>{if(journal)journal.append([journal.observer.recordModeration(id,name,action)]);},[journal]);
   const recordFriendAction=useCallback((id:string,name:string,kind:'friend-add'|'friend-remove')=>{if(journal)journal.append(journal.observer.recordFriendAction(id,name,kind));},[journal]);
-  const retry=useCallback(()=>{if(journal){void journal.load();void journal.flush();}},[journal]);
+  const retry=useCallback(()=>{if(journal){void journal.load();void journal.flush();void journal.flushGame();}},[journal]);
   const clear=useCallback(async()=>{await journal?.clear();},[journal]);
-  const pause=useCallback(()=>journal?.observer.pause(),[journal]);
+  const pause=useCallback(()=>journal?.pause(),[journal]);
+  const observeSession=useCallback((self:User,friends:User[],source:ObservationSource)=>journal?.observeSession(self,friends,source),[journal]);
+  const friendStats=useCallback((id:string)=>friendStatistics(journal?.state.visits||[],id),[journal,state.visits]);
   // A synchronous account render gate prevents a previous account's history flashing before effects.
-  const visible = journal && state===journal.state ? state : journal?.state || {events:[],loading:false,error:''};
-  return {...visible,observePipeline,observeProfile,seedUsers,recordModeration,recordFriendAction,retry,clear,pause};
+  const visible = journal && state===journal.state ? state : journal?.state || {events:[],visits:[],sessions:[],loading:false,error:''};
+  return {...visible,observePipeline,observeProfile,seedUsers,recordModeration,recordFriendAction,retry,clear,pause,observeSession,friendStats};
 }
 export type HistoryState = ReturnType<typeof useHistory>;
