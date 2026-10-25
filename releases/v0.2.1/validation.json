@@ -1,0 +1,53 @@
+{
+  "version": "0.2.1",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 4,
+  "apk": {
+    "name": "VRCNext-Mobile-0.2.1.apk",
+    "bytes": 4619280,
+    "sha256": "0e8dbeea5fde73b6f770b747113f7b77c780bec0171a68d4464470055438ec46",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished020": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 222,
+    "playwrightPassed": 24,
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 26,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 16,
+    "testAndDevMarkersAbsent": true,
+    "instrumentationApkCompiled": true
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "instrumentationExecutedFor021": false,
+    "note": "Browser UI and native compilation are separate checks. Historical 0.1.1 software emulator WebView renderer failure is not a 0.2.1 physical-device result."
+  },
+  "screenProtection": {
+    "defaultEnabled": false,
+    "storedNatively": true,
+    "appliedImmediately": true,
+    "deviceScreenshotCaptureVerified": false
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.2.1-source.zip",
+    "sourceCommit": "75dacfb0a1fe2bc84c3befabd35f7912501288a7",
+    "trackedFiles": 142,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "dcdab4cd25df1e42132902f6178a341f021aaa9af536484a9dc74d45d31d88eb"
+  }
+}
