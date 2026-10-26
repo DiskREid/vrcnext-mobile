@@ -1,0 +1,355 @@
+{
+  "repository": "DiskREid/vrcnext-mobile",
+  "releases": [
+    {
+      "tag": "v0.1.0",
+      "targetCommit": "dbb6f0365e3d6a0fdb2ab996142332b7a029f6c5",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.1.0",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 1383,
+          "sha256": "a6a1301f719beeb4f997bf09d71621aaf5659f1dd3116423362e403fb5d99ab8",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-4058fc632929ce9e655c/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 189,
+          "sha256": "71e0cde99ecf360873445fd56ed82d121b002699f87c2f2603987411eec1a66c",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-4058fc632929ce9e655c/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.1.0-source.zip",
+          "bytes": 221402,
+          "sha256": "c240da6f66248eb21ecf1998f994e706ed99dffb44b3b8ae060d7af426c94a07",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-4058fc632929ce9e655c/VRCNext-Mobile-0.1.0-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.1.0.apk",
+          "bytes": 4510574,
+          "sha256": "af6c05e263629a4213dcdb8d6905b054570f6134600873245c6e1cb0608aa777",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-4058fc632929ce9e655c/VRCNext-Mobile-0.1.0.apk"
+        },
+        {
+          "name": "VRCNext-Mobile-0.1.0.apk.sha256",
+          "bytes": 91,
+          "sha256": "c0339f47077e84ac88eee9dba74567e63c5086aa8a994a36b388242d76b49014",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-4058fc632929ce9e655c/VRCNext-Mobile-0.1.0.apk.sha256"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 5854750,
+          "sha256": "0fb1f86aa4ef8da2ad9704cd72ef9eaca74c49b113f490a4535a68a8c2f439af",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-4058fc632929ce9e655c/release-files.zip"
+        }
+      ]
+    },
+    {
+      "tag": "v0.1.1",
+      "targetCommit": "106a1e89d3f3cffe2bdb652c09145c9bea9e789d",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.1.1",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3204,
+          "sha256": "120f33fde6a98c07b7a8202a1b296ed2eb05040903ded2baaa010dc9e03a74b0",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-81028797032e2df17849/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 274,
+          "sha256": "c004cc26727bc79cc5c75f21974349083b06ef375a42960e6a83692319cd7952",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-81028797032e2df17849/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.1.1-source.zip",
+          "bytes": 241059,
+          "sha256": "f54cb461f75c036ba494b9ca71b1f4627894f39b70842aa1c5e40ccefd68073e",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-81028797032e2df17849/VRCNext-Mobile-0.1.1-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.1.1.apk",
+          "bytes": 4656901,
+          "sha256": "2800410ae48c3e9d9156703a5d60a36353077c8f8a78f181058d49a29e586298",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-81028797032e2df17849/VRCNext-Mobile-0.1.1.apk"
+        },
+        {
+          "name": "VRCNext-Mobile-0.1.1.apk.sha256",
+          "bytes": 91,
+          "sha256": "16296faea5e383f66422bbf7c96cdc4bd274b048f18c6a4d40ba0a4c1bb8b728",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-81028797032e2df17849/VRCNext-Mobile-0.1.1.apk.sha256"
+        },
+        {
+          "name": "runtime-check.json",
+          "bytes": 1183,
+          "sha256": "32447b38c5bae054712dfc221580e7a698d7e3934f74cffef1cc9411dc2692fe",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-81028797032e2df17849/runtime-check.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 5860313,
+          "sha256": "ba7cc0b9ab644386e09c2f71bbea83deab08b852d73799b362ae5a9d38495b15",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-81028797032e2df17849/release-files.zip"
+        }
+      ]
+    },
+    {
+      "tag": "v0.2.0",
+      "targetCommit": "51ebab15fc0f7cff0800df4076f725e82a62daf3",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.0",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3458,
+          "sha256": "7c374bec185427ec43700c751eb606486ff20726ac2f224de8092db5c805e7b6",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f38da826b07b5f5cd156/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 3038,
+          "sha256": "cb1a035a39b7fa472740b9188f5627ba80f4e08082b5b7b91de20d23a51284a2",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f38da826b07b5f5cd156/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.0-source.zip",
+          "bytes": 398907,
+          "sha256": "9b6dab8896eddcb1d3ca34e47dcf58f392b52726273537a6992c124ecef3ad22",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f38da826b07b5f5cd156/VRCNext-Mobile-0.2.0-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.0.apk",
+          "bytes": 4696092,
+          "sha256": "1b5ddc76b4d074cd0e806b2c98f0d8df536f092b3f74c46b32356c44778b73f7",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f38da826b07b5f5cd156/VRCNext-Mobile-0.2.0.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 1631,
+          "sha256": "1072aeb97bae1f1c73e5ca15a79fa5b7a505c00061743031e92470b45b2e622d",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f38da826b07b5f5cd156/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6184725,
+          "sha256": "0b81992dc9a3611ba2e43060651a80030a17517ae0f8606d55a0745c4e08e84b",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f38da826b07b5f5cd156/release-files.zip"
+        }
+      ]
+    },
+    {
+      "tag": "v0.2.1",
+      "targetCommit": "4d2419d67b3dc95ffb690f6f8387353a172029af",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.1",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3915,
+          "sha256": "8f6316da33f076ff6bf7292112c0db7401a05844a57ac1977039ad9de0b5da69",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-9247888eb529e39234fa/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 3616,
+          "sha256": "492d85fca5748c03d314217859a14d5ed52bddc37c5aa24b3e7cc86d6d2c7560",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-9247888eb529e39234fa/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.1-source.zip",
+          "bytes": 419947,
+          "sha256": "dcdab4cd25df1e42132902f6178a341f021aaa9af536484a9dc74d45d31d88eb",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-9247888eb529e39234fa/VRCNext-Mobile-0.2.1-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.1.apk",
+          "bytes": 4619280,
+          "sha256": "0e8dbeea5fde73b6f770b747113f7b77c780bec0171a68d4464470055438ec46",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-9247888eb529e39234fa/VRCNext-Mobile-0.2.1.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 1631,
+          "sha256": "fc740246d88430fc349aa92d649c2e2d32e5b5c8dbabce423bf7fcf135fd93f8",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-9247888eb529e39234fa/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6289559,
+          "sha256": "b5e4e5c7ed92a5340215e56b06fbd66c1c324085cf5f65dd4e3508ecfcf7559a",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-9247888eb529e39234fa/release-files.zip"
+        }
+      ]
+    },
+    {
+      "tag": "v0.2.2",
+      "targetCommit": "a8475e2317e8fa7527cd9914d3d3d449f8ffdc29",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.2",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3467,
+          "sha256": "003004c556106bdf87ee18f1b525a6b1952961912ba05502ad5221ff01f976cd",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-3ca1db05dca65733e848/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 3397,
+          "sha256": "c25e48b1a048c7ce1f93910506ec6f1082bd9cc76a76783fbf2247efde9dfa3e",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-3ca1db05dca65733e848/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.2-source.zip",
+          "bytes": 432451,
+          "sha256": "f4a282e26dc26cd45faa56f42622f53098cc89c09dab9bc535691c185ff97eeb",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-3ca1db05dca65733e848/VRCNext-Mobile-0.2.2-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.2.apk",
+          "bytes": 4706555,
+          "sha256": "6e640b6d184438b806f049126046a10b70b59d10eccdf06436922d4e04baac03",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-3ca1db05dca65733e848/VRCNext-Mobile-0.2.2.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 1631,
+          "sha256": "493a24c7f98ac8d03dcb4994a738c0efb6c5aa46a124ecf2b760eee4444da2ea",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-3ca1db05dca65733e848/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6265469,
+          "sha256": "79b4037720d3d4a7c619a2da062a8d7d567686413a75556cbd3deb0ed9c4512d",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-3ca1db05dca65733e848/release-files.zip"
+        }
+      ]
+    },
+    {
+      "tag": "v0.2.3",
+      "targetCommit": "55f9874f3c53f97e341a1320e607150874ec25cc",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.3",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3758,
+          "sha256": "fc51db1e813574b25714414b7a4077d4868d47d36f078a506d938e7c6b9c2a37",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f6ca590615030912ef1e/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 3947,
+          "sha256": "a215ee9bf1a87b128938a7b750080ce3f94f64fbed63a1f5578bf1a8c3782ef8",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f6ca590615030912ef1e/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.3-source.zip",
+          "bytes": 456126,
+          "sha256": "ba8839bbde9793104e945a415fefce7f38d327053c190b6eee085e3eb02d8510",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f6ca590615030912ef1e/VRCNext-Mobile-0.2.3-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.3.apk",
+          "bytes": 4717917,
+          "sha256": "b7040d04c6a7a6428fae732c040e2fcc0729e2c78feda2712e39d1d9d4b761c3",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f6ca590615030912ef1e/VRCNext-Mobile-0.2.3.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 1631,
+          "sha256": "8d932601dab894a892f170c447891a36d714eca7096d25b7bf6f01ee396c8cdb",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f6ca590615030912ef1e/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6505273,
+          "sha256": "653aecf73c43bb89b3ae162f18d48de8ac4f8f50314fa228f60746f3cd2bd9c4",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-f6ca590615030912ef1e/release-files.zip"
+        }
+      ]
+    },
+    {
+      "tag": "v0.2.4",
+      "targetCommit": "dee5a5a4a3102b29a25a7931a63718e671a78e8e",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.4",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3105,
+          "sha256": "a164be24fbf216da04e62362acf5953dcca716da8ba9baf5420ac013b5d65d9d",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-85003c2b6e29b22e44df/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 4222,
+          "sha256": "8d4eb4534e4ad720206200482fba25d6974382a1e42ade121e38fb7c661ce59f",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-85003c2b6e29b22e44df/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.4-source.zip",
+          "bytes": 463081,
+          "sha256": "1d6e7c2b23126bce6b916c5be59fe65383fffd472dfbb739175bfbce15b46507",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-85003c2b6e29b22e44df/VRCNext-Mobile-0.2.4-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.4.apk",
+          "bytes": 4608526,
+          "sha256": "68e37fb9154dda88ae3369733e633d148b96639ed041aecfbbe1b3aa850a07d0",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-85003c2b6e29b22e44df/VRCNext-Mobile-0.2.4.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 1631,
+          "sha256": "5b4161aca2511a85eb88978bd57beba2aeabec199b622bb2208582affb611dd4",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-85003c2b6e29b22e44df/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6571675,
+          "sha256": "a56ff55849d0eccbe3f518042cef9ff308bf8279b724d85b158a3bf01fab454c",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-85003c2b6e29b22e44df/release-files.zip"
+        }
+      ]
+    },
+    {
+      "tag": "v0.2.5",
+      "targetCommit": "3224aeed1c56eed59369890e5c2998ff3c25a525",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.5",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3981,
+          "sha256": "c459d467f8a0a8755cee174d2b4d85712cb8ac3aac5164436c5a02ba82acab16",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-98df60d0082c18666d6f/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 5033,
+          "sha256": "6d627aab40b872eb2a35ecdaad662110aca0fc214f25567ebb5315195f8251ac",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-98df60d0082c18666d6f/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.5-source.zip",
+          "bytes": 481004,
+          "sha256": "4a02a316dc4aa22a808736721f514697b3487b32fed413ae807a7b76d4911cc0",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-98df60d0082c18666d6f/VRCNext-Mobile-0.2.5-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.5.apk",
+          "bytes": 4612090,
+          "sha256": "b08da01ccf45bf0dacca8d3d802b423fd743c3ec4088340b836c0e8b7d1be7ce",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-98df60d0082c18666d6f/VRCNext-Mobile-0.2.5.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 1631,
+          "sha256": "342d48778f910975e93f5cb09ecfc067bf2779c2f6ada4f5cb51b829d282023d",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-98df60d0082c18666d6f/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6894627,
+          "sha256": "4e6f46b4c20ecc37ed749bf35d8902a6601007f8ba56312a466487c9491f88e1",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-98df60d0082c18666d6f/release-files.zip"
+        }
+      ]
+    }
+  ]
+}
