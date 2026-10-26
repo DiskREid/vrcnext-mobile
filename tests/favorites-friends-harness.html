@@ -1,0 +1,43 @@
+<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Friend favorites contract fixture only</title></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {Capacitor,registerPlugin} from '@capacitor/core';
+import '/src/styles.css';
+const picture='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const self={id:'usr_favorite-self',displayName:'Favorite Self',state:'offline',location:'offline',status:'active'};
+const friend={id:'usr_favorite-friend',displayName:'Favorite Friend',state:'active',location:'offline',status:'busy',isFriend:true,currentAvatarThumbnailImageUrl:picture,tags:[]};
+let favorite;
+let sequence=0;
+const listeners=new Map();
+window.__favoriteFriendTest={requests:[],unexpected:[],failRead:false,failNextAdd:false,selfId:self.id,friendId:friend.id};
+const bridge={async sessionState(){return{hasAuth:true};},async request(options){
+ const url=new URL(options.path,'https://synthetic.invalid');
+ const method=options.method||'GET';
+ const body=options.body?JSON.parse(options.body):undefined;
+ window.__favoriteFriendTest.requests.push({path:options.path,method,body});
+ if(url.pathname==='/auth/user')return{status:200,data:self};
+ if(url.pathname==='/auth/user/friends')return{status:200,data:url.searchParams.get('offline')==='false'?[friend]:[]};
+ if(url.pathname===`/users/${self.id}`)return{status:200,data:self};
+ if(url.pathname===`/users/${friend.id}`)return{status:200,data:friend};
+ if(url.pathname===`/profile/${friend.id}`)return{status:200,data:{id:friend.id,bio:'Synthetic favorite friend fixture.'}};
+ if(url.pathname==='/favorites'&&method==='GET')return window.__favoriteFriendTest.failRead?{status:503,data:{error:{message:'Synthetic favorite list unavailable'}}}:{status:200,data:favorite?[favorite]:[]};
+ if(url.pathname==='/favorites/groups/friend')return{status:200,data:{favoriteGroups:[{id:'fvgrp_first',type:'friend',name:'group_0',displayName:'Favorite close friends',visibility:'private'},{id:'fvgrp_second',type:'friend',name:'group_2',displayName:'Favorite later',visibility:'private'}]}};
+ if(url.pathname==='/favorites'&&method==='POST'){
+  if(window.__favoriteFriendTest.failNextAdd){window.__favoriteFriendTest.failNextAdd=false;return{status:503,data:{error:{message:'Synthetic favorite write unavailable'}}};}
+  if(body.favoriteId!==friend.id||body.type!=='friend'||!body.tags?.length)return{status:400,data:{error:{message:'Unexpected favorite payload'}}};
+  favorite={id:'fvrt_favorite-'+(++sequence),favoriteId:friend.id,type:'friend',tags:body.tags};
+  return{status:200,data:favorite};
+ }
+ if(url.pathname.startsWith('/favorites/')&&method==='DELETE'){
+  if(url.pathname!==`/favorites/${favorite?.id}`)return{status:404,data:{error:{message:'Favorite record ID required'}}};
+  favorite=undefined;return{status:200,data:{success:{status_code:200,message:'Removed'}}};
+ }
+ if(url.pathname==='/calendar'||url.pathname===`/users/${self.id}/groups`)return{status:200,data:[]};
+ window.__favoriteFriendTest.unexpected.push(options.path);return{status:500,data:{error:{message:'Unexpected synthetic favorites route'}}};
+},async addListener(name,listener){listeners.set(name,listener);return{remove:async()=>{}};},async connectPipeline(){listeners.get('connection')?.({state:'connected'});},async disconnectPipeline(){},async clearSession(){},async loadImage(){return{dataUrl:picture};},async openLink(){},async copyText(){},async exportJson(){return{saved:true};}};
+registerPlugin('VrcNative',{web:()=>bridge});
+registerPlugin('App',{web:()=>({getState:async()=>({isActive:true}),addListener:async()=>({remove:async()=>{}}),exitApp:async()=>{}})});
+Capacitor.isNativePlatform=()=>true;
+const {default:App}=await import('/src/App.tsx');
+createRoot(document.getElementById('root')).render(React.createElement(App));
+</script></body></html>

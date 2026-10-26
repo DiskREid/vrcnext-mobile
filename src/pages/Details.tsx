@@ -14,7 +14,6 @@ import {
   Check,
   Flag,
   Star,
-  Hand,
 } from 'lucide-react';
 import { api, native } from '../api';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
@@ -22,9 +21,12 @@ import { loadFavoriteGroups } from '../api/favorites';
 import WorldInstances from '../components/WorldInstances';
 import InstanceCreator from '../components/InstanceCreator';
 import InstanceInviteDialog from '../components/InstanceInviteDialog';
+import FriendFavoriteButton from '../components/FriendFavoriteButton';
+import BoopPicker from '../components/BoopPicker';
 import type { KnownInstance } from '../data/world-instances';
 import { instanceCount } from '../data/instance-location';
 import { overlayLiveUser, presenceIndicator } from '../data/presence';
+import { accessibleLocation } from '../data/locations';
 import type { User, World, FavoriteGroup } from '../api';
 import { useApp, useLoad } from '../state';
 import { demoFriends, demoWorlds, demoGroups } from '../demo';
@@ -152,9 +154,8 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
   const banner = useSecureImage(u?.profileBannerUrl);
   const [tab, setTab] = useState('profile'),
     [note, setNote] = useState(''),
-    [fav, setFav] = useState(false),
     [confirm, setConfirm] = useState(''),
-    [booping, setBooping] = useState(false);
+    [boopOpen, setBoopOpen] = useState(false);
   useEffect(() => {
     if (!ctx.demo && load.data && profile.data && !load.error && !profile.error)
       ctx.history.observeProfile(mergePublicProfile(load.data, profile.data));
@@ -195,9 +196,9 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
             </p>
             {u.statusDescription && <p className="status-description">{u.statusDescription}</p>}
             <div className="detail-actions">
-              <button className="button primary" onClick={() => invite(u)}>
+              <button className="button primary" disabled={!accessibleLocation(ctx.user.location)} onClick={() => invite(u)}>
                 <Send size={16} />
-                Пригласить
+                Пригласить друга
               </button>
               <button
                 className="button secondary"
@@ -220,25 +221,11 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
                 </button>
               )}
               {(u.isFriend || u.friendKey) && u.id !== ctx.user.id && (
-                <button
-                  className="button secondary"
-                  disabled={booping}
-                  onClick={() => {
-                    setBooping(true);
-                    void ctx
-                      .act(() => api.boop(u.id), 'Boop отправлен')
-                      .finally(() => setBooping(false));
-                  }}
-                >
-                  <Hand size={16} />
-                  {booping ? 'Отправка…' : 'Boop'}
-                </button>
+                <button className="button secondary" onClick={() => setBoopOpen(true)}>Boop</button>
               )}
-              <button className="icon-button" aria-label="В избранное" onClick={() => setFav(!fav)}>
-                <Heart size={20} />
-              </button>
+              {!isSelf && <FriendFavoriteButton user={u} />}
             </div>
-            {fav && <FavoritePicker id={id} type="friend" onClose={() => setFav(false)} />}
+            {boopOpen && <BoopPicker target={u} onClose={() => setBoopOpen(false)} />}
             <Segmented value={tab} onChange={setTab} items={userProfileTabs} />
             <div className="form-stack user-profile-panel" hidden={tab !== 'profile'}>
               {profile.loading && typeof u.bio !== 'string' ? (
@@ -341,11 +328,11 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
     </Modal>
   );
 }
-export function WorldDetails({ target, onClose }: { target: World | string; onClose: () => void }) {
+export function WorldDetails({ target, initialLocation, onClose }: { target: World | string; initialLocation?: string; onClose: () => void }) {
   const id = typeof target === 'string' ? target : target.id;
-  return <WorldDetailsContent key={id} id={id} onClose={onClose} />;
+  return <WorldDetailsContent key={`${id}:${initialLocation || ''}`} id={id} initialLocation={initialLocation} onClose={onClose} />;
 }
-function WorldDetailsContent({ id, onClose }: { id: string; onClose: () => void }) {
+function WorldDetailsContent({ id, initialLocation, onClose }: { id: string; initialLocation?: string; onClose: () => void }) {
   const ctx = useApp();
   const world = useLoad(
     () =>
@@ -357,6 +344,8 @@ function WorldDetailsContent({ id, onClose }: { id: string; onClose: () => void 
   const [fav, setFav] = useState(false), [create, setCreate] = useState(false);
   const [invitation, setInvitation] = useState<{ mode: 'self' | 'friends'; location?: string }>();
   const [createdInstances, setCreatedInstances] = useState<KnownInstance[]>([]);
+  const scopedLocation = accessibleLocation(initialLocation) && initialLocation.split(':')[0] === id ? initialLocation : undefined;
+  const invalidTarget = initialLocation !== undefined && !scopedLocation;
   const w = world.data;
   return (
     <Modal title="Мир" onClose={onClose} wide>
@@ -396,6 +385,12 @@ function WorldDetailsContent({ id, onClose }: { id: string; onClose: () => void 
               </div>
             </div>
             <p className="preserve-lines">{w.description}</p>
+            {scopedLocation && <section className="inset-panel" aria-label="Выбранный инстанс">
+              <h3>Выбранный инстанс</h3>
+              <p className="id-text">{scopedLocation}</p>
+              <p className="muted small">Приглашение ведёт именно в этот инстанс. Примите его в VRChat, чтобы присоединиться.</p>
+            </section>}
+            {invalidTarget && <p className="error-inline" role="alert">Адрес выбранного инстанса недоступен. Обновите профиль пользователя.</p>}
             <div className="chips">
               {w.unityPackages?.some((p) => p.platform === 'android') && (
                 <Badge className="green">Android / Quest</Badge>
@@ -409,19 +404,19 @@ function WorldDetailsContent({ id, onClose }: { id: string; onClose: () => void 
                 .map((t) => <Badge key={t}>{t.replace('author_tag_', '')}</Badge>)}
             </div>
             <div className="detail-actions">
-              <button className="button primary" onClick={() => setInvitation({ mode: 'self' })}><Send size={16} />Пригласить себя</button>
-              <button className="button secondary" onClick={() => setInvitation({ mode: 'friends' })}><Users size={16} />Пригласить друзей</button>
-              <button className="button primary" onClick={() => setCreate(!create)}>
+              <button className="button primary" disabled={invalidTarget} onClick={() => setInvitation({ mode: 'self', location: scopedLocation })}><Send size={16} />Пригласить себя</button>
+              <button className="button secondary" disabled={invalidTarget} onClick={() => setInvitation({ mode: 'friends', location: scopedLocation })}><Users size={16} />Пригласить друзей</button>
+              {!initialLocation && <button className="button primary" onClick={() => setCreate(!create)}>
                 Создать инстанс
-              </button>
+              </button>}
               <button className="button secondary" onClick={() => setFav(!fav)}>
                 <Heart size={17} />В избранное
               </button>
             </div>
             {fav && <FavoritePicker id={id} type="world" onClose={() => setFav(false)} />}
             {create && <InstanceCreator world={w} onClose={() => setCreate(false)} onCreated={(instance, location) => setCreatedInstances((old) => [...old.filter((entry) => entry.location !== location), { location, count: instanceCount(instance.n_users) ?? instanceCount(instance.userCount) }])} />}
-            <WorldInstances world={w} created={createdInstances} onInviteFriends={(location) => setInvitation({ mode: 'friends', location })} />
-            {invitation && <InstanceInviteDialog world={w} created={createdInstances} mode={invitation.mode} initialLocation={invitation.location} onClose={() => setInvitation(undefined)} />}
+            {!initialLocation && <WorldInstances world={w} created={createdInstances} onInviteFriends={(location) => setInvitation({ mode: 'friends', location })} />}
+            {invitation && <InstanceInviteDialog world={w} created={createdInstances} mode={invitation.mode} initialLocation={invitation.location} fixedLocation={!!scopedLocation} onClose={() => setInvitation(undefined)} />}
 
           </>
         )

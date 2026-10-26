@@ -92,6 +92,23 @@ describe('observed game locations and co-presence',()=>{
     expect(observer.observe({...self,location:'private'},[friend],'api').visits[0].reason).toBe('observation-gap');
     expect(realLocation('offline')).toBe(false);expect(realLocation('private')).toBe(false);expect(realLocation('https://other.test')).toBe(false);
   });
+  it('does not turn tagged privacy placeholders into real recorded visits',()=>{
+    for(const placeholder of ['offline','private','traveling']){
+      const location=`wrld_a:${placeholder}~region(eu)`;
+      expect(realLocation(location)).toBe(false);
+      expect(observedLocation({location})).toBeUndefined();
+      expect(fixture().observer.observe({...self,location},[friend],'api')).toEqual({visits:[],sessions:[]});
+    }
+  });
+  it('uses same-sample disclosed friend fields for exact co-presence without overriding privacy',()=>{
+    const {observer}=fixture();
+    const friends=[
+      {...friend,location:undefined,worldId:'wrld_a',instanceId:'1'},
+      {...friend,id:'usr_hidden',location:'private',worldId:'wrld_a',instanceId:'1'},
+      {...friend,id:'usr_elsewhere',location:undefined,worldId:'wrld_a',instanceId:'2'},
+    ];
+    expect(observer.observe(self,friends,'api').visits[0].participants.map(person=>person.userId)).toEqual([friend.id]);
+  });
   it('ends a missing participant at lastObserved and records a later re-encounter separately',()=>{
     const {observer,time}=fixture();observer.observe(self,[friend],'api');time(120);observer.observe(self,[friend],'api');time(240);
     const alone=observer.observe(self,[],'api');expect(alone.visits[0].participants[0].end).toBe(at(120));

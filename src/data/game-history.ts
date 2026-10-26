@@ -34,7 +34,7 @@ const empty = (): GameData => ({ visits: [], sessions: [] });
 const copyVisit = (visit: GameVisit): GameVisit => ({ ...visit, participants: visit.participants.map((p) => ({ ...p })) });
 export function realLocation(value: unknown): value is string {
   return typeof value === 'string' && /^wrld_[a-zA-Z0-9-]+:[a-zA-Z0-9~_().+\-]+$/.test(value)
-    && !['offline', 'private', 'traveling'].includes(value.slice(value.indexOf(':') + 1));
+    && !['offline', 'private', 'traveling'].includes(value.slice(value.indexOf(':') + 1).split('~')[0]);
 }
 /** Compose only fields disclosed together in this sample; explicit hidden/offline values win. */
 export function observedLocation(user: Pick<User, 'location' | 'worldId' | 'instanceId'>): string | undefined {
@@ -119,7 +119,7 @@ export class GameObserver {
       worldId: location.split(':')[0], start: time, lastObserved: time,
       reason: 'observation-gap', source, participants: [],
     };
-    const seen = new Map(friends.filter((friend) => friend.id !== self.id && friend.location === location && friend.state !== 'offline').map((friend) => [friend.id, friend]));
+    const seen = new Map(friends.filter((friend) => friend.id !== self.id && observedLocation(friend) === location && friend.state !== 'offline').map((friend) => [friend.id, friend]));
     const participants = this.visit.participants.map((prior): GameParticipant => {
       if (prior.end) return { ...prior };
       const friend = seen.get(prior.userId);

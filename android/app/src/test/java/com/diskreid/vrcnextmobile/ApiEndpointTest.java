@@ -9,8 +9,8 @@ public class ApiEndpointTest {
         okhttp3.HttpUrl url = ApiEndpoint.resolve("/instances/" + location);
         assertEquals("/api/1/instances/" + location, url.encodedPath());
         assertEquals("https://api.vrchat.cloud/api/1/instances/" + location, url.toString());
-        assertEquals("/api/1/instances/" + location + "/invite",
-                ApiEndpoint.resolve("/instances/" + location + "/invite").encodedPath());
+        assertEquals("/api/1/invite/myself/to/" + location,
+                ApiEndpoint.resolve("/invite/myself/to/" + location).encodedPath());
         assertEquals("api.vrchat.cloud", url.host());
     }
     @Test public void preservesEncodedSearchWithoutChangingOrigin() {

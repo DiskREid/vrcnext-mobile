@@ -2,6 +2,8 @@ package com.diskreid.vrcnextmobile;
 
 import android.content.ActivityNotFoundException;
 import android.app.Activity;
+import android.Manifest;
+import android.os.Build;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -14,8 +16,11 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.ActivityCallback;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import androidx.activity.result.ActivityResult;
 import java.io.OutputStream;
 import java.io.IOException;
@@ -48,9 +53,11 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 /** Native-only VRChat transport: no cookies or pipeline tokens cross the WebView boundary. */
-@CapacitorPlugin(name = "VrcNative")
+@CapacitorPlugin(name = "VrcNative", permissions = {
+        @Permission(alias = "legacyPictures", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE })
+})
 public class VrcNativePlugin extends Plugin {
-    private static final String USER_AGENT = "Mobile-VRCNext/0.2.5 (https://github.com/DiskREid/vrcnext-mobile/issues)";
+    private static final String USER_AGENT = "Mobile-VRCNext/0.2.6 (https://github.com/DiskREid/vrcnext-mobile/issues)";
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -293,7 +300,7 @@ public class VrcNativePlugin extends Plugin {
         catch (Exception invalid) { reject(call, "This image source is not supported", "INVALID_IMAGE_URL"); return; }
         final int generation = sessionGeneration.get();
         final int maxDimension = call.getInt("maxDimension", 1024);
-        if (maxDimension != 128 && maxDimension != 256 && maxDimension != 512 && maxDimension != 1024) {
+        if (maxDimension != 128 && maxDimension != 256 && maxDimension != 512 && maxDimension != 1024 && maxDimension != 2048) {
             reject(call, "Unsupported preview size", "INVALID_IMAGE_SIZE"); return;
         }
         final String cacheKey = generation + ":" + maxDimension + ":" + source;
@@ -335,7 +342,7 @@ public class VrcNativePlugin extends Plugin {
                         }
                         if (!response.isSuccessful() || response.body() == null) throw new IOException();
                         ResponseBody body = response.body();
-                        final int limit = 5 * 1024 * 1024;
+                        final int limit = maxDimension == 2048 ? OriginalImage.MAX_BYTES : 5 * 1024 * 1024;
                         if (body.contentLength() > limit || body.source().request(limit + 1L)) throw new IOException();
                         String mime = response.header("Content-Type", "").split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
                         byte[] bytes = body.bytes();
@@ -390,6 +397,78 @@ public class VrcNativePlugin extends Plugin {
                 reject(call, "Image request cancelled", "REQUEST_CANCELLED");
             } catch (Exception failure) {
                 reject(call, "Could not load this image securely", "IMAGE_DOWNLOAD_FAILED");
+            }
+        });
+    }
+
+    @PluginMethod public void downloadImage(PluginCall call) {
+        try { ImageEndpoint.resolve(call.getString("url", "")); }
+        catch (Exception invalid) { reject(call, "Недоступный адрес изображения", "INVALID_IMAGE_URL"); return; }
+        if (Build.VERSION.SDK_INT <= 28 && getPermissionState("legacyPictures") != PermissionState.GRANTED) {
+            getActivity().runOnUiThread(() -> requestPermissionForAlias("legacyPictures", call, "picturesPermission"));
+            return;
+        }
+        saveOriginalImage(call);
+    }
+
+    @PermissionCallback private void picturesPermission(PluginCall call) {
+        if (call == null) return;
+        if (getPermissionState("legacyPictures") != PermissionState.GRANTED) {
+            reject(call, "Разрешите сохранение изображений в галерею", "PICTURES_PERMISSION_DENIED"); return;
+        }
+        saveOriginalImage(call);
+    }
+
+    private void saveOriginalImage(PluginCall call) {
+        final int generation = sessionGeneration.get();
+        submit(imageIo, call, () -> {
+            try {
+                HttpUrl target = ImageEndpoint.resolve(call.getString("url", ""));
+                for (int redirect = 0; redirect <= 5; redirect++) {
+                    if (destroyed || generation != sessionGeneration.get()) throw new IOException();
+                    boolean apiHost = target.host().equals("api.vrchat.cloud");
+                    if (apiHost) {
+                        synchronized (imageTimingLock) {
+                            if (cooldownUntil > System.currentTimeMillis()) throw new IOException();
+                            long wait = nextImageRequestAt - System.currentTimeMillis();
+                            if (wait > 0) Thread.sleep(wait);
+                            nextImageRequestAt = System.currentTimeMillis() + 350;
+                        }
+                    }
+                    Request request = new Request.Builder().url(target).header("User-Agent", USER_AGENT)
+                            .header("Accept", "image/avif,image/webp,image/png,image/jpeg,image/gif").get().build();
+                    try (Response response = (apiHost ? http : publicDbHttp).newCall(request).execute()) {
+                        if (response.code() >= 300 && response.code() < 400) {
+                            HttpUrl next = target.resolve(response.header("Location", ""));
+                            if (next == null || redirect == 5) throw new IOException();
+                            target = ImageEndpoint.resolve(next.toString());
+                            continue;
+                        }
+                        if (response.code() == 429 && apiHost) {
+                            long now = System.currentTimeMillis(), retry = retryDelay(response.header("Retry-After"));
+                            cooldownUntil = Math.max(cooldownUntil, retry > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + retry);
+                        }
+                        if (!response.isSuccessful() || response.body() == null) throw new IOException();
+                        ResponseBody body = response.body();
+                        byte[] bytes = OriginalImage.readBounded(body.byteStream(), body.contentLength(), OriginalImage.MAX_BYTES);
+                        String mime = ImageEndpoint.rasterMime(bytes, response.header("Content-Type", "").split(";", 2)[0].trim().toLowerCase(Locale.ROOT));
+                        android.graphics.BitmapFactory.Options dimensions = new android.graphics.BitmapFactory.Options();
+                        dimensions.inJustDecodeBounds = true;
+                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, dimensions);
+                        if (dimensions.outWidth <= 0 || dimensions.outHeight <= 0 || dimensions.outWidth > 20000 || dimensions.outHeight > 20000
+                                || (long) dimensions.outWidth * dimensions.outHeight > 100000000L) throw new IOException();
+                        if (destroyed || generation != sessionGeneration.get()) throw new IOException();
+                        String name = GalleryImageStore.save(getContext(), bytes, mime, call.getString("fileName", "VRCNext-image"));
+                        resolve(call, new JSObject().put("saved", true).put("fileName", name));
+                        return;
+                    }
+                }
+                throw new IOException();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                reject(call, "Скачивание отменено", "REQUEST_CANCELLED");
+            } catch (Exception failure) {
+                reject(call, "Не удалось сохранить оригинал. Проверьте доступ к файлу, сеть и свободное место. Максимум 32 МБ.", "IMAGE_SAVE_FAILED");
             }
         });
     }

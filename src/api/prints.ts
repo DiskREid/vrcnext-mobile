@@ -48,8 +48,7 @@ export function printMedia(print: Print) {
   const original =
     mediaUrl(print.files?.image) ||
     mediaUrl(print.fileUrl) ||
-    mediaUrl(print.imageUrl) ||
-    mediaUrl(print.thumbnailImageUrl);
+    mediaUrl(print.imageUrl);
   return {
     original,
     thumbnail: mediaUrl(print.thumbnailImageUrl) || original,

@@ -146,11 +146,15 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  className = '',
+  closeOnBackdrop = true,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
+  closeOnBackdrop?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null),
     titleId = useId();
@@ -204,12 +208,12 @@ export function Modal({
     <div
       className="modal-backdrop"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (closeOnBackdrop && e.target === e.currentTarget) onClose();
       }}
     >
       <div
         ref={ref}
-        className={`modal ${wide ? 'wide' : ''}`}
+        className={`modal ${wide ? 'wide' : ''} ${className}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

@@ -37,12 +37,17 @@ window.__worldInstanceTest={actions:[],requests:[],unexpected:[],worldId,groupId
 const createdLocation=`${worldId}:900~group(${groupId})~groupAccessType(members)~region(eu)~nonce(created)`;
 const transport={
  async request(options){
+ if(options.path.startsWith('/favorites?type=friend'))return{status:200,data:[]};
   window.__worldInstanceTest.requests.push({path:options.path,method:options.method||'GET',body:options.body});
   const url=new URL(options.path,'https://fixture.invalid');
   if(url.pathname===`/worlds/${worldId}`)return window.__worldInstanceTest.failWorldRefresh?{status:503,data:{error:{message:'Fixture world refresh failure'}}}:{status:200,data:fixtureWorld};
   if(url.pathname===`/users/${selfId}/groups`)return{status:200,data:[{...group,id:'grpm_membership',groupId}]};
   if(url.pathname===`/groups/${groupId}`)return{status:200,data:{...group,myMember:{roleIds:['grol_host'],permissions:window.__worldInstanceTest.createPermissions||['*']},roles:[{id:'grol_host',name:'Fixture Hosts',permissions:['*']}]}};
   if(url.pathname==='/instances'&&options.method==='POST'){const body=JSON.parse(options.body);const loc=body.type==='group'?createdLocation:`${worldId}:901~friends(${selfId})~region(eu)`;return{status:200,data:{id:body.type==='group'?'900':'901',instanceId:loc.split(':')[1],worldId,type:body.type,n_users:0,minimumAvatarPerformance:window.__worldInstanceTest.ignoreAvatarRestriction?null:body.minimumAvatarPerformance}};}
+  if(url.pathname.startsWith('/invite/myself/to/')&&options.method==='POST'){
+   if(window.__worldInstanceTest.failSelfInviteNext){window.__worldInstanceTest.failSelfInviteNext=false;return{status:503,data:{error:{message:'Fixture temporary invitation failure'}}};}
+   return{status:200,data:{success:{status_code:200,message:'Fixture invitation'}}};
+  }
   if(url.pathname.startsWith('/invite/')&&options.method==='POST')return window.__worldInstanceTest.failRecipientId===url.pathname.slice('/invite/'.length)?{status:403,data:{error:{message:'Fixture recipient denied'}}}:{status:200,data:{success:{status_code:200}}};
   if(url.pathname===`/users/${selfId}/instances/groups/${groupId}`)return{status:200,data:[{id:groupLocation,location:groupLocation,worldId,type:'group',groupAccessType:'public',n_users:8,region:'use',world:fixtureWorld,users:[initialFriends.find(friend=>friend.id===groupFriendId)]}]};
   if(url.pathname.startsWith('/users/')){
@@ -52,10 +57,6 @@ const transport={
   }
   if(url.pathname.startsWith('/profile/'))return{status:200,data:{id:decodeURIComponent(url.pathname.slice('/profile/'.length)),bio:'Synthetic friend profile.'}};
   if(url.pathname.startsWith(`/instances/${worldId}:`)){
-   if((options.method||'GET')==='POST'&&url.pathname.endsWith('/invite')){
-    if(window.__worldInstanceTest.failSelfInviteNext){window.__worldInstanceTest.failSelfInviteNext=false;return{status:503,data:{error:{message:'Fixture temporary invitation failure'}}};}
-    return{status:200,data:{success:{status_code:200,message:'Fixture invitation'}}};
-   }
    return{status:200,data:{id:decodeURIComponent(url.pathname.slice('/instances/'.length)),worldId,world:fixtureWorld,type:'public',n_users:7,capacity:40}};
   }
   window.__worldInstanceTest.unexpected.push(options.path);

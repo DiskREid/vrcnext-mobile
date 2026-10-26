@@ -1,8 +1,9 @@
 import { defineConfig } from '@playwright/test';
 import { existsSync } from 'node:fs';
+const uiPort = process.env.VRCNEXT_UI_PORT || '5173';
 export default defineConfig({
   testDir: './tests',
-  testMatch: ['ui.spec.ts', 'groups.spec.ts'],
+  testMatch: '*.spec.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 45000,
@@ -10,7 +11,7 @@ export default defineConfig({
   reporter: [['list']],
   outputDir: 'test-results/ui',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: `http://127.0.0.1:${uiPort}`,
     browserName: 'chromium',
     launchOptions: {
       executablePath:
@@ -32,8 +33,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --port 5173 --strictPort',
-    url: 'http://127.0.0.1:5173',
+    command: `npm run dev -- --port ${uiPort} --strictPort`,
+    url: `http://127.0.0.1:${uiPort}`,
     reuseExistingServer: !process.env.CI,
     timeout: 20000,
   },

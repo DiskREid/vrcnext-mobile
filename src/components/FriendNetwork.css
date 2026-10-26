@@ -44,7 +44,7 @@
 .network-zoom { position: absolute; right: 9px; top: 9px; z-index: 1; display: flex; align-items: center; gap: 2px; background: #10131ce8; border: 1px solid var(--border); padding: 4px; border-radius: 11px; }
 .network-zoom > span { min-width: 42px; text-align: center; color: var(--muted); font-size: 11px; }
 .network-zoom > .icon-button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
-.network-edges line { stroke-width: 1.4; opacity: .42; pointer-events: none; }
+.network-edges path { stroke-width: 1.4; opacity: .42; pointer-events: none; }
 .network-edges .mutual-edge { stroke-width: 2; opacity: .78; }
 .network-edges .selected-edge { stroke-width: 3; opacity: 1; }
 .network-edges .dimmed { opacity: .1; }
@@ -58,7 +58,9 @@
 .network-node text { pointer-events: none; }
 .network-initials { font-family: inherit; font-size: 14px; font-weight: 650; }
 .network-label { font-family: inherit; fill: var(--text); font-size: 12px; paint-order: stroke; stroke: #191d29; stroke-width: 3px; stroke-linejoin: round; }
-.network-label-hidden { opacity: 0; }
+.network-avatar { overflow: hidden; border-radius: 50%; }
+.network-avatar > .avatar { width: 100% !important; height: 100% !important; border-radius: 50%; overflow: hidden; pointer-events: none; }
+.network-avatar .status-dot { display: none; }
 .network-node:hover .network-label, .network-node:focus .network-label { opacity: 1; }
 .network-gesture-help { margin: 11px 0 20px; line-height: 1.65; }
 .network-scan { padding: 18px; margin: 22px 0 12px; }

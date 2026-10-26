@@ -45,6 +45,7 @@ import {
   Section,
 } from '../components/ui';
 import SecureImage from '../components/SecureImage';
+import { FullscreenImageViewer } from '../components/FullscreenImageViewer';
 import { printDate, printMedia } from '../api/prints';
 import { createCalendarClient, withCalendarGroups } from '../api/calendar';
 import { reconcilePage } from '../hooks/paged-data';
@@ -317,11 +318,13 @@ function CollectionPreview({
   alt,
   refreshKey,
   interactive = false,
+  onOpen,
 }: {
   src: string;
   alt: string;
   refreshKey: string;
   interactive?: boolean;
+  onOpen?: () => void;
 }) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -336,6 +339,11 @@ function CollectionPreview({
         loading={interactive ? 'eager' : 'lazy'}
         onLoadError={() => setFailed(true)}
         onLoad={() => setFailed(false)}
+        role={onOpen ? 'button' : undefined}
+        tabIndex={onOpen ? 0 : undefined}
+        aria-label={onOpen ? `На весь экран: ${alt}` : undefined}
+        onClick={onOpen}
+        onKeyDown={(event) => { if (onOpen && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }}
         style={failed ? { visibility: 'hidden' } : undefined}
       />
       {failed && (
@@ -393,6 +401,7 @@ export function InventoryPage() {
   const [tab, setTab] = useState<InventoryTab>('gallery');
   const [items, setItems] = useState<CollectionItem[]>([]);
   const [selected, setSelected] = useState<CollectionItem | null>(null);
+  const [viewer, setViewer] = useState<{ id: string; src: string; originalUrl?: string; title: string } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [appearanceAction, setAppearanceAction] = useState<'icon' | 'banner' | null>(null);
   const [busy, setBusy] = useState(false);
@@ -480,14 +489,15 @@ export function InventoryPage() {
     setBusy(false);
   }
   async function original() {
-    const url = selected?.sourceUrl || selected?.image;
-    if (!url) return;
-    try {
-      await native.openLink({ url });
-    } catch {
-      notify(
-        'Не удалось открыть оригинал. В Android он открывается во внешнем браузере; для закрытых файлов может потребоваться вход в VRChat.',
-      );
+    if (!selected?.image) return;
+    const item = selected;
+    setViewer({ id: item.id, src: item.image, originalUrl: item.sourceUrl || undefined, title: item.name });
+    // A paged File can omit versions. Resolve real metadata rather than guessing /1/file.
+    if (!demo && !item.sourceUrl && item.id.startsWith('file_')) {
+      try {
+        const file = fileItem(await api.file(item.id), item.kind);
+        setViewer(previous => previous?.id === item.id ? { ...previous, originalUrl: file.sourceUrl || undefined } : previous);
+      } catch { /* Keep the available preview; do not pretend it is an original. */ }
     }
   }
   async function applyAppearance() {
@@ -700,6 +710,7 @@ export function InventoryPage() {
                     alt={selected.name}
                     refreshKey={`${pageKey}:${mediaRevision}`}
                     interactive
+                    onOpen={() => void original()}
                   />
                 ) : (
                   <Empty title="Нет изображения" />
@@ -739,7 +750,7 @@ export function InventoryPage() {
                   {selected.image && (
                     <button className="button secondary" onClick={original}>
                       <ExternalLink size={16} />
-                      Открыть оригинал
+                      На весь экран
                     </button>
                   )}
                   {selected.worldId && (
@@ -760,17 +771,12 @@ export function InventoryPage() {
                     </button>
                   )}
                 </div>
-                {selected.image && (
-                  <p className="muted original-link-note">
-                    Оригинал откроется во внешнем браузере. Для закрытых файлов может потребоваться
-                    вход в VRChat.
-                  </p>
-                )}
               </div>
             </>
           )}
         </Modal>
       )}
+      {viewer && <FullscreenImageViewer src={viewer.src} originalUrl={viewer.originalUrl} title={viewer.title} onClose={() => setViewer(null)} />}
       {upload && canUpload && (
         <UploadDialog
           tag={tab as UploadTag}

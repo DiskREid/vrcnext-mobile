@@ -25,7 +25,7 @@ export type AppState = {
   notify: (text: string) => void;
   act: <T>(operation: () => Promise<T>, success?: string) => Promise<T | undefined>;
   openUser: (user: User | string) => void;
-  openWorld: (world: World | string) => void;
+  openWorld: (world: World | string, instanceLocation?: string) => void;
   openGroup: (group: Group) => void;
   openCalendarEvent: (event: CalendarEvent) => void;
   onRefresh: () => void;

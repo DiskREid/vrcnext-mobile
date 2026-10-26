@@ -9,6 +9,7 @@ import { useApp, useLoad } from '../state';
 import { AvatarImage, Badge, Empty, ErrorState, imageOf, Loading, Modal, PageHeader, SearchField, Segmented } from '../components/ui';
 import SecureImage from '../components/SecureImage';
 import { statusName } from './Details';
+import { refreshFriendFavorites } from '../data/favorite-friends';
 import './Favorites.css';
 
 const typeItems = [
@@ -69,7 +70,7 @@ export default function FavoritesPage() {
     const author = entity && 'authorName' in entity ? entity.authorName : '';
     return `${name || ''} ${author || ''} ${f.favoriteId}`.toLocaleLowerCase().includes(search.toLocaleLowerCase());
   }) || [];
-  const refresh = () => { clearFavoriteEntityCache(); setRevision((v) => v + 1); };
+  const refresh = () => { clearFavoriteEntityCache(); if(type === 'friend') void refreshFriendFavorites(ctx.user.id, ctx.demo); setRevision((v) => v + 1); };
   useEffect(() => { setVisible(18); }, [type, category, search]);
   return <>
     <PageHeader eyebrow="ВАШИ КОЛЛЕКЦИИ" title="Избранное" subtitle="Друзья, миры и аватары — все доступные категории аккаунта"

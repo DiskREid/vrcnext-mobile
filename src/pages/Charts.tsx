@@ -239,7 +239,7 @@ function InstanceActivity({ day, active }: { day: string; active: boolean }) {
       <button className="icon-button" aria-label="Увеличить масштаб времени" disabled={zoom >= 12} onClick={() => gesture.changeZoom(zoom * 1.5)}><ZoomIn size={18}/></button>
       <button className="text-button" onClick={() => gesture.changeZoom(1)}>Весь день</button>
     </div>
-    {!rows.length ? <Empty icon={<Clock3 size={32}/>} title={query ? 'Посещения не найдены' : 'За этот день нет наблюдений'} text={query ? 'Измените поиск или дату.' : 'Откройте журнал игры и синхронизируйте доступное местоположение. История до начала наблюдения не восстанавливается.'}/> : <>
+    {!rows.length ? <Empty icon={<Clock3 size={32}/>} title={query ? 'Посещения не найдены' : 'За этот день нет наблюдений'} text={query ? 'Измените поиск или дату.' : 'Новые посещения сохраняются, только если VRChat передаёт ваше точное местоположение, пока приложение открыто. История с ПК не импортируется.'}/> : <>
       <p className="muted small chart-gesture-note">Масштабируйте двумя пальцами, перемещайте шкалу одним. Нажмите на цветную полосу для подробностей.</p>
       <div ref={ref} role="region" aria-label="Временная диаграмма посещений" className="instance-chart-scroll" {...gesture.events}>
         <div className="instance-chart-canvas" style={{ width: `${zoom * 100}%` }}>

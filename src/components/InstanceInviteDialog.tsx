@@ -6,8 +6,8 @@ import { buildWorldInstances } from '../data/world-instances';
 import type { KnownInstance } from '../data/world-instances';
 import { AvatarImage, Empty, ErrorState, imageOf, Loading, Modal, SearchField } from './ui';
 
-export default function InstanceInviteDialog({ world, initialLocation = '', mode, created, onClose }: {
-  world: World; initialLocation?: string; mode: 'self' | 'friends'; created: KnownInstance[]; onClose: () => void;
+export default function InstanceInviteDialog({ world, initialLocation = '', fixedLocation = false, mode, created, onClose }: {
+  world: World; initialLocation?: string; fixedLocation?: boolean; mode: 'self' | 'friends'; created: KnownInstance[]; onClose: () => void;
 }) {
   const ctx = useApp();
   const [location, setLocation] = useState(initialLocation), [query, setQuery] = useState('');
@@ -58,11 +58,11 @@ export default function InstanceInviteDialog({ world, initialLocation = '', mode
     <div className="form-stack">
       <p>{world.name}</p>
       <p className="muted small">Приглашение придёт в VRChat. Для отправки с телефона не требуется находиться в игре.</p>
-      <label className="field">Инстанс для приглашения<select value={location} disabled={busy} onChange={(event) => { setLocation(event.target.value); setSent([]); setSelected([]); setSelfSent(false); setError(''); }}>
+      {fixedLocation ? <p className="muted small preserve-lines">Выбранный инстанс: <span className="id-text">{initialLocation}</span></p> : <label className="field">Инстанс для приглашения<select value={location} disabled={busy} onChange={(event) => { setLocation(event.target.value); setSent([]); setSelected([]); setSelfSent(false); setError(''); }}>
         <option value="">Выберите инстанс</option>
         {rows.map((row) => <option key={row.location} value={row.location}>#{row.instanceId.split('~')[0]} · {row.type}{row.region ? ` · ${row.region.toUpperCase()}` : ''}{row.count !== undefined ? ` · ${row.count} игроков` : ''}</option>)}
         {!!initialLocation && !rows.some((row) => row.location === initialLocation) && <option value={initialLocation}>#{initialLocation.split(':')[1]?.split('~')[0]} · выбранный инстанс</option>}
-      </select></label>
+      </select></label>}
       {!rows.length && !initialLocation && <p className="muted">Нет доступных инстансов. Вернитесь к миру и создайте новый.</p>}
       {mode === 'friends' && <>
         <SearchField value={query} onChange={setQuery} placeholder="Кого пригласить" />

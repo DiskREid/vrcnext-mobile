@@ -1,0 +1,7 @@
+.notification-categories { max-width:100%; margin:18px 0; }
+.notification-categories .segmented { max-width:100%; overflow-x:auto; justify-content:flex-start; }
+.notification-categories .segmented button { flex:0 0 auto; white-space:nowrap; min-height:44px; }
+.notification-unread-count { color:var(--muted); font-size:12px; margin:12px 0; }
+.notification-card.is-unread { border-left:3px solid var(--accent); }
+.notification-new { display:inline-flex; align-items:center; gap:5px; color:var(--accent); font-size:11px; }
+.notification-new::before { content:''; width:7px; height:7px; background:currentColor; border-radius:50%; }

@@ -22,6 +22,7 @@ export interface NativeBridge {
   screenProtection(): Promise<{ enabled: boolean }>;
   setScreenProtection(options: { enabled: boolean }): Promise<{ enabled: boolean }>;
   loadImage(options: { url: string; maxDimension?: number }): Promise<{ dataUrl: string }>;
+  downloadImage(options: { url: string; fileName: string }): Promise<{ saved: boolean; fileName: string }>;
   request(options: NativeRequest): Promise<NativeResponse>;
   searchPublicAvatars(options: { query: string; page: number }): Promise<NativeResponse>;
   clearSession(): Promise<void>;

@@ -31,6 +31,7 @@ const avatars = [
 window.__regressionTest = {actions:[],requests:[],failInstance:false,worldA,worldB,selfId,friendId,ownerId,location};
 const transport = {
  async request(options) {
+ if(options.path.startsWith('/favorites?type=friend'))return{status:200,data:[]};
   window.__regressionTest.requests.push({path:options.path,method:options.method||'GET'});
   const url = new URL(options.path,'https://fixture.invalid');
   if(url.pathname.startsWith('/instances/')) {

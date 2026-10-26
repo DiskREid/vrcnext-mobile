@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Publish existing binaries unchanged, verify every asset, and resume safely on rerun."""
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -122,6 +123,17 @@ def main():
             for path in paths:
                 data = path.read_bytes()
                 asset = next((item for item in existing if item['name'] == path.name), None)
+                if asset and path == bundle:
+                    # ZIP compression can differ between Python/zlib versions. Verify the
+                    # original directory contents instead of replacing a published bundle.
+                    data = request(asset['url'], binary=True)
+                    with zipfile.ZipFile(io.BytesIO(data)) as saved:
+                        originals = {p.relative_to(folder).as_posix(): p for p in folder.rglob('*') if p.is_file()}
+                        if len(saved.namelist()) != len(originals) or set(saved.namelist()) != set(originals):
+                            raise RuntimeError(f'Existing bundle contents differ: {tag}')
+                        for name, original in originals.items():
+                            if sha(saved.read(name)) != sha(original.read_bytes()):
+                                raise RuntimeError(f'Existing bundle file differs: {tag}/{name}')
                 if not asset:
                     asset = request(release['upload_url'].split('{')[0] + '?' + urllib.parse.urlencode({'name': path.name}), 'POST', data=data)
                 # Never overwrite a different published file on a rerun.

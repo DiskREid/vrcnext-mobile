@@ -116,6 +116,18 @@ describe('account-scoped graph snapshots', () => {
 });
 
 describe('explicit mutual scanning', () => {
+  it('exposes received avatar sources only transiently and never puts them in saved graph records', async () => {
+    const received = { ...bob, currentAvatarThumbnailImageUrl: 'https://example.test/avatar.png' };
+    const onUsers = vi.fn();
+    const snapshot = await scanMutualFriends(alice.id, async () => [received], { now: () => stamp, onUsers });
+    expect(onUsers).toHaveBeenCalledOnce();
+    expect(onUsers).toHaveBeenCalledWith([received]);
+    expect(snapshot.mutuals[0]).not.toHaveProperty('currentAvatarThumbnailImageUrl');
+    const store = storage();
+    writeNetworkCache(self.id, [snapshot], store);
+    expect(JSON.stringify([...store.data.values()])).not.toContain('avatar.png');
+  });
+
   it('reads sequential raw offsets, deduplicates boundary IDs and reports progress', async () => {
     const first = Array.from({length:100},(_,index)=>person(`usr_friend-${index}`));
     const load = vi.fn(async (_id:string,offset:number)=>offset===0?first:[first[99],person('usr_last')]);

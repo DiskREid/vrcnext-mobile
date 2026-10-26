@@ -1,0 +1,56 @@
+import {test,expect} from '@playwright/test';
+import type {Page} from '@playwright/test';
+type Fixture={requests:{path:string;method:string;body?:string}[];unexpected:string[];friendId:string;recipientId:string;location:string;ownLocation:string;openedLocation:string};
+const fixture=(page:Page)=>page.evaluate(()=>(window as unknown as {__inviteTest:Fixture}).__inviteTest);
+
+for(const inGame of [false,true])test(`exact friend instance self and recipient invitations work ${inGame?'while already in another game instance':'from the phone without a game location'}`,async({page},testInfo)=>{
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto('/tests/invites-harness.html'+(inGame?'?game=1':''));
+ const card=page.getByRole('region',{name:'Текущий инстанс',exact:true});
+ await expect(card.getByRole('button',{name:'Открыть мир Exact Target World',exact:true})).toBeVisible();
+ await card.getByRole('button',{name:'Попросить инвайт',exact:true}).click();
+ let state=await fixture(page);
+ expect(state.requests.filter(r=>r.method==='POST')).toEqual([{path:`/requestInvite/${state.friendId}`,method:'POST',body:'{}'}]);
+ await card.getByRole('button',{name:'Открыть мир Exact Target World',exact:true}).click();
+ const world=page.getByRole('dialog',{name:'Мир',exact:true});
+ await expect(world.getByRole('heading',{name:'Exact Target World',exact:true})).toBeVisible();
+ await expect(world.getByRole('region',{name:'Выбранный инстанс',exact:true})).toContainText(state.location);
+ expect((await fixture(page)).openedLocation).toBe(state.location);
+ await expect(world.getByRole('article')).toHaveCount(0);
+ await expect(world.getByRole('button',{name:'Создать инстанс',exact:true})).toHaveCount(0);
+ await world.getByRole('button',{name:'Пригласить себя',exact:true}).click();
+ const self=page.getByRole('dialog',{name:'Пригласить себя',exact:true});
+ await expect(self.getByRole('combobox')).toHaveCount(0);
+ await expect(self).toContainText(state.location);
+ await self.getByRole('button',{name:'Отправить приглашение себе',exact:true}).click();
+ await expect(self.getByRole('status')).toContainText('Приглашение себе отправлено');
+ state=await fixture(page);
+ const selfRequest=state.requests.filter(r=>r.path.startsWith('/invite/myself/to/'));
+ expect(selfRequest).toHaveLength(1);
+ expect(decodeURIComponent(selfRequest[0].path)).toBe('/invite/myself/to/'+state.location);
+ expect(selfRequest[0].body).toBe('{}');
+ expect(selfRequest[0].path).not.toContain('%3A');
+ expect(state.requests.filter(r=>r.method==='POST'&&r.path.startsWith('/instances/'))).toEqual([]);
+ await self.getByRole('button',{name:'Закрыть',exact:true}).click();
+ await world.getByRole('button',{name:'Пригласить друзей',exact:true}).click();
+ const recipients=page.getByRole('dialog',{name:'Пригласить друзей',exact:true});
+ await expect(recipients.getByRole('combobox')).toHaveCount(0);
+ await recipients.locator('.invite-recipient').filter({hasText:'Invite Recipient'}).getByRole('checkbox').check();
+ await recipients.getByRole('button',{name:'Пригласить (1)',exact:true}).click();
+ await expect(recipients.getByRole('status')).toContainText('Отправлено: 1');
+ state=await fixture(page);
+ expect(state.requests.find(r=>r.path===`/invite/${state.recipientId}`)).toEqual({path:`/invite/${state.recipientId}`,method:'POST',body:JSON.stringify({instanceId:state.location})});
+ await page.screenshot({path:`artifacts/regressions/${testInfo.project.name}-exact-friend-invitation-${inGame?'game':'phone'}-synthetic-fixture.png`});
+ expect(errors).toEqual([]);expect(state.unexpected).toEqual([]);
+});
+
+test('an invalid scoped instance never falls back to another instance selector',async({page})=>{
+ await page.goto('/tests/invites-harness.html?invalid=1');
+ await page.getByRole('button',{name:'Открыть мир Exact Target World',exact:true}).click();
+ const world=page.getByRole('dialog',{name:'Мир',exact:true});
+ await expect(world.getByRole('alert')).toContainText('Адрес выбранного инстанса недоступен');
+ await expect(world.getByRole('button',{name:'Пригласить себя',exact:true})).toBeDisabled();
+ await expect(world.getByRole('button',{name:'Пригласить друзей',exact:true})).toBeDisabled();
+ await expect(world.getByRole('combobox')).toHaveCount(0);
+ expect((await fixture(page)).requests.filter(r=>r.method==='POST')).toEqual([]);
+});

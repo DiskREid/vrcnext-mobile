@@ -32,7 +32,7 @@ describe('instance URL routes', () => {
     await client.inviteSelf(location);
     expect(vi.mocked(bridge.request).mock.calls.map(([request]) => request.path)).toEqual([
       '/instances/' + location,
-      '/instances/' + location + '/invite',
+      '/invite/myself/to/' + location,
     ]);
   });
   it('encodes individual instance values without changing the structural delimiter', async () => {
@@ -432,7 +432,6 @@ describe('invite-template messaging', () => {
       method: 'POST',
       body: JSON.stringify({
         instanceId: 'wrld_4432ea9b-729c-46e3-8eaf-846aa0a37fdd:0~region(eu)',
-        worldId: 'wrld_4432ea9b-729c-46e3-8eaf-846aa0a37fdd',
         messageSlot: 3,
       }),
     });
@@ -687,7 +686,7 @@ describe('v2 notifications and group actions', () => {
     expect(bridge.request).toHaveBeenNthCalledWith(1, {
       path: '/invite/usr_friend',
       method: 'POST',
-      body: '{"instanceId":"wrld_123:0~region(eu)","worldId":"wrld_123"}',
+      body: '{"instanceId":"wrld_123:0~region(eu)"}',
     });
   });
   it('resolves group request short codes against the current user memberships', async () => {

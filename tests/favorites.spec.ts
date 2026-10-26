@@ -1,0 +1,73 @@
+import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+type Fixture={requests:{path:string;method:string;body?:{tags?:string[];favoriteId?:string;type?:string}}[];unexpected:string[];failRead:boolean;failNextAdd:boolean;friendId:string};
+const data=(page:Page)=>page.evaluate(()=>(window as unknown as {__favoriteFriendTest:Fixture}).__favoriteFriendTest);
+async function open(page:Page){
+  await page.goto('/tests/favorites-friends-harness.html');
+  await expect(page.getByRole('heading',{name:'Привет, Favorite Self ✦',exact:true})).toBeVisible();
+  await page.locator('nav[aria-label="Основная навигация"]:visible').getByRole('button',{name:'Друзья',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveCount(1);
+  await page.locator('.friend-card').click();
+  const profile=page.getByRole('dialog',{name:'Профиль',exact:true});
+  await expect(profile.getByRole('heading',{name:'Favorite Friend',exact:true})).toBeVisible();
+  return profile;
+}
+async function noOverflow(page:Page){
+  const sizes=await page.evaluate(()=>[document.documentElement,...document.querySelectorAll('.modal')].map(element=>({width:element.clientWidth,scroll:element.scrollWidth})));
+  for(const size of sizes)expect(size.scroll).toBeLessThanOrEqual(size.width+1);
+}
+test('friend favorites persist across profile reopen, highlight the list and preserve a remaining category',async({page},testInfo)=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  const profile=await open(page);
+  const empty=profile.getByRole('button',{name:'Добавить друга в избранное',exact:true});
+  await expect(empty).toHaveAttribute('aria-pressed','false');
+  await empty.click();
+  const manager=page.getByRole('dialog',{name:'Избранный друг',exact:true});
+  await manager.getByRole('checkbox',{name:'Favorite close friends',exact:true}).check();
+  await manager.getByRole('checkbox',{name:'Favorite later',exact:true}).check();
+  await manager.getByRole('button',{name:'Сохранить категории',exact:true}).click();
+  await expect(manager).toHaveCount(0);
+  const filled=profile.getByRole('button',{name:'Друг в избранном · изменить',exact:true});
+  await expect(filled).toHaveAttribute('aria-pressed','true');
+  await expect(filled.locator('svg')).toHaveAttribute('fill','currentColor');
+  await profile.getByRole('button',{name:'Закрыть',exact:true}).click();
+  await expect(page.locator('.friend-card')).toHaveClass(/is-favorite/);
+  await expect(page.getByLabel('Избранный друг',{exact:true})).toBeVisible();
+  await page.locator('.friend-card').click();
+  await expect(filled).toHaveAttribute('aria-pressed','true');
+  await filled.click();
+  await expect(manager.getByRole('checkbox',{name:'Favorite close friends',exact:true})).toBeChecked();
+  await expect(manager.getByRole('checkbox',{name:'Favorite later',exact:true})).toBeChecked();
+  await manager.getByRole('checkbox',{name:'Favorite close friends',exact:true}).uncheck();
+  await manager.getByRole('button',{name:'Сохранить категории',exact:true}).click();
+  await expect(manager).toHaveCount(0);await filled.click();
+  await expect(manager.getByRole('checkbox',{name:'Favorite close friends',exact:true})).not.toBeChecked();
+  await expect(manager.getByRole('checkbox',{name:'Favorite later',exact:true})).toBeChecked();
+  await page.screenshot({path:`artifacts/regressions/${testInfo.project.name}-friend-favorites-synthetic-fixture.png`});
+  await manager.getByRole('button',{name:'Убрать из всех категорий',exact:true}).click();
+  await manager.getByRole('button',{name:'Сохранить категории',exact:true}).click();
+  await expect(empty).toHaveAttribute('aria-pressed','false');
+  await profile.getByRole('button',{name:'Закрыть',exact:true}).click();
+  await expect(page.locator('.friend-card')).not.toHaveClass(/is-favorite/);
+  const state=await data(page),writes=state.requests.filter(r=>r.method==='POST');
+  expect(writes.map(r=>r.body?.tags)).toEqual([['group_0','group_2'],['group_2']]);
+  expect(state.requests.filter(r=>r.method==='DELETE').every(r=>/^\/favorites\/fvrt_/.test(r.path))).toBe(true);
+  expect(state.unexpected).toEqual([]);expect(errors).toEqual([]);await noOverflow(page);
+});
+test('failed category replacement restores existing favorite groups instead of losing the friend',async({page})=>{
+  const profile=await open(page);
+  await profile.getByRole('button',{name:'Добавить друга в избранное',exact:true}).click();
+  const manager=page.getByRole('dialog',{name:'Избранный друг',exact:true});
+  await manager.getByRole('checkbox',{name:'Favorite close friends',exact:true}).check();
+  await manager.getByRole('checkbox',{name:'Favorite later',exact:true}).check();
+  await manager.getByRole('button',{name:'Сохранить категории',exact:true}).click();
+  await expect(manager).toHaveCount(0);
+  await profile.getByRole('button',{name:'Друг в избранном · изменить',exact:true}).click();
+  await manager.getByRole('checkbox',{name:'Favorite close friends',exact:true}).uncheck();
+  await page.evaluate(()=>(window as unknown as {__favoriteFriendTest:Fixture}).__favoriteFriendTest.failNextAdd=true);
+  await manager.getByRole('button',{name:'Сохранить категории',exact:true}).click();
+  await expect(manager.getByRole('alert')).toContainText('Исходные категории восстановлены');
+  await expect(manager.getByRole('checkbox',{name:'Favorite close friends',exact:true})).toBeChecked();
+  await expect(manager.getByRole('checkbox',{name:'Favorite later',exact:true})).toBeChecked();
+  expect((await data(page)).unexpected).toEqual([]);await noOverflow(page);
+});

@@ -1,4 +1,5 @@
 import SecureImage from '../components/SecureImage';
+import { FullscreenImageViewer } from '../components/FullscreenImageViewer';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
@@ -428,6 +429,7 @@ export function GroupDetail({
     [initial.id, tab, demo],
   );
   const [gallery, setGallery] = useState('');
+  const [viewingImage, setViewingImage] = useState<{ src: string; title: string } | null>(null);
   const galleryList = list(raw.galleries).map(record);
   const galleryImages = usePaged<VrcFile>(
     async (offset) =>
@@ -654,12 +656,11 @@ export function GroupDetail({
                     {galleryImages.items.map((value, index) => {
                       const image = record(value);
                       return (
-                        <SecureImage
-                          key={text(image.id, String(index))}
-                          src={text(image.imageUrl, text(image.url))}
-                          alt={text(image.description, 'Изображение группы')}
-                          loading="lazy"
-                        />
+                        <button className="gallery-image-button" key={text(image.id, String(index))}
+                          aria-label={`Открыть изображение группы ${index + 1}`}
+                          onClick={() => setViewingImage({ src: text(image.imageUrl, text(image.url)), title: text(image.description, 'Изображение группы') })}>
+                          <SecureImage src={text(image.imageUrl, text(image.url))} alt={text(image.description, 'Изображение группы')} loading="lazy" />
+                        </button>
                       );
                     })}
                   </div>
@@ -684,6 +685,7 @@ export function GroupDetail({
           </>
         )}
       </div>
+      {viewingImage && <FullscreenImageViewer src={viewingImage.src} originalUrl={viewingImage.src} title={viewingImage.title} onClose={() => setViewingImage(null)} />}
     </Modal>
   );
 }

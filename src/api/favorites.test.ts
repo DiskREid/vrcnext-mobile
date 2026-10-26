@@ -13,6 +13,26 @@ function fixture(results: unknown[]) {
 }
 
 describe('all favorite categories and complete lists', () => {
+  it('removes only one friend category by replacing the favorite record with remaining tags', async () => {
+    const friend: Favorite = { id: 'fvrt_record-id', favoriteId: 'usr_friend', type: 'friend', tags: ['group_0', 'group_2'] };
+    const remaining = { ...friend, id: 'fvrt_replaced', tags: ['group_2'] };
+    const { client, request } = fixture([{}, remaining]);
+    expect(await client.setTags(friend, ['group_2'])).toEqual(remaining);
+    expect(request.mock.calls).toEqual([
+      ['/favorites/fvrt_record-id', 'DELETE'],
+      ['/favorites', 'POST', { type: 'friend', favoriteId: 'usr_friend', tags: ['group_2'] }],
+    ]);
+  });
+  it('removes all categories with the record ID and does not re-add an empty favorite', async () => {
+    const friend: Favorite = { id: 'fvrt_remove', favoriteId: 'usr_friend', type: 'friend', tags: ['group_0'] };
+    const { client, request } = fixture([{}]);
+    expect(await client.setTags(friend, [])).toBeUndefined();
+    expect(request.mock.calls).toEqual([['/favorites/fvrt_remove', 'DELETE']]);
+  });
+  it('does not call dropped server tags a successful favorite update', async () => {
+    const { client } = fixture([{ id: 'fvrt_partial', favoriteId: 'usr_friend', type: 'friend', tags: ['group_0'] }]);
+    await expect(client.add('usr_friend', 'friend', ['group_0', 'group_2'])).rejects.toThrow('подтверждение');
+  });
   it('uses modern groups by type and retains every server-provided category including the eighth', async () => {
     const groups = Array.from({length:8}, (_,i)=>({id:`grp_${i}`,name:`worlds${i+1}`,displayName:`Worlds ${i+1}`,visibility:'private'}));
     const {client,request}=fixture([{favoriteGroups:groups,maxFavoriteGroups:8}]);

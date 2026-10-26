@@ -4,6 +4,7 @@ import { IndexedHistoryStore, MemoryHistoryStore } from './history-storage';
 import type { HistoryStore } from './history-storage';
 import { closeInterrupted, friendStatistics, GameObserver } from './game-history';
 import type { GameData, GameSession, GameVisit, ObservationSource } from './game-history';
+import { presenceMode } from './presence';
 
 export type HistoryKind = 'online' | 'offline' | 'world' | 'instance' | 'status' | 'avatar' | 'bio'
   | 'friend-add' | 'friend-remove' | 'name' | 'trust' | 'profile' | 'moderation';
@@ -50,7 +51,7 @@ function displayLocation(value: string) {
 /** Pure observation reducer. Unknown values establish a baseline, never a fabricated change. */
 export class HistoryObserver {
   private known = new Map<string, Snapshot>();
-  private presence = new Map<string, 'online'|'offline'>();
+  private presence = new Map<string, 'online'|'offline'|'website'>();
   private membership = new Map<string, boolean>();
   constructor(private readonly now: () => string = () => new Date().toISOString(), private readonly id: () => string = () => crypto.randomUUID()) {}
   pause() { this.known.clear(); this.presence.clear(); this.membership.clear(); }
@@ -93,7 +94,7 @@ export class HistoryObserver {
   }
   observePipeline(event:PipelineEvent, friends:User[], self:User): HistoryEvent[] {
     if (!event.type.startsWith('friend-') && event.type !== 'user-update') return [];
-    const content = event.content;
+    const content = object(event.content);
     const partial = object(content.user) as Partial<User>;
     const userId = typeof content.userId === 'string' ? content.userId : typeof content.userid === 'string' ? content.userid : typeof partial.id === 'string' ? partial.id : undefined;
     if (!userId || !userId.startsWith('usr_')) return [];
@@ -108,10 +109,18 @@ export class HistoryObserver {
     }
     if (event.type === 'friend-online' || event.type === 'friend-offline') {
       const online = event.type === 'friend-online';
-      if (this.presence.get(userId) !== (online?'online':'offline')) output.push(this.event(online?'online':'offline',userId,next,'pipeline',online?'Получено событие входа в VRChat':'Получено событие выхода из VRChat'));
+      const previous = this.presence.get(userId);
+      // Leaving the website is not proof of leaving the game. A game exit needs a known game presence.
+      const wasInGame = previous === 'online' || previous === undefined && current && presenceMode(current) === 'game';
+      if (previous !== (online?'online':'offline') && (online || wasInGame)) output.push(this.event(online?'online':'offline',userId,next,'pipeline',online?'Получено событие входа в VRChat':'Получено событие выхода из VRChat'));
       this.presence.set(userId,online?'online':'offline');
     }
-    // friend-active is website/app presence. It deliberately creates no game-login event.
+    // Website activity resets the game-presence baseline without inventing a game-login/exit.
+    // Otherwise a later genuine friend-online would be suppressed as a duplicate forever.
+    if (event.type === 'friend-active') {
+      next.location = typeof content.location === 'string' ? content.location : typeof partial.location === 'string' ? partial.location : '';
+      this.presence.set(userId, presenceMode({ ...next, state: 'active' }) === 'game' ? 'online' : 'website');
+    }
     if (event.type === 'friend-location' && typeof content.location === 'string') {
       const location = content.location;
       if (known.location !== location) {

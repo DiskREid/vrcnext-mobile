@@ -1,0 +1,20 @@
+<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Notification categories synthetic fixture only</title></head><body><div id="root"></div><script type="module">
+import React from 'react';import{createRoot}from'react-dom/client';import'/src/styles.css';
+const{api,createApi}=await import('/src/api/index.ts');
+const v1=[{id:'not_invite',type:'invite',senderUserId:'usr_friend',senderUsername:'Synthetic Inviter',created_at:'2026-10-25T10:00:00Z',seen:false,details:{worldId:'wrld_test:123'}},{id:'not_friend',type:'friendRequest',senderUserId:'usr_requester',senderUsername:'Synthetic Requester',created_at:'2026-10-26T15:00:00Z',seen:false},{id:'not_boop',type:'boop',senderUserId:'usr_booper',created_at:'2026-10-24T10:00:00Z',seen:true}];
+const v2=[{id:'not_group',type:'group.announcement',senderId:'grp_test',senderDisplayName:'Synthetic Group',createdAt:'2026-10-26T13:00:00Z',seen:false,data:{groupId:'grp_test',groupName:'Synthetic Group'}},{id:'not_event',type:'event.announcement',title:'Synthetic Calendar Event',createdAt:'2026-10-26T14:00:00Z',seen:false,link:'event:grp_test,cal_test',canDelete:false}];
+window.__notificationsTest={requests:[],actions:[],unexpected:[]};
+const transport={async request(options){
+ window.__notificationsTest.requests.push({path:options.path,method:options.method||'GET'});const url=new URL(options.path,'https://synthetic.invalid');
+ if(url.pathname==='/auth/user/notifications')return{status:200,data:v1};
+ if(url.pathname==='/notifications')return{status:200,data:v2};
+ if(url.pathname.endsWith('/see')){const record=[...v1,...v2].find(n=>url.pathname.includes('/'+n.id+'/'));if(record){record.seen=true;return{status:200,data:{}};}}
+ window.__notificationsTest.unexpected.push(options.path);return{status:500,data:{error:{message:'Unexpected synthetic notification route'}}};
+},sessionState:async()=>({hasAuth:false}),clearSession:async()=>{},disconnectPipeline:async()=>{}};
+Object.assign(api,createApi(transport));
+const{AppProvider}=await import('/src/state.tsx');const{default:Notifications}=await import('/src/pages/Notifications.tsx');
+const noop=()=>{};const action=type=>value=>window.__notificationsTest.actions.push({type,id:typeof value==='string'?value:value.id});
+const history={events:[],visits:[],sessions:[],loading:false,error:'',observePipeline:noop,observeProfile:noop,seedUsers:noop,recordModeration:noop,recordFriendAction:noop,retry:noop,clear:async()=>{},pause:noop,observeSession:noop,friendStats:()=>({encounters:0,totalMs:0})};
+function Fixture(){const[revision,setRevision]=React.useState(0);window.__notificationsTest.incoming=()=>{v1.unshift({id:'not_new',type:'invite',senderUserId:'usr_new',senderUsername:'Synthetic Newest',created_at:'2026-10-26T16:00:00Z',seen:false,details:{worldId:'wrld_test:999'}});setRevision(x=>x+1);};const value={user:{id:'usr_self',displayName:'Self',location:'offline',state:'offline'},onUserUpdated:noop,demo:false,online:true,refresh:0,pageActive:true,notificationsRefresh:revision,friends:{data:[],loading:false,refreshing:false,error:'',apply:noop,reload:noop},history,calendarSync:{events:[],reminders:[],loading:false,error:'',refresh:noop,dismissReminder:noop},observation:{status:'active',error:'',refresh:noop},notify:noop,act:async operation=>operation(),openUser:action('user'),openWorld:action('world'),openGroup:action('group'),openCalendarEvent:action('event'),onRefresh:noop,logout:noop,activity:[]};return React.createElement(AppProvider,{value},React.createElement('div',{className:'app-shell'},React.createElement('main',{className:'main-content'},React.createElement(Notifications))));}
+createRoot(document.getElementById('root')).render(React.createElement(Fixture));
+</script></body></html>

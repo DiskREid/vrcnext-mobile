@@ -445,13 +445,9 @@ test('new feed, locations, favorites and Social use real empty states or explici
   await page.getByRole('button', { name: 'Подробности Luna', exact: true }).click();
   await noHorizontalOverflow(page);
   await navigate(page, 'Ещё');
-  await page.getByRole('button', { name: /^Журнал игры Наблюдения миров/ }).click();
-  await expect(page.getByRole('heading', { name: 'Журнал игры', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Посещения ещё не наблюдались', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Сессии', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Игровых сессий пока нет', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Видео', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Источник видео недоступен', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Журнал игры/ })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Диаграммы Время, встречи/ }).click();
+  await expect(page.getByRole('button', { name: 'Mutual Friend Network', exact: true })).toBeVisible();
   await noHorizontalOverflow(page);
   expect(errors).toEqual([]);
   expect(network).toEqual([]);
@@ -554,13 +550,11 @@ test('known friend network supports zoom, two-finger gestures and explicit profi
   await page.getByRole('button', { name: 'Сбросить граф', exact: true }).click();
   await page.getByRole('button', { name: 'Увеличить граф', exact: true }).click();
   const beforeSelection = await scene.getAttribute('transform');
-  const luna = graph.getByRole('button', { name: 'Выбрать Luna', exact: true });
+  const luna = graph.getByRole('button', { name: 'Открыть профиль Luna', exact: true });
   const lunaPosition = await luna.getAttribute('transform');
   await luna.press('Enter');
   await expect(scene).toHaveAttribute('transform', beforeSelection!);
   await expect(luna).toHaveAttribute('transform', lunaPosition!);
-  await expect(page.getByRole('dialog', { name: 'Профиль', exact: true })).toHaveCount(0);
-  await page.getByRole('region', { name: 'Выбранный пользователь', exact: true }).getByRole('button', { name: 'Открыть профиль', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Профиль', exact: true }).getByRole('heading', { name: 'Luna', exact: true })).toBeVisible();
   await noHorizontalOverflow(page);
   expect(errors).toEqual([]); expect(network).toEqual([]);
@@ -756,7 +750,7 @@ test('world instance list groups disclosed friends and opens their real profiles
 
   await publicA.getByRole('button', { name: 'Инвайт себе', exact: true }).click();
   await expect.poll(async () => (await worldInstanceFixture(page)).requests.filter((request) => request.method === 'POST').length).toBe(1);
-  expect((await worldInstanceFixture(page)).requests.find((request) => request.method === 'POST')).toMatchObject({ path: `/instances/${fixture.locationA}/invite`, body: '{}' });
+  expect((await worldInstanceFixture(page)).requests.find((request) => request.method === 'POST')).toMatchObject({ path: `/invite/myself/to/${fixture.locationA}`, body: '{}' });
   const requestsBeforeMove = (await worldInstanceFixture(page)).requests.length;
   await page.evaluate(() => (window as unknown as { __worldInstanceTest: WorldInstanceFixture }).__worldInstanceTest.moveFriend());
   await expect(publicA.locator('.world-instance-friend')).toHaveCount(1);
@@ -835,9 +829,9 @@ test('world info sends self and friend invitations without a running game and pr
   await expect(dialog.getByRole('checkbox',{name:/Fixture Nearby/})).toBeChecked();
   const requests=(await worldInstanceFixture(page)).requests.filter(r=>r.method==='POST');
   expect(requests).toHaveLength(3);
-  expect(requests[0].path).toBe(`/instances/${fixture.locationA}/invite`);
+  expect(requests[0].path).toBe(`/invite/myself/to/${fixture.locationA}`);
   expect(requests.slice(1).map(r=>r.path)).toEqual([`/invite/${fixture.nearId}`,`/invite/${fixture.pairId}`]);
-  expect(JSON.parse(requests[2].body!)).toMatchObject({instanceId:fixture.locationA,worldId:fixture.worldId});
+  expect(JSON.parse(requests[2].body!)).toEqual({instanceId:fixture.locationA});
   await noHorizontalOverflow(page);
 });
 
@@ -863,7 +857,7 @@ test('group creation sends avatar restriction and full group location, then retr
   const creates=requests.filter(r=>r.path==='/instances'&&r.method==='POST');
   expect(creates).toHaveLength(1);
   expect(JSON.parse(creates[0].body!)).toEqual({worldId:fixture.worldId,type:'group',region:'eu',ownerId:fixture.groupId,groupAccessType:'members',queueEnabled:true,minimumAvatarPerformance:'Good',roleIds:['grol_host'],displayName:'Mobile Friends'});
-  const invitePath=requests.find(r=>r.method==='POST'&&r.path.endsWith('/invite'))!.path;
+  const invitePath=requests.find(r=>r.method==='POST'&&r.path.startsWith('/invite/myself/to/'))!.path;
   expect(invitePath).toContain(`:900~group(${fixture.groupId})~groupAccessType(members)`);
   expect(invitePath).not.toContain('%3A');
   await dialog.getByRole('button',{name:'Пригласить себя в созданный инстанс',exact:true}).click();
@@ -950,7 +944,7 @@ test('a group restriction ignored by the server does not trigger an automatic se
   await expect(dialog.getByRole('button',{name:'Пригласить себя в созданный инстанс',exact:true})).toBeDisabled();
   const requests=(await worldInstanceFixture(page)).requests;
   expect(requests.filter(r=>r.path==='/instances'&&r.method==='POST')).toHaveLength(1);
-  expect(requests.filter(r=>r.path.endsWith('/invite')&&r.method==='POST')).toEqual([]);
+  expect(requests.filter(r=>r.path.startsWith('/invite/myself/to/')&&r.method==='POST')).toEqual([]);
 });
 
 test('a failed world refresh preserves a created instance and retries its invite without creating again',async({page})=>{
@@ -1014,13 +1008,13 @@ test('mobile network list selects a person, checks only on demand and focuses re
   await selected.getByRole('button',{name:'Показать связи',exact:true}).click();
   const graph=page.getByRole('img',{name:'Граф общих друзей',exact:true});
   await expect(graph).toBeVisible();
-  await expect(graph.getByRole('button',{name:'Выбрать Website Friend',exact:true})).toBeVisible();
-  await expect(graph.getByRole('button',{name:'Выбрать Offline Friend',exact:true})).toBeVisible();
-  await expect(graph.getByRole('button',{name:'Выбрать Historical Outsider',exact:true})).toBeVisible();
-  await expect(graph.getByRole('button',{name:'Выбрать Game Friend',exact:true})).toHaveCount(0);
-  const connections=await graph.locator('.network-edges line title').allTextContents();
-  expect(connections.some(text=>text.includes('Website Friend')&&text.includes('Offline Friend'))).toBe(true);
-  expect(connections.some(text=>text.includes('Offline Friend')&&text.includes('Historical Outsider'))).toBe(false);
+  await expect(graph.getByRole('button',{name:'Открыть профиль Website Friend',exact:true})).toBeVisible();
+  await expect(graph.getByRole('button',{name:'Открыть профиль Offline Friend',exact:true})).toBeVisible();
+  await expect(graph.getByRole('button',{name:'Открыть профиль Historical Outsider',exact:true})).toBeVisible();
+  await expect(graph.getByRole('button',{name:'Открыть профиль Game Friend',exact:true})).toHaveCount(0);
+  const connections=await graph.locator('.network-edges path').evaluateAll(paths=>paths.map(path=>Number(path.getAttribute('data-edge-count'))));
+  expect(connections.reduce((sum,count)=>sum+count,0)).toBe(5);
+  expect(connections.length).toBeLessThan(5);
   await graph.scrollIntoViewIfNeeded();
   const nodes=await graph.locator('.network-node-disc').evaluateAll(elements=>elements.map(element=>{const box=element.getBoundingClientRect();return{x:box.x,y:box.y,width:box.width,height:box.height};}));
   for(const node of nodes)expect(node.width,'focused nodes remain large enough to read').toBeGreaterThanOrEqual(39);
@@ -1031,7 +1025,7 @@ test('mobile network list selects a person, checks only on demand and focuses re
   }
   await page.screenshot({path:`artifacts/regressions/${testInfo.project.name}-network-focus-synthetic-fixture.png`});
   await page.getByRole('button',{name:'Все связи',exact:true}).click();
-  await expect(graph.getByRole('button',{name:'Выбрать Game Friend',exact:true})).toBeVisible();
+  await expect(graph.getByRole('button',{name:'Открыть профиль Game Friend',exact:true})).toBeVisible();
   expect((await networkFixture(page)).requests.filter(r=>r.path.includes('/mutuals/friends'))).toHaveLength(1);
   await noHorizontalOverflow(page);expect(errors).toEqual([]);expect(external).toEqual([]);expect((await networkFixture(page)).unexpected).toEqual([]);
 });

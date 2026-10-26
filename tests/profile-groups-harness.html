@@ -24,6 +24,7 @@ const firstMutual=[{...early,id:'grpm_mutual-early',groupId:early.id},...Array.f
 let releaseGroup;
 window.__profileGroupsTest={requests:[],unexpected:[],actions:[],scenario,ids,selfId,friendId,holdGroupNext:false,heldGroup:false,memberOverrides:{},releaseGroup:()=>releaseGroup?.()};
 const transport={async request(options){
+ if(options.path.startsWith('/favorites?type=friend'))return{status:200,data:[]};
  window.__profileGroupsTest.requests.push({path:options.path,method:options.method||'GET'});
  const url=new URL(options.path,'https://synthetic.invalid');
  if(url.pathname===`/users/${friendId}`)return{status:200,data:friend};

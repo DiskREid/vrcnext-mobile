@@ -35,6 +35,8 @@ export interface MutualScanOptions {
   now?: () => string;
   cancelled?: () => boolean;
   onProgress?: (loaded: number) => void;
+  /** Transient image sources may be read by the view, but are never persisted in graph snapshots. */
+  onUsers?: (users: User[]) => void;
 }
 
 const MAX_PAGES = 25;
@@ -268,6 +270,7 @@ export async function scanMutualFriends(
       if (!people.has(person.id)) additions++;
       people.set(person.id, person);
     }
+    options.onUsers?.(rows);
     offset += rows.length;
     options.onProgress?.(people.size);
     if (rows.length < PAGE_SIZE) return result(true);

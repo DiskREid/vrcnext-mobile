@@ -1,0 +1,21 @@
+import{test,expect}from'@playwright/test';
+type Fixture={requests:{path:string;method:string}[];actions:{type:string;id:string}[];unexpected:string[];incoming:()=>void};
+test('notifications categorize real protocols, sort newest first, mark read and route actual destinations',async({page},info)=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/tests/notifications-harness.html');
+ const cards=page.locator('.notification-card');await expect(cards).toHaveCount(5);
+ expect(await cards.evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-notification-id')))).toEqual(['not_friend','not_event','not_group','not_invite','not_boop']);
+ await expect(page.getByRole('status')).toContainText('4');
+ const friend=page.locator('[data-notification-id="not_friend"]');await expect(friend).toHaveAttribute('data-unread','true');
+ await friend.getByRole('button',{name:'Прочитано',exact:true}).click();await expect(friend).toHaveAttribute('data-unread','false');await expect(page.getByRole('status')).toContainText('3');
+ await page.getByRole('button',{name:'Запросы в друзья',exact:true}).click();await expect(cards).toHaveCount(1);await friend.getByRole('button',{name:'Открыть профиль',exact:true}).click();
+ await page.getByRole('button',{name:'Приглашения',exact:true}).click();await expect(cards).toHaveCount(1);await expect(cards.first()).toHaveAttribute('data-notification-id','not_invite');
+ await page.getByRole('button',{name:'Объявления групп',exact:true}).click();await expect(cards).toHaveCount(1);await cards.getByRole('button',{name:'Открыть группу',exact:true}).click();
+ await page.getByRole('button',{name:'Календарные события',exact:true}).click();await expect(cards).toHaveCount(1);await cards.getByRole('button',{name:'Открыть мероприятие',exact:true}).click();await expect(cards.getByRole('button',{name:'Скрыть',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'Все',exact:true}).click();
+ await page.evaluate(()=>(window as unknown as{__notificationsTest:Fixture}).__notificationsTest.incoming());await expect(cards).toHaveCount(6);await expect(cards.first()).toHaveAttribute('data-notification-id','not_new');
+ const state=await page.evaluate(()=>(window as unknown as{__notificationsTest:Fixture}).__notificationsTest);
+ expect(state.actions).toEqual([{type:'user',id:'usr_requester'},{type:'group',id:'grp_test'},{type:'event',id:'cal_test'}]);expect(state.requests.some(r=>r.path==='/auth/user/notifications/not_friend/see'&&r.method==='PUT')).toBe(true);expect(state.unexpected).toEqual([]);expect(errors).toEqual([]);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1)).toBe(true);
+ await page.screenshot({path:`artifacts/regressions/${info.project.name}-notification-categories-synthetic-fixture.png`});
+});

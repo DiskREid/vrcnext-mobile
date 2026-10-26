@@ -1,0 +1,10 @@
+.friend-favorite-toggle.selected { color:var(--accent); background:var(--accent-soft); }
+.friend-card.is-favorite { border-color:var(--accent); }
+.friend-favorite-badge { display:inline-flex; align-items:center; gap:4px; color:var(--accent); font-size:11px; margin-left:6px; }
+.friend-favorite-manager .friend-favorite-category { display:flex; align-items:center; gap:12px; padding:12px; min-height:48px; border:1px solid var(--border); border-radius:12px; cursor:pointer; }
+.friend-favorite-category input { width:20px; height:20px; flex:none; accent-color:var(--accent); }
+.friend-favorite-category span { flex:1; overflow-wrap:anywhere; }
+.friend-favorite-category > svg { color:var(--accent); flex:none; }
+
+.friend-card-title { display:flex; align-items:center; gap:6px; min-width:0; }
+.friend-card-title h3 { min-width:0; }

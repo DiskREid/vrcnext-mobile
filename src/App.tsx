@@ -33,7 +33,7 @@ import {
   MapPin,
   Plus,
 } from 'lucide-react';
-import type { User, World, Notification, Group, CalendarEvent } from './api';
+import type { User, World, Group, CalendarEvent } from './api';
 import { App as AndroidApp } from '@capacitor/app';
 import { api, native, ApiError, isNative } from './api';
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -41,10 +41,10 @@ import { AppProvider, PageScope, useApp, useLoad } from './state';
 import type { Activity as ActivityItem } from './state';
 import { demoUser, demoWorlds, demoEvents } from './demo';
 import { useFriends } from './data/friends';
+import { clearFriendFavoritesCache, invalidateFriendFavoritesCache, useFriendFavorites } from './data/favorite-friends';
 import { useHistory } from './data/history';
 import { useObservation } from './data/observation';
 import { useCalendarSync } from './data/calendar-sync';
-import { parseCalendarLink } from './api/calendar';
 import { presenceLabel } from './data/locations';
 import { presenceMode } from './data/presence';
 import { reconcilePage } from './hooks/paged-data';
@@ -53,7 +53,7 @@ import Feed from './pages/Feed';
 import FavoritesPage from './pages/Favorites';
 import Locations from './pages/Locations';
 import Social from './pages/Social';
-const GameLogPage = lazy(() => import('./pages/GameLog'));
+import NotificationsPage from './pages/Notifications';
 const ChartsPage = lazy(() => import('./pages/Charts'));
 import { clearFavoriteEntityCache } from './api/favorites';
 import PullRefresh from './components/PullRefresh';
@@ -94,7 +94,6 @@ type Screen =
   | 'locations'
   | 'favorites'
   | 'social'
-  | 'gameLog'
   | 'charts';
 const tabs: { id: Screen; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { id: 'home', label: 'Главная', icon: Home },
@@ -113,6 +112,7 @@ export default function App() {
     [mutationRevision, setMutationRevision] = useState(0),
     [selectedUser, setSelectedUser] = useState<User | string | null>(null),
     [selectedWorld, setSelectedWorld] = useState<World | string | null>(null),
+    [selectedWorldLocation, setSelectedWorldLocation] = useState<string>(),
     [selectedGroup, setSelectedGroup] = useState<Group | null>(null),
     [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null),
     [toast, setToast] = useState(''),
@@ -150,14 +150,16 @@ export default function App() {
     );
   const refresh = () => {
     clearFavoriteEntityCache();
+    invalidateFriendFavoritesCache();
     setRevision((v) => v + 1);
     setPageRevisions((current) => ({ ...current, [screen]: (current[screen] || 0) + 1 }));
-    if (screen === 'gameLog' || screen === 'charts') observation.refresh();
+    if (screen === 'charts') observation.refresh();
     if (screen === 'calendar' || screen === 'notifications') calendarSync.refresh();
   };
   const login = (u: User) => {
     clearImageCache();
     clearFavoriteEntityCache();
+    clearFriendFavoritesCache();
     setDemo(false);
     setUser(u);
     setScreen('home');
@@ -177,6 +179,7 @@ export default function App() {
     }
     clearImageCache();
     clearFavoriteEntityCache();
+    clearFriendFavoritesCache();
     setUser(null);
     setDemo(false);
     setActivity([]);
@@ -257,7 +260,7 @@ export default function App() {
           const id = String(event.content.userId || partial?.id || '');
           if (partial && id === latest.user.id) {
             setUser((current) => current ? { ...current, ...partial, id: current.id } : current);
-            if (typeof partial.location === 'string') latest.history.observeSession({ ...partial, id, displayName: partial.displayName || latest.user.displayName }, latest.friends.refreshing ? [] : latest.friends.data, 'pipeline');
+            if (typeof partial.location === 'string' || typeof partial.worldId === 'string' && typeof partial.instanceId === 'string') latest.history.observeSession({ ...partial, id, displayName: partial.displayName || latest.user.displayName }, latest.friends.refreshing ? [] : latest.friends.data, 'pipeline');
           }
         }
         if (event.type.startsWith('notification')) { clearTimeout(notificationTimer.current); notificationTimer.current = setTimeout(() => setNotificationsRefresh((v) => v + 1), 1000); }
@@ -363,10 +366,11 @@ export default function App() {
           setSelectedEvent(null);
           setSelectedUser(target);
         },
-        openWorld: (target) => {
+        openWorld: (target, instanceLocation) => {
           setSelectedUser(null);
           setSelectedGroup(null);
           setSelectedEvent(null);
+          setSelectedWorldLocation(instanceLocation);
           setSelectedWorld(target);
         },
         openGroup: (target) => { setSelectedUser(null); setSelectedWorld(null); setSelectedEvent(null); setSelectedGroup(target); },
@@ -457,7 +461,7 @@ export default function App() {
                       inventory: 'Медиатека',
                       messenger: 'Сообщения',
                       timeline: 'Активность',
-                      feed: 'Лента', locations: 'Friends Locations', favorites: 'Избранное', social: 'Social', gameLog: 'Журнал игры', charts: 'Диаграммы',
+                      feed: 'Лента', locations: 'Friends Locations', favorites: 'Избранное', social: 'Social', charts: 'Диаграммы',
                       settings: 'Настройки',
                       moderation: 'Модерация',
                     }[screen as string as 'profile']}
@@ -524,7 +528,6 @@ export default function App() {
                     : page === 'inventory' ? <InventoryPage />
                     : page === 'messenger' ? <MessengerPage />
                     : page === 'charts' ? <ChartsPage />
-                    : page === 'gameLog' ? <GameLogPage />
                     : page === 'social' ? <Social />
                     : page === 'favorites' ? <FavoritesPage />
                     : page === 'locations' ? <Locations />
@@ -560,7 +563,7 @@ export default function App() {
       {selectedGroup && <GroupDetail initial={selectedGroup} onClose={() => setSelectedGroup(null)} onChanged={refresh} />}
       {selectedUser && <UserDetails target={selectedUser} onClose={() => setSelectedUser(null)} />}
       {selectedWorld && (
-        <WorldDetails target={selectedWorld} onClose={() => setSelectedWorld(null)} />
+        <WorldDetails target={selectedWorld} initialLocation={selectedWorldLocation} onClose={() => setSelectedWorld(null)} />
       )}
       {toast && (
         <div role="status" className="toast">
@@ -792,6 +795,8 @@ function FriendsPage() {
     () => ctx.demo ? Promise.resolve(ctx.friends.data) : search && debounced ? api.searchUsers(debounced, page * 50) : Promise.resolve([]),
     [ctx.refresh, search, debounced, page],
   );
+  const favorites = useFriendFavorites(ctx.user.id, ctx.demo, ctx.refresh, ctx.pageActive !== false);
+  const favoriteIds = new Set(favorites.records.map((record) => record.favoriteId));
   const friends = search ? results : ctx.friends;
   useEffect(() => {
     if (search && friends.data)
@@ -856,10 +861,10 @@ function FriendsPage() {
       ) : items.length ? (
         <div className="friend-grid">
           {items.map((f) => (
-            <button className="friend-card card" key={f.id} onClick={() => ctx.openUser(f)}>
+            <button className={`friend-card card ${favoriteIds.has(f.id) ? 'is-favorite' : ''}`} key={f.id} onClick={() => ctx.openUser(f)}>
               <AvatarImage name={f.displayName} src={imageOf(f)} size={54} user={f} fallbackSrc={f.currentAvatarThumbnailImageUrl || f.currentAvatarImageUrl} />
               <div className="friend-card-text">
-                <h3>{f.displayName}</h3>
+                <div className="friend-card-title"><h3>{f.displayName}</h3>{favoriteIds.has(f.id) && <span className="friend-favorite-badge" aria-label="Избранный друг"><Star size={13} fill="currentColor" /></span>}</div>
                 <p>{f.statusDescription || statusName(f.status)}</p>
                 <span className="friend-location">
                   <PresenceIndicator user={f} />
@@ -893,243 +898,6 @@ function FriendsPage() {
     </>
   );
 }
-const notificationLabel = (type: string) =>
-  ({
-    boop: 'Boop от друга',
-    friendRequest: 'Заявка в друзья',
-    invite: 'Приглашение',
-    requestInvite: 'Запрос приглашения',
-    inviteResponse: 'Ответ на приглашение',
-    requestInviteResponse: 'Ответ на запрос',
-    'group.announcement': 'Объявление группы',
-    'group.event.created': 'Новое событие группы',
-    'group.event.starting': 'Событие группы скоро начнётся',
-    'event.announcement': 'Объявление мероприятия',
-    'group.invite': 'Приглашение в группу',
-    'group.joinRequest': 'Запрос в группу',
-    groupAnnouncement: 'Объявление группы',
-  })[type] || 'Уведомление VRChat';
-function GroupEventNotices() {
-  const ctx = useApp();
-  const upcoming = ctx.calendarSync.events.filter((event) => Date.parse(event.startsAt || event.startDate || '') > Date.now()).sort((a,b) => Date.parse(a.startsAt || a.startDate || '') - Date.parse(b.startsAt || b.startDate || ''));
-  if (ctx.demo) return null;
-  return <section className="section group-event-notices">
-    <div className="section-heading"><h2>Предстоящие события групп</h2><button className="text-button" disabled={ctx.calendarSync.loading} onClick={ctx.calendarSync.refresh}>Обновить события</button></div>
-    {ctx.calendarSync.error && <ErrorState error={ctx.calendarSync.error} retry={ctx.calendarSync.refresh} />}
-    <p className="muted small">Синхронизация раз в 5 минут при открытом приложении.{ctx.calendarSync.lastSync ? ` Последняя: ${new Date(ctx.calendarSync.lastSync).toLocaleString('ru')}.` : ''}</p>
-    {ctx.calendarSync.loading && !upcoming.length ? <Loading /> : !upcoming.length ? <p className="muted">Предстоящих событий в полученных данных нет.</p> : upcoming.slice(0, 8).map((event) => <button key={event.id} className="card group-event-notice" onClick={() => ctx.openCalendarEvent(event)}><CalendarDays size={19} /><span><strong>{event.title || event.name || 'Событие группы'}</strong><small>{event.group?.name || event.groupId || 'Группа'} · {new Date(event.startsAt || event.startDate!).toLocaleString('ru')}</small>{event.description && <small className="group-event-excerpt">{event.description}</small>}</span><ChevronRight size={17} /></button>)}
-  </section>;
-}
-function NotificationsPage() {
-  const ctx = useApp(),
-    [offset, setOffset] = useState(0),
-    [items, setItems] = useState<Notification[]>([]),
-    [response, setResponse] = useState<Notification | null>(null),
-    [text, setText] = useState('');
-  const scope = `${ctx.pageActive !== false}:${ctx.refresh}:${ctx.notificationsRefresh}:${offset}`;
-  const observation = useRef({ scope, generation: 0 });
-  if (observation.current.scope !== scope) observation.current = { scope, generation: observation.current.generation + 1 };
-  const load = useLoad(
-    async () => {
-      if (ctx.demo) return {items: [
-            {
-              id: 'demo_invite',
-              type: 'invite',
-              senderUsername: 'Luna',
-              senderUserId: 'usr_1',
-              message: 'Присоединяйся, мы на крыше! ✦',
-              created_at: new Date().toISOString(),
-              details: { worldId: 'wrld_demo1:demo' },
-            },
-          ] as Notification[], hasMore: false};
-      const generation = observation.current.generation;
-      const isCurrent = () => observation.current.generation === generation;
-      const page = await api.notificationPage(offset, isCurrent);
-      if (!isCurrent()) return { items: [], hasMore: false };
-      // Modern V2 is a recent snapshot. Refresh it even while older V1 pages are open.
-      const head = offset ? (await api.notificationPage(0, isCurrent)).items : [];
-      return { items: [...head, ...page.items], hasMore: page.hasMore };
-    },
-    [ctx.refresh, ctx.notificationsRefresh, offset],
-  );
-  useEffect(() => {
-    if (load.data)
-      setItems((p) =>
-        offset === 0
-          ? load.data!.items
-          : Array.from(new Map([...p, ...load.data!.items].map((n) => [n.id, n])).values()),
-      );
-  }, [load.data]);
-  const action = (operation: () => Promise<unknown>, success: string, id: string) =>
-    void ctx.act(async () => {
-      await operation();
-      setItems((p) => p.filter((i) => i.id !== id));
-    }, success);
-  const locationOf = (n: Notification) => {
-    const d = n.details || {};
-    const raw = String(d.worldId || d.instanceId || '');
-    return raw.startsWith('wrld_') ? raw : '';
-  };
-  return (
-    <>
-      <PageHeader
-        eyebrow="НЕ ПРОПУСТИТЕ"
-        title="Уведомления"
-        subtitle="Приглашения, друзья и события групп"
-      />
-      <GroupEventNotices />
-      {load.loading && !items.length ? (
-        <Loading />
-      ) : load.error ? (
-        <ErrorState error={load.error} retry={load.reload} />
-      ) : !items.length ? (
-        <Empty
-          title="Вы всё посмотрели"
-          text="Новые приглашения и заявки появятся здесь."
-          icon={<Bell size={32} />}
-        />
-      ) : (
-        <div className="notification-list">
-          {items.map((n) => (
-            <article className="card notification-card" key={n.id}>
-              <div className="notification-icon">
-                {n.type === 'friendRequest' ? (
-                  <Users size={21} />
-                ) : n.type.includes('group') ? (
-                  <Globe2 size={21} />
-                ) : (
-                  <Send size={21} />
-                )}
-              </div>
-              <div className="notification-body">
-                <div className="notification-meta">
-                  <Badge>{notificationLabel(n.type)}</Badge>
-                  <time>
-                    {n.created_at || n.createdAt ? new Date(n.created_at || n.createdAt!).toLocaleString('ru', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }) : 'Время не передано'}
-                  </time>
-                </div>
-                <button
-                  className="text-button person-link"
-                  onClick={() => n.senderUserId && ctx.openUser(n.senderUserId)}
-                >
-                  {n.senderUsername || 'VRChat'}
-                </button>
-                <p>{n.message || 'Новое событие в вашем аккаунте.'}</p>
-                <div className="detail-actions">
-                  {['friendRequest', 'group.invite', 'group.joinRequest'].includes(n.type) && (
-                    <button
-                      className="button primary compact"
-                      onClick={() =>
-                        action(
-                          async () => { await api.acceptNotification(n, ctx.user.location); if (n.type === 'friendRequest' && n.senderUserId) ctx.history.recordFriendAction(n.senderUserId, n.senderUsername || n.senderUserId, 'friend-add'); },
-                          'Запрос принят',
-                          n.id,
-                        )
-                      }
-                    >
-                      Принять
-                    </button>
-                  )}
-                  {n.type === 'invite' && locationOf(n) && (
-                    <button
-                      className="button primary compact"
-                      onClick={() =>
-                        action(() => api.acceptNotification(n), 'Приглашение принято', n.id)
-                      }
-                    >
-                      Принять приглашение
-                    </button>
-                  )}
-                  {(n.type === 'invite' || n.type === 'requestInvite') && (
-                    <button className="button secondary compact" onClick={() => setResponse(n)}>
-                      Ответить
-                    </button>
-                  )}
-                  {n.type === 'requestInvite' && n.senderUserId && (
-                    <button
-                      className="button primary compact"
-                      onClick={() =>
-                        action(
-                          () => api.invite(n.senderUserId!, ctx.user.location || ''),
-                          'Приглашение отправлено',
-                          n.id,
-                        )
-                      }
-                    >
-                      Пригласить
-                    </button>
-                  )}
-                  {parseCalendarLink(n._link || n.link) && <button className="button secondary compact" onClick={() => {
-                    const link = parseCalendarLink(n._link || n.link)!;
-                    ctx.openCalendarEvent({ id: link.eventId, groupId: link.groupId, title: n.title || 'Событие группы' });
-                  }}>Открыть мероприятие</button>}
-                  {n.seen !== true && <button className="button secondary compact" onClick={() => void ctx.act(async () => { await api.readNotification(n); setItems((current) => current.map((item) => item.id === n.id ? {...item, seen:true} : item)); }, 'Уведомление прочитано')}>Прочитано</button>}
-                  <button
-                    className="button secondary compact"
-                    disabled={n.canDelete === false}
-                    title={n.canDelete === false ? 'VRChat не разрешает удаление этого уведомления' : undefined}
-                    onClick={() =>
-                      action(() => api.dismissNotification(n), 'Уведомление скрыто', n.id)
-                    }
-                  >
-                    {n.type === 'friendRequest' ? 'Отклонить' : 'Скрыть'}
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-      {load.data?.hasMore && (
-        <button className="button secondary load-more" disabled={load.loading} onClick={() => setOffset((o) => o + 100)}>
-          Загрузить ещё
-        </button>
-      )}
-      {response && (
-        <Modal title="Ответ на приглашение" onClose={() => setResponse(null)}>
-          <form
-            className="form-stack"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void ctx.act(async () => {
-                await api.respondToInvite(
-                  ctx.user.id,
-                  response.id,
-                  response.type as 'invite' | 'requestInvite',
-                  text,
-                );
-                setResponse(null);
-                setText('');
-              }, 'Ответ отправлен');
-            }}
-          >
-            <p className="muted">
-              Ответ использует шаблон VRChat и доступный слот. Частоту изменений ограничивает
-              VRChat.
-            </p>
-            <label className="field">
-              Ваш ответ
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={64}
-                required
-              />
-            </label>
-            <button className="button primary" type="submit">
-              Отправить
-            </button>
-          </form>
-        </Modal>
-      )}
-    </>
-  );
-}
 function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
   const { user, demo } = useApp();
   const options: {
@@ -1140,7 +908,6 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
     color: string;
   }[] = [
     { id: 'charts', title: 'Диаграммы', text: 'Время, встречи и известные связи', icon: Activity, color: 'purple' },
-    { id: 'gameLog', title: 'Журнал игры', text: 'Наблюдения миров и встреч', icon: Radio, color: 'green' },
     { id: 'feed', title: 'Лента', text: 'История наблюдаемых событий', icon: Activity, color: 'purple' },
     { id: 'locations', title: 'Friends Locations', text: 'Друзья по мирам и инстансам', icon: MapPin, color: 'green' },
     { id: 'favorites', title: 'Избранное', text: 'Друзья, миры и аватары', icon: Star, color: 'peach' },

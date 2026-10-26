@@ -191,7 +191,7 @@ function ProfileLocationContent({ user }: { user: User }) {
   );
   return <section className="inset-panel user-location" aria-label="Текущий инстанс">
     <h3><Globe2 size={17} /> Текущий инстанс</h3>
-    <button className="user-location-world" aria-label={`Открыть мир ${world?.name || worldId}`} onClick={() => ctx.openWorld(world || worldId!)}>
+    <button className="user-location-world" aria-label={`Открыть мир ${world?.name || worldId}`} onClick={() => ctx.openWorld(world || worldId!, location)}>
       {world && <SecureImage src={imageOf(world)} alt="" />}
       <span><strong>{world?.name || worldId}</strong><small>{instanceType(location, asString(instance.type), asString(instance.groupAccessType))}
         {count !== undefined ? ` · ${count}${capacity !== undefined ? `/${capacity}` : ''} участников` : ''}

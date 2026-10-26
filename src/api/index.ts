@@ -4,6 +4,8 @@ import { normalizeCalendarEvent, normalizeCalendarPage } from './calendar';
 import { instanceCreationOptions } from './instances';
 import { normalizeFriendPresence } from './friends';
 import { normalizeGroups } from './groups';
+import { boopPayload } from './boop';
+import type { BoopSelection } from './boop';
 import type { NativeBridge, NativeResponse } from './native';
 import type {
   Avatar,
@@ -507,8 +509,9 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
     },
     user: (id: string) => request<User>('/users/' + segment(id)),
     userProfile: (id: string) => request<Record<string, unknown>>('/profile/' + segment(id)),
-    async boop(id: string): Promise<void> {
-      const response = await request<unknown>('/users/' + segment(id) + '/boop', 'POST', {});
+    boopInventory: (offset = 0) => list<InventoryItem>('/inventory' + query({ types: 'emoji', archived: false, n: 100, offset })),
+    async boop(id: string, selection?: BoopSelection): Promise<void> {
+      const response = await request<unknown>('/users/' + segment(id) + '/boop', 'POST', boopPayload(selection));
       const success = record(record(response)?.success);
       if (!success || (typeof success.status_code === 'number' && (success.status_code < 200 || success.status_code >= 300)))
         throw new ApiError('VRChat не подтвердил отправку Boop. Обновите профиль перед повторной попыткой.');
@@ -577,16 +580,15 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
     createInstance: (options: CreateInstanceOptions) =>
       request<Instance>('/instances', 'POST', instanceCreationOptions(options)),
     inviteSelf: (location: string) =>
-      request('/instances/' + instancePathSegment(location) + '/invite', 'POST', {}),
+      request('/invite/myself/to/' + instancePathSegment(location), 'POST', {}),
     invite: (id: string, location: string, messageSlot?: number) =>
       request('/invite/' + segment(id), 'POST', {
         instanceId: requireLocation(location),
-        worldId: location.split(':')[0],
         ...(messageSlot === undefined ? {} : { messageSlot }),
       }),
-    requestInvite: (id: string, messageSlot?: number) =>
+    requestInvite: (id: string, requestSlot?: number) =>
       request('/requestInvite/' + segment(id), 'POST', {
-        ...(messageSlot === undefined ? { instanceId: '' } : { messageSlot }),
+        ...(requestSlot === undefined ? {} : { requestSlot }),
       }),
     async groups(userId: string): Promise<Group[]> {
       return normalizeGroups(await list<Group>('/users/' + segment(userId) + '/groups')).map((group) => ({

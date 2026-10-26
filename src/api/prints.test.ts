@@ -41,4 +41,8 @@ describe('Print response media', () => {
     ).toBe('2026-10-20T12:00:00Z');
     expect(printDate({ id: 'prnt_synthetic' })).toBeUndefined();
   });
+  it('does not present a thumbnail-only response as a downloadable original', () => {
+    const thumbnail = 'https://file-variants.vrchat.com/thumbnail.png';
+    expect(printMedia({ id: 'prnt_preview', thumbnailImageUrl: thumbnail })).toEqual({ original: '', thumbnail });
+  });
 });

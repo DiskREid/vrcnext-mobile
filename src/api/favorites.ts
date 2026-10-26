@@ -62,7 +62,7 @@ export function createFavoritesClient(request: Request = api.request) {
   async function add(favoriteId: string, type: FavoriteType, tags: string[]): Promise<Favorite> {
     if (!tags.length || tags.some((t) => !t)) throw new ApiError('Выберите коллекцию избранного.');
     const result = await request<Favorite>('/favorites', 'POST', { type, favoriteId, tags });
-    if (!result || typeof result.id !== 'string' || !result.id || result.favoriteId !== favoriteId || result.type !== type || !Array.isArray(result.tags))
+    if (!result || typeof result.id !== 'string' || !result.id || result.favoriteId !== favoriteId || result.type !== type || !Array.isArray(result.tags) || !sameTags(result.tags, tags))
       throw new ApiError('VRChat не вернул подтверждение записи избранного. Обновите список перед повторной попыткой.');
     return result;
   }
@@ -75,9 +75,11 @@ export function createFavoritesClient(request: Request = api.request) {
     }
     return add(original.favoriteId, original.type, [...original.tags]);
   }
-  async function move(original: Favorite, destination: string, destinationType: FavoriteType = original.type): Promise<Favorite> {
-    if (!destination) throw new ApiError('Выберите коллекцию назначения.');
-    if (original.type === destinationType && sameTags(original.tags, [destination])) return original;
+  async function setTags(original: Favorite, destination: string[], destinationType: FavoriteType = original.type): Promise<Favorite | undefined> {
+    const tags = [...new Set(destination)];
+    if (tags.some((tag) => !tag)) throw new ApiError('Выберите коллекцию избранного.');
+    if (original.type === destinationType && sameTags(original.tags, tags)) return original;
+    if (!tags.length) { await remove(original.id); return undefined; }
     try { await remove(original.id); }
     catch (error) {
       if (!(error instanceof ApiError) || error.status !== 0) throw error;
@@ -88,7 +90,7 @@ export function createFavoritesClient(request: Request = api.request) {
       // The read-back proves that the DELETE committed; complete the originally requested move.
     }
     try {
-      return await add(original.favoriteId, destinationType, [destination]);
+      return await add(original.favoriteId, destinationType, tags);
     } catch (error) {
       // A timed-out POST may already have committed. Read the server before compensating.
       let current: Favorite | undefined;
@@ -96,7 +98,7 @@ export function createFavoritesClient(request: Request = api.request) {
       catch {
         throw new FavoriteMoveError(`Перемещение не подтверждено: ${detail(error)} Не удалось проверить запись. Обновите список; исходные категории сохранены для восстановления.`, original, false, true);
       }
-      if (current && current.type === destinationType && sameTags(current.tags, [destination])) return current;
+      if (current && current.type === destinationType && sameTags(current.tags, tags)) return current;
       if (current) {
         throw new FavoriteMoveError(current.type === original.type && sameTags(current.tags, original.tags)
           ? `Мир/пользователь/аватар остался в исходных категориях: ${detail(error)}`
@@ -109,11 +111,15 @@ export function createFavoritesClient(request: Request = api.request) {
       throw new FavoriteMoveError(`Перемещение не выполнено: ${detail(error)} Исходные категории восстановлены.`, original, true, false);
     }
   }
+  async function move(original: Favorite, destination: string, destinationType: FavoriteType = original.type): Promise<Favorite> {
+    if (!destination) throw new ApiError('Выберите коллекцию назначения.');
+    return (await setTags(original, [destination], destinationType))!;
+  }
   async function updateGroup(ownerId: string, group: FavoriteGroup, displayName: string, visibility: FavoriteVisibility) {
     if (!displayName.trim()) throw new ApiError('Введите название коллекции.');
     return request('/favorite/group/' + [group.type, group.name, ownerId].map(enc).join('/'), 'PUT', { displayName: displayName.trim(), visibility });
   }
-  return { groups, favorites, familyFavorites, metadata, add, remove, move, recover, updateGroup };
+  return { groups, favorites, familyFavorites, metadata, add, remove, move, setTags, recover, updateGroup };
 }
 
 export const favoriteApi = createFavoritesClient();

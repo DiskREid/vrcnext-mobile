@@ -29,6 +29,18 @@ describe('observed friend history',()=>{
     expect(history.observePipeline({type:'friend-online',content:{userId:alice.id,location:alice.location}},[alice],self)).toEqual([]);
     expect(history.observePipeline({type:'friend-offline',content:{userId:alice.id}},[alice],self)).toMatchObject([{kind:'offline'}]);
   });
+  it('does not suppress a new game login after website activity or invent an exit from website logout',()=>{
+    const history=observer();
+    expect(history.observePipeline({type:'friend-online',content:{userId:alice.id,location:alice.location}},[alice],self)).toMatchObject([{kind:'online'}]);
+    expect(history.observePipeline({type:'friend-active',content:{userId:alice.id}},[alice],self)).toEqual([]);
+    expect(history.observePipeline({type:'friend-offline',content:{userId:alice.id}},[{...alice,state:'active',location:'offline'}],self)).toEqual([]);
+    expect(history.observePipeline({type:'friend-online',content:{userId:alice.id,location:'wrld_b:2'}},[alice],self)).toMatchObject([{kind:'online'}]);
+  });
+  it('starts a fresh location baseline after a game-to-website transition',()=>{
+    const history=observer();history.seedUsers([alice]);
+    history.observePipeline({type:'friend-active',content:{userId:alice.id}},[alice],self);
+    expect(history.observePipeline({type:'friend-location',content:{userId:alice.id,location:'wrld_a:2'}},[alice],self)).toMatchObject([{kind:'world',before:'',after:'wrld_a:2'}]);
+  });
   it('distinguishes moving to another instance of the same world from another world',()=>{
     const history=observer();history.seedUsers([alice]);
     expect(history.observePipeline({type:'friend-location',content:{userId:alice.id,location:'wrld_a:2',user:{displayName:'Alice'}}},[alice],self)).toMatchObject([{kind:'instance',worldId:'wrld_a',before:'wrld_a:1',after:'wrld_a:2'}]);
