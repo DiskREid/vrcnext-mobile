@@ -360,37 +360,37 @@
           "name": "README.md",
           "bytes": 4743,
           "sha256": "edc07f77a3340b44b06326bf1e82adb574d59803e0b616b36fad87d71237c7ac",
-          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-7a6cb331b44bd99233f0/README.md"
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.6/README.md"
         },
         {
           "name": "SHA256SUMS.txt",
           "bytes": 6739,
           "sha256": "e8caea07ea12a0391ee500cb74389ad15b958be1e1604bc3579bf0763abe0b5e",
-          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-7a6cb331b44bd99233f0/SHA256SUMS.txt"
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.6/SHA256SUMS.txt"
         },
         {
           "name": "VRCNext-Mobile-0.2.6-source.zip",
           "bytes": 1422942,
           "sha256": "7d02164f85fcfb1e67948ab8fa49b7672ebd732eccdd6f339ec6110517a3cb22",
-          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-7a6cb331b44bd99233f0/VRCNext-Mobile-0.2.6-source.zip"
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.6/VRCNext-Mobile-0.2.6-source.zip"
         },
         {
           "name": "VRCNext-Mobile-0.2.6.apk",
           "bytes": 5627945,
           "sha256": "143bf004983238b88c1abcf317e5b2787982756ad658c7861ac1c47f82330c7b",
-          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-7a6cb331b44bd99233f0/VRCNext-Mobile-0.2.6.apk"
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.6/VRCNext-Mobile-0.2.6.apk"
         },
         {
           "name": "validation.json",
           "bytes": 1631,
           "sha256": "e1667c4f1c6f7b2afdf5fe3a43b6afe2ecc860731829fa84a03b2eed330141c7",
-          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-7a6cb331b44bd99233f0/validation.json"
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.6/validation.json"
         },
         {
           "name": "release-files.zip",
           "bytes": 9210816,
           "sha256": "97c1fe39217e6e895d9ef09b48f5ca7b91dd221e9d73d4893fd7059a43f25ca0",
-          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/untagged-7a6cb331b44bd99233f0/release-files.zip"
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.6/release-files.zip"
         }
       ]
     }
