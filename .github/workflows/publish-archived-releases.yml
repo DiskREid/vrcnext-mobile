@@ -1,0 +1,41 @@
+name: Publish archived APK releases
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-archived-releases.yml
+      - scripts/publish-archived-releases.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-archived-releases
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check archives
+        run: python3 scripts/publish-archived-releases.py --check
+      - name: Publish and verify assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/publish-archived-releases.py
+      - name: Record verified publication
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add releases/github-publication.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record verified GitHub Releases publication [skip ci]'
+            git push origin HEAD:main
+          fi
