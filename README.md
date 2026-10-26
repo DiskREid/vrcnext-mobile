@@ -131,9 +131,11 @@ Keystore и устройством требует отдельного приё�
 
 ## Скачать готовую сборку
 
-- [Скачать APK 0.2.5](https://github.com/DiskREid/vrcnext-mobile/raw/refs/heads/main/releases/v0.2.5/VRCNext-Mobile-0.2.5.apk)
-- [Скачать архив исходников](https://github.com/DiskREid/vrcnext-mobile/raw/refs/heads/main/releases/v0.2.5/VRCNext-Mobile-0.2.5-source.zip)
-- [SHA256](releases/v0.2.5/SHA256SUMS.txt) · [Снимки интерфейса](releases/v0.2.5/screenshots)
+[Все версии в GitHub Releases](https://github.com/DiskREid/vrcnext-mobile/releases).
+
+- [Скачать APK 0.2.5](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.5/VRCNext-Mobile-0.2.5.apk)
+- [Скачать архив исходников](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.5/VRCNext-Mobile-0.2.5-source.zip)
+- [SHA256](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.5/SHA256SUMS.txt) · [Снимки интерфейса](releases/v0.2.5/screenshots)
 
 APK, архив и снимки находятся в каталоге `releases/v0.2.5` этого репозитория.
 Это тестовая debug-сборка. Реальный вход в VRChat и операции аккаунта на телефоне
