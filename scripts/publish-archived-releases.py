@@ -149,6 +149,16 @@ def main():
                 assets.append({'name': path.name, 'bytes': len(data), 'sha256': sha(data), 'url': asset['browser_download_url']})
         if release['draft']:
             release = request(api + f'/releases/{release["id"]}', 'PATCH', {'draft': False, 'make_latest': 'true' if folder == plan[-1][0] else 'false'})
+            # Draft uploads use temporary untagged URLs. Read the published URLs
+            # after GitHub has assigned the actual version tag.
+            published = request(api + f'/releases/{release["id"]}/assets?per_page=100') or []
+            for item in assets:
+                current = next((asset for asset in published if asset['name'] == item['name']), None)
+                if not current or current['size'] != item['bytes']:
+                    raise RuntimeError(f'Published asset missing: {tag}/{item["name"]}')
+                if current.get('digest') and current['digest'] != 'sha256:' + item['sha256']:
+                    raise RuntimeError(f'Published asset changed: {tag}/{item["name"]}')
+                item['url'] = current['browser_download_url']
         records.append({'tag': tag, 'targetCommit': commit, 'url': release['html_url'], 'assets': assets})
         print(f'Verified {tag}: {len(assets)} assets', flush=True)
     (ROOT / 'releases/github-publication.json').write_text(json.dumps({'repository': repository, 'releases': records}, ensure_ascii=False, indent=2) + '\n')
