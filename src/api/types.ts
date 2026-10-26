@@ -82,7 +82,9 @@ export interface Group {
   rules?: string;
   joinState?: string;
   membershipStatus?: string;
-  myMember?: { membershipStatus?: string; roleIds?: string[]; mRoleIds?: string[]; permissions?: string[] };
+  mutualGroup?: boolean;
+  isMember?: boolean;
+  myMember?: { id?: string; membershipStatus?: string; roleIds?: string[]; mRoleIds?: string[]; permissions?: string[] } | null;
   roles?: { id: string; name: string; defaultRole?: boolean; permissions?: string[] }[];
   languages?: string[];
   links?: string[];

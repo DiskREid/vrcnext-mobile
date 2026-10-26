@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Profile common groups transport regression fixture only</title></head>
+<body><div id="root"></div><script type="module">
+// Synthetic contract examples only. This test entry is never bundled into the APK.
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import '/src/styles.css';
+const {api,createApi}=await import('/src/api/index.ts');
+const picture='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const selfId='usr_11111111-1111-4111-8111-111111111111';
+const friendId='usr_22222222-2222-4222-8222-222222222222';
+const ids={early:'grp_11111111-1111-4111-8111-111111111111',late:'grp_22222222-2222-4222-8222-222222222222',pending:'grp_33333333-3333-4333-8333-333333333333',other:'grp_44444444-4444-4444-8444-444444444444',hidden:'grp_55555555-5555-4555-8555-555555555555'};
+const group=(id,name)=>({id,name,iconUrl:picture,memberCount:42,description:'Synthetic group membership regression.'});
+const early=group(ids.early,'Synthetic Shared Early');
+const late=group(ids.late,'Synthetic Shared Nested');
+const pending=group(ids.pending,'Synthetic Pending Membership');
+const other=group(ids.other,'Synthetic Friend Only');
+const hidden=group(ids.hidden,'Synthetic Shared Hidden');
+const scenario=new URLSearchParams(location.search).get('scenario')||'paged';
+const friend={id:friendId,displayName:'Synthetic Group Friend',location:'offline',state:'offline',status:'ask me',isFriend:true,currentAvatarThumbnailImageUrl:picture,tags:[]};
+const visibleGroups=[{...early,mutualGroup:true,id:'grpm_target-early',groupId:early.id},{id:'grpm_target-nested',groupId:late.id,group:late},pending,other];
+const ownGroups=[{...early,id:'grpm_self-early',groupId:early.id,membershipStatus:'member'},{id:'grpm_self-nested',groupId:late.id,membershipStatus:'member',group:late},{...pending,id:'grpm_self-pending',groupId:pending.id,membershipStatus:'requested'},{...hidden,id:'grpm_self-hidden',groupId:hidden.id,membershipStatus:'member'}];
+const firstMutual=[{...early,id:'grpm_mutual-early',groupId:early.id},...Array.from({length:99},(_,index)=>group('grp_extra-'+index,'Synthetic Mutual '+index))];
+let releaseGroup;
+window.__profileGroupsTest={requests:[],unexpected:[],actions:[],scenario,ids,selfId,friendId,holdGroupNext:false,heldGroup:false,memberOverrides:{},releaseGroup:()=>releaseGroup?.()};
+const transport={async request(options){
+ window.__profileGroupsTest.requests.push({path:options.path,method:options.method||'GET'});
+ const url=new URL(options.path,'https://synthetic.invalid');
+ if(url.pathname===`/users/${friendId}`)return{status:200,data:friend};
+ if(url.pathname===`/profile/${friendId}`)return{status:200,data:{id:friendId,bio:'Synthetic profile groups fixture.'}};
+ if(url.pathname===`/users/${friendId}/groups`)return{status:200,data:visibleGroups};
+ if(url.pathname===`/users/${selfId}/groups`)return scenario==='unavailable'?{status:503,data:{error:{message:'Synthetic own group list unavailable'}}}:{status:200,data:ownGroups};
+ if(url.pathname===`/users/${friendId}/mutuals/groups`){
+  if(scenario==='denied'||scenario==='unavailable')return{status:403,data:{error:{message:'Synthetic mutual groups unavailable'}}};
+  const offset=Number(url.searchParams.get('offset')||0);
+  return{status:200,data:offset===0?firstMutual:offset===100?[{id:'grpm_mutual-hidden',groupId:hidden.id,group:hidden}]:[]};
+ }
+ if(url.pathname.startsWith('/groups/')){
+  const id=decodeURIComponent(url.pathname.slice('/groups/'.length));
+  const value=[early,late,pending,other,hidden].find(item=>item.id===id);
+  if(value){
+   const member=Object.hasOwn(window.__profileGroupsTest.memberOverrides,id)?window.__profileGroupsTest.memberOverrides[id]:{membershipStatus:id===ids.pending?'requested':id===ids.other&&scenario!=='recheck'?'none':'member'};
+   const data={...value,myMember:member};
+   if(window.__profileGroupsTest.holdGroupNext){window.__profileGroupsTest.holdGroupNext=false;window.__profileGroupsTest.heldGroup=true;await new Promise(resolve=>{releaseGroup=resolve;});window.__profileGroupsTest.heldGroup=false;}
+   return{status:200,data};
+  }
+ }
+ window.__profileGroupsTest.unexpected.push(options.path);
+ return{status:500,data:{error:{message:'Unexpected synthetic group route'}}};
+},sessionState:async()=>({hasAuth:false}),clearSession:async()=>{},disconnectPipeline:async()=>{}};
+Object.assign(api,createApi(transport));
+const {AppProvider}=await import('/src/state.tsx');
+const {UserDetails}=await import('/src/pages/Details.tsx');
+const {GroupDetail}=await import('/src/pages/Explore.tsx');
+const noop=()=>{};
+const history={events:[],visits:[],sessions:[],loading:false,error:'',observePipeline:noop,observeProfile:noop,seedUsers:noop,recordModeration:noop,recordFriendAction:noop,retry:noop,clear:async()=>{},pause:noop,observeSession:noop,friendStats:()=>({encounters:0,totalMs:0})};
+function Fixture(){
+ const [selectedGroup,setSelectedGroup]=React.useState();
+ const [revision,setRevision]=React.useState(0);
+ const openGroup=value=>{window.__profileGroupsTest.actions.push({type:'group',id:value.id});setSelectedGroup(value);};
+ const value={user:{id:selfId,displayName:'Synthetic Self',location:'offline',state:'offline',status:'active'},onUserUpdated:noop,demo:false,online:true,refresh:revision,pageActive:true,notificationsRefresh:0,friends:{data:[friend],loading:false,refreshing:false,error:'',apply:noop,reload:noop},history,calendarSync:{events:[],reminders:[],loading:false,error:'',refresh:noop,dismissReminder:noop},observation:{status:'active',error:'',refresh:noop},notify:noop,act:async operation=>operation(),openUser:noop,openWorld:noop,openGroup,openCalendarEvent:noop,onRefresh:()=>setRevision(previous=>previous+1),logout:noop,activity:[]};
+ return React.createElement(AppProvider,{value},React.createElement('div',{className:'app-shell'},React.createElement('main',{className:'main-content'},React.createElement('h1',null,'Synthetic profile groups fixture')),React.createElement(UserDetails,{target:friendId,onClose:noop}),selectedGroup&&React.createElement(GroupDetail,{initial:selectedGroup,onClose:()=>setSelectedGroup(undefined),onChanged:()=>setRevision(previous=>previous+1)})));
+}
+createRoot(document.getElementById('root')).render(React.createElement(Fixture));
+</script></body></html>

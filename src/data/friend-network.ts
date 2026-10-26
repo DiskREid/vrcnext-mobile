@@ -1,4 +1,6 @@
 import type { User } from '../api';
+import { presenceMode } from './presence';
+import type { PresenceMode } from './presence';
 
 export interface GraphPerson {
   id: string;
@@ -19,6 +21,8 @@ export interface GraphNode extends GraphPerson {
   self: boolean;
   friend: boolean;
   component: number;
+  /** Current friend data only; saved graph labels cannot establish live presence. */
+  presence: PresenceMode;
 }
 export interface GraphEdge {
   source: string;
@@ -90,6 +94,7 @@ function observation(value: unknown): GraphObservation | undefined {
 export function buildKnownGraph(self: User, friends: User[], observations: GraphObservation[]): KnownGraph {
   const people = new Map<string, GraphPerson>();
   const friendIds = new Set<string>();
+  const liveFriends = new Map(friends.map((friend) => [friend.id, friend]));
   const edges = new Map<string, GraphEdge>();
   const own = normalizeGraphPerson(self);
   if (!own) return { nodes: [], edges: [] };
@@ -144,9 +149,24 @@ export function buildKnownGraph(self: User, friends: User[], observations: Graph
     component++;
   }
   return {
-    nodes: ordered.map((id) => ({ ...people.get(id)!, self: id === own.id, friend: friendIds.has(id), component: components.get(id) ?? -1 })),
+    nodes: ordered.map((id) => ({
+      ...people.get(id)!, self: id === own.id, friend: friendIds.has(id), component: components.get(id) ?? -1,
+      // /auth/user.state is always offline: only its disclosed game location proves self presence.
+      presence: id === own.id ? presenceMode(self) === 'game' ? 'game' : 'unknown'
+        : liveFriends.has(id) ? presenceMode(liveFriends.get(id)!) : 'unknown',
+    })),
     edges: [...edges.values()].sort((a, b) => compare(a.source, b.source) || compare(a.target, b.target)),
   };
+}
+
+/** Direct known neighbors only: selecting a person must not invent links among their friends. */
+export function knownConnections(graph: KnownGraph, userId: string): GraphNode[] {
+  const neighbors = new Set<string>();
+  for (const edge of graph.edges) {
+    if (edge.source === userId) neighbors.add(edge.target);
+    if (edge.target === userId) neighbors.add(edge.source);
+  }
+  return graph.nodes.filter((node) => neighbors.has(node.id));
 }
 
 export function isObservationFresh(value: GraphObservation, now = Date.now()): boolean {

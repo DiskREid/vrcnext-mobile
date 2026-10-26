@@ -1,5 +1,6 @@
 import { api, unwrapList, ApiError } from './index';
 import type { Avatar, Group, User, World } from './types';
+import { normalizeGroups } from './groups';
 
 export type JsonRecord = Record<string, unknown>;
 export const asRecord = (value: unknown): JsonRecord =>
@@ -171,7 +172,7 @@ export function createProfileData(request: typeof api.request) {
 export const profileData = createProfileData(api.request);
 
 export function normalizeProfileGroups(groups: Group[]): Group[] {
-  return groups.map((group) => ({ ...group, id: group.groupId || group.id }));
+  return normalizeGroups(groups);
 }
 
 export function profileDate(value: unknown): string {

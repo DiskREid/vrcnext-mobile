@@ -27,6 +27,7 @@ import { clearFavoriteEntityCache, loadFavoriteGroups, loadFavoriteWorlds, loadF
 import { FavoriteCategoryPicker, demoFavoriteGroups } from './Favorites';
 import { InstanceFriends } from '../components/WorldInstances';
 import { disclosedInstanceLocation } from '../data/world-instances';
+import { groupMembership } from '../api/groups';
 import { friendsInInstance, instanceCount } from '../data/instance-location';
 import {
   AvatarImage,
@@ -398,13 +399,12 @@ export function GroupDetail({
   const [busy, setBusy] = useState(false);
   const detail = useLoad(async () => (demo ? initial : api.group(initial.id)), [initial.id, demo]);
   const group = detail.data || initial;
-  const raw = record(group),
-    member = record(raw.myMember);
-  const joined =
-    text(
-      member.membershipStatus,
-      text(raw.membershipStatus, text(record(initial).membershipStatus)),
-    ) === 'member' || Boolean(raw.isMember);
+  const raw = record(group);
+  // Once loaded, the server's explicit member/null/pending state replaces initial card evidence.
+  const membership = groupMembership(group);
+  const joined = membership === 'member';
+  const membershipPending = membership === 'requested';
+  const membershipUnknown = membership === 'unknown';
   const posts = usePaged<GroupPost>(
     async (offset) =>
       tab !== 'posts'
@@ -447,6 +447,8 @@ export function GroupDetail({
     await act(
       async () => {
         const result = await (remove ? api.leaveGroup(initial.id) : api.joinGroup(initial.id));
+        // A confirmed mutation invalidates the initial card immediately; never offer a second join/leave from old data.
+        detail.setData({ ...group, myMember: remove ? null : undefined, membershipStatus: remove ? 'inactive' : text(record(result).membershipStatus), isMember: remove ? false : undefined, mutualGroup: false });
         detail.reload();
         onChanged();
         setLeave(false);
@@ -475,11 +477,11 @@ export function GroupDetail({
       <div className="detail-actions">
         <button
           className={`button ${joined ? 'secondary' : ''}`}
-          disabled={busy}
+          disabled={busy || detail.loading || membershipUnknown || membershipPending || membership === 'blocked'}
           onClick={() => (joined ? setLeave(true) : void changeMembership(false))}
         >
           {joined ? <Check size={17} /> : <Plus size={17} />}
-          {joined ? 'Вы участник · выйти' : 'Вступить в группу'}
+          {joined ? 'Вы участник · выйти' : membershipUnknown ? detail.loading ? 'Проверяем участие…' : 'Участие не подтверждено' : membershipPending ? 'Запрос отправлен' : membership === 'blocked' ? 'Вступление недоступно' : membership === 'invited' ? 'Вы приглашены · вступить' : 'Вступить в группу'}
         </button>
       </div>
       {leave && (

@@ -23,6 +23,7 @@ import {
   safeProfileJson,
 } from '../api/profile-data';
 import type { JsonRecord, ProfileFavoriteGroup } from '../api/profile-data';
+import { commonProfileGroups, profileGroupForViewer } from '../api/groups';
 import { useApp, useLoad } from '../state';
 import { usePaged } from '../hooks/usePaged';
 import { disclosedUserLocation, instanceType } from '../data/locations';
@@ -296,22 +297,28 @@ function GroupsTab({ user }: { user: User }) {
   const all = useLoad(
     () =>
       ctx.demo ? Promise.resolve(demoGroups) : api.userGroups(user.id).then(normalizeProfileGroups),
-    [user.id, ctx.demo],
+    [user.id, ctx.demo, ctx.refresh],
+  );
+  const own = useLoad(
+    () => user.id === ctx.user.id ? Promise.resolve([]) : ctx.demo ? Promise.resolve(demoGroups) : api.userGroups(ctx.user.id),
+    [ctx.user.id, user.id, ctx.demo, ctx.refresh],
   );
   const mutual = usePaged<Group>(
     (offset) =>
       ctx.demo
         ? Promise.resolve(offset ? [] : demoGroups)
+        : user.id === ctx.user.id ? Promise.resolve([])
         : profileData.mutualGroups(user.id, offset),
-    [user.id, ctx.demo],
+    [user.id, ctx.user.id, ctx.demo],
     100,
+    ctx.refresh,
   );
-  const common = new Set(mutual.items.map((group) => group.id));
-  const groups = (mode === 'all' ? all.data || [] : mutual.items).filter((group) =>
+  const common = commonProfileGroups(all.data || [], user.id === ctx.user.id ? all.data || [] : own.data || [], mutual.items);
+  const groups = (mode === 'all' ? all.data || [] : common.groups).filter((group) =>
     group.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
   );
-  const error = mode === 'all' ? all.error : mutual.error,
-    loading = mode === 'all' ? all.loading : mutual.loading;
+  const membershipError = own.error || mutual.error;
+  const loading = mode === 'all' ? all.loading : all.loading || own.loading || mutual.loading;
   return (
     <div className="form-stack">
       <Segmented
@@ -327,13 +334,15 @@ function GroupsTab({ user }: { user: User }) {
         onChange={setSearch}
         placeholder="Поиск по группам пользователя"
       />
-      {error && <ErrorState error={error} retry={mode === 'all' ? all.reload : mutual.reload} />}
+      {all.error && <ErrorState error={all.error} retry={all.reload} />}
+      {own.error && <ErrorState error={own.error} retry={own.reload} />}
+      {mutual.error && <ErrorState error={mutual.error} retry={mutual.reload} />}
       {loading && !groups.length ? (
         <Loading />
       ) : (
         <>
           {groups.map((group) => (
-            <button className="list-row" key={group.id} onClick={() => ctx.openGroup(group)}>
+            <button className="list-row" key={group.id} onClick={() => ctx.openGroup(profileGroupForViewer(group, common.ids.has(group.id), user.id === ctx.user.id))}>
               <AvatarImage name={group.name} src={group.iconUrl} />
               <span>
                 <strong>{group.name}</strong>
@@ -343,14 +352,14 @@ function GroupsTab({ user }: { user: User }) {
                     : ''}
                 </small>
               </span>
-              {common.has(group.id) && (
+              {common.ids.has(group.id) && (
                 <Badge>
                   <Check size={12} /> Общая
                 </Badge>
               )}
             </button>
           ))}
-          {!groups.length && !error && <Empty title="Нет доступных групп" />}
+          {!groups.length && !all.error && !membershipError && <Empty title={mode === 'mutual' ? 'Нет доступных общих групп' : 'Нет доступных групп'} />}
         </>
       )}
       {mode === 'mutual' && (

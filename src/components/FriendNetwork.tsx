@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { App as AndroidApp } from '@capacitor/app';
 import type { PluginListenerHandle } from '@capacitor/core';
-import { GitBranch, Minus, Plus, RefreshCw, RotateCcw, Search, Square, Users } from 'lucide-react';
+import { ArrowUpRight, GitBranch, LocateFixed, Minus, Plus, RefreshCw, RotateCcw, Search, Square, Users, X } from 'lucide-react';
 import { api, isNative } from '../api';
-import { boundNetworkObservations, buildKnownGraph, isObservationFresh, readNetworkCache, scanMutualFriends, writeNetworkCache } from '../data/friend-network';
+import { boundNetworkObservations, buildKnownGraph, isObservationFresh, knownConnections, readNetworkCache, scanMutualFriends, writeNetworkCache } from '../data/friend-network';
 import type { GraphNode, GraphObservation } from '../data/friend-network';
 import { useApp } from '../state';
-import { Empty, ErrorState, SearchField } from './ui';
+import { AvatarImage, Empty, ErrorState, imageOf, SearchField, Segmented } from './ui';
 import './FriendNetwork.css';
 
 const colors = ['#b3a4ff', '#88d6bc', '#f0b28e', '#e4a8d2', '#85bdf3', '#e4ce85', '#8bd4dc', '#d5a8f1'];
@@ -20,6 +20,7 @@ const colorOf = (component: number) => colors[Math.abs(component) % colors.lengt
 const shortName = (value: string) => Array.from(value).length > 18 ? Array.from(value).slice(0, 17).join('') + '…' : value;
 const initials = (value: string) => Array.from(value).slice(0, 2).join('').toLocaleUpperCase();
 const dateLabel = (value: string) => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('ru', { dateStyle: 'short', timeStyle: 'short' }) : 'Дата неизвестна';
+const presenceText = (node: GraphNode) => node.self ? 'Вы' : ({ game: 'В VRChat', website: 'На сайте / в приложении', offline: 'Не в сети', unknown: 'Присутствие неизвестно' })[node.presence];
 
 /** Layout depends on identities and confirmed components, not changing presence/status fields. */
 function positions(nodes: GraphNode[]): PositionedNode[] {
@@ -35,25 +36,15 @@ function positions(nodes: GraphNode[]): PositionedNode[] {
       }),
     ];
   }
-  const groups = new Map<number, GraphNode[]>();
-  for (const node of nodes) if (!node.self) {
-    const group = groups.get(node.component) || [];
-    group.push(node); groups.set(node.component, group);
-  }
-  const components = [...groups.keys()].sort((a, b) => a - b);
-  const result: PositionedNode[] = self ? [{ ...self, x: 400, y: 300 }] : [];
-  components.forEach((component, index) => {
-    const members = groups.get(component)!;
-    const angle = index * Math.PI * 2 / Math.max(1, components.length) - Math.PI / 2;
-    const radius = components.length > 1 ? 190 : self ? 130 : 0;
-    const center = { x: 400 + Math.cos(angle) * radius, y: 300 + Math.sin(angle) * radius };
-    members.forEach((node, child) => {
-      const distance = members.length > 1 ? Math.min(150, 24 * Math.sqrt(child + 1)) : 0;
-      const childAngle = child * 2.399963229728653;
-      result.push({ ...node, x: center.x + Math.cos(childAngle) * distance, y: center.y + Math.sin(childAngle) * distance });
-    });
+  // Small neighborhoods need individually spaced names, not a tight component spiral.
+  const ordered = [...nodes.filter((node) => node.self), ...nodes.filter((node) => !node.self)];
+  const columns = ordered.length <= 4 ? 2 : 3;
+  const rows = Math.ceil(ordered.length / columns);
+  return ordered.map((node, index) => {
+    const row = Math.floor(index / columns);
+    const rowSize = Math.min(columns, ordered.length - row * columns);
+    return { ...node, x: 400 + (index % columns - (rowSize - 1) / 2) * 240, y: 300 + (row - (rows - 1) / 2) * 170 };
   });
-  return result;
 }
 
 /** Only explicit API checks add mutual edges. A first friend list proves only links to yourself. */
@@ -67,11 +58,14 @@ export function FriendNetwork() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [selected, setSelected] = useState('');
+  const [mode, setMode] = useState(() => window.matchMedia('(max-width: 600px)').matches ? 'list' : 'graph');
+  const [focusOnly, setFocusOnly] = useState(false);
   const [force, setForce] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [limit, setLimit] = useState(200);
   const [view, setView] = useState<Transform>(initialView);
+  const [canvasScale, setCanvasScale] = useState(1);
   const viewRef = useRef(view);
   const layoutRef = useRef<PositionedNode[]>([]);
   const generation = useRef(0);
@@ -88,15 +82,22 @@ export function FriendNetwork() {
   };
   const resetView = () => {
     const current = layoutRef.current;
-    if (current.length <= 12) { changeView(initialView); return; }
-    const left = Math.min(...current.map((node) => node.x)) - 70, right = Math.max(...current.map((node) => node.x)) + 70;
-    const top = Math.min(...current.map((node) => node.y)) - 70, bottom = Math.max(...current.map((node) => node.y)) + 85;
-    const scale = clamp(Math.min(1, 760 / (right - left), 560 / (bottom - top)), .15, 5);
-    changeView({ scale, x: 400 - (left + right) / 2 * scale, y: 300 - (top + bottom) / 2 * scale });
+    if (!current.length) { changeView(initialView); return; }
+    const bounds = svg.current?.getBoundingClientRect();
+    const width = bounds?.width || 800, height = bounds?.height || 600;
+    const ratio = Math.min(width / 800, height / 600);
+    setCanvasScale(ratio);
+    const left = Math.min(...current.map((node) => node.x)), right = Math.max(...current.map((node) => node.x));
+    const top = Math.min(...current.map((node) => node.y)), bottom = Math.max(...current.map((node) => node.y));
+    // Reserve real pixels for names and zoom controls even in the narrow portrait canvas.
+    const physicalScale = Math.min(1.5, (width - 130) / Math.max(1, right - left), (height - 155) / Math.max(1, bottom - top));
+    const scale = clamp(physicalScale / ratio, .15, 5);
+    const centerX = 400, centerY = (height / 2 + 15 - (height - 600 * ratio) / 2) / ratio;
+    changeView({ scale, x: centerX - (left + right) / 2 * scale, y: centerY - (top + bottom) / 2 * scale });
   };
   const cancelScan = () => { generation.current++; setBusy(false); setNotice('Проверка остановлена. Полученные ранее снимки сохранены.'); };
   useEffect(() => {
-    generation.current++; setBusy(false); setSelected(''); setCacheError(''); setScanError(''); setNotice('');
+    generation.current++; setBusy(false); setSelected(''); setFocusOnly(false); setCacheError(''); setScanError(''); setNotice('');
     setCache({ account, observations: [] });
     resetView();
     if (!ctx.demo) {
@@ -117,27 +118,59 @@ export function FriendNetwork() {
     return () => { retired = true; generation.current++; void handle?.remove(); document.removeEventListener('visibilitychange', visibility); };
   }, []);
   useEffect(() => { if (!ctx.online || ctx.pageActive === false) cancelScan(); }, [ctx.online, ctx.pageActive]);
-  useEffect(() => { setLimit(200); resetView(); }, [query, filter]);
+  useEffect(() => { setLimit(200); }, [query, filter]);
 
   const graph = useMemo(() => buildKnownGraph(ctx.user, ctx.friends.data, observations), [ctx.user, ctx.friends.data, observations]);
+  const selectedNode = graph.nodes.find((node) => node.id === selected);
+  const connections = knownConnections(graph, selected);
+  const neighborhood = new Set([selected, ...connections.map((node) => node.id)]);
+  const liveProfiles = new Map(ctx.friends.data.map((friend) => [friend.id, friend]));
+  const selectedProfile = liveProfiles.get(selected);
+  const degrees = new Map<string, number>();
+  for (const edge of graph.edges) {
+    degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+    degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+  }
   const needle = query.trim().toLocaleLowerCase();
-  const matches = graph.nodes.filter((node) => {
-    if (needle && !`${node.displayName} ${node.id} ${node.statusDescription || ''}`.toLocaleLowerCase().includes(needle)) return false;
+  const filtered = graph.nodes.filter((node) => {
     return filter === 'all' || filter === 'friends' && (node.friend || node.self)
-      || filter === 'online' && node.status !== undefined && node.status !== 'offline'
-      || filter === 'offline' && node.status === 'offline';
+      || filter === 'online' && (node.presence === 'game' || node.presence === 'website')
+      || filter === 'game' && node.presence === 'game' || filter === 'web' && node.presence === 'website'
+      || filter === 'offline' && node.presence === 'offline' || filter === 'unknown' && node.presence === 'unknown';
   });
-  const visible = [...matches.filter((node) => node.self), ...matches.filter((node) => !node.self)].slice(0, limit);
+  const matches = filtered.filter((node) => !needle || `${node.displayName} ${node.id} ${node.statusDescription || ''}`.toLocaleLowerCase().includes(needle));
+  // Search gives readable results without removing surrounding graph context.
+  const candidates = mode === 'list' ? matches : focusOnly && selectedNode ? graph.nodes.filter((node) => neighborhood.has(node.id)) : filtered;
+  const orderedCandidates = [...candidates.filter((node) => node.self), ...candidates.filter((node) => !node.self)];
+  const firstPage = orderedCandidates.slice(0, limit);
+  const visible = selectedNode && candidates.some((node) => node.id === selected) && !firstPage.some((node) => node.id === selected)
+    ? [...firstPage.slice(0, -1), selectedNode] : firstPage;
   // An unchanged identity/component key keeps every coordinate fixed during status updates.
   const layoutKey = visible.map((node) => `${node.id}:${node.component}`).join('|');
   const layout = useMemo(() => positions(visible), [layoutKey]);
   layoutRef.current = layout;
-  useEffect(() => { resetView(); }, [layoutKey]);
+  useEffect(() => { resetView(); }, [layoutKey, mode]);
+  useEffect(() => {
+    if (mode !== 'graph' || !svg.current) return;
+    const observer = new ResizeObserver(() => resetView());
+    observer.observe(svg.current);
+    return () => observer.disconnect();
+  }, [mode]);
+  const actualScale = Math.max(.05, view.scale * canvasScale);
   const liveNodes = new Map(visible.map((node) => [node.id, node]));
   const points = new Map(layout.map((node) => [node.id, node]));
   const edges = graph.edges.filter((edge) => points.has(edge.source) && points.has(edge.target));
   const selectedObservation = observations.find((observation) => observation.userId === selected);
   const scanCandidates = ctx.friends.data.filter((friend) => !needle || `${friend.displayName} ${friend.id}`.toLocaleLowerCase().includes(needle));
+
+  function selectPerson(id: string) {
+    if (busy) return;
+    setSelected(id); setFocusOnly(false); setScanError(''); setNotice('');
+  }
+  function focusConnections() {
+    if (!selectedNode) return;
+    setQuery(''); setFilter('all'); setFocusOnly(true); setMode('graph'); setLimit(200);
+  }
 
   async function scan() {
     if (ctx.demo || busy || !selected || !ctx.online) return;
@@ -226,7 +259,7 @@ export function FriendNetwork() {
     if (pointers.current.size) beginGesture(undefined, true);
     else {
       gesture.current = undefined;
-      if (!cancelled && before?.node && !before.moved) ctx.openUser(before.node);
+      if (!cancelled && before?.node && !before.moved) selectPerson(before.node);
     }
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
@@ -244,39 +277,89 @@ export function FriendNetwork() {
   }
 
   return <section className="friend-network">
-    <div className="network-heading"><div><h2>Mutual Friend Network</h2><p className="muted">Связи, которые действительно вернул VRChat</p></div><GitBranch size={25} /></div>
-    <p className="network-explanation">Линии к вам известны из списка друзей. Связи между остальными появляются только после проверки общих друзей. Пропущенная линия означает отсутствие данных. Цвета объединяют компоненты известных связей без вашего узла.</p>
+    <div className="network-heading">
+      <div><h2>Mutual Friend Network</h2><p className="muted">Ваши друзья и известные связи между ними</p></div><GitBranch size={25} />
+    </div>
+    <p className="network-explanation">Выберите человека в списке или на графе, чтобы открыть профиль и проверить общих друзей.</p>
+    <div className="network-toolbar">
+      <Segmented value={mode} onChange={setMode} items={[{ id: 'graph', label: 'Граф' }, { id: 'list', label: 'Список' }]} />
+      {focusOnly && <button className="button secondary compact" onClick={() => { setFocusOnly(false); setQuery(''); setFilter('all'); }}><X size={16} />Все связи</button>}
+    </div>
     <div className="network-filters">
       <SearchField value={query} onChange={setQuery} placeholder="Найти пользователя в графе" />
-      <label className="field">Фильтр<select aria-label="Фильтр пользователей графа" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">Все пользователи</option><option value="friends">Мои друзья</option><option value="online">Известный статус: в сети</option><option value="offline">Известный статус: не в сети</option></select></label>
+      <label className="field">Присутствие<select aria-label="Фильтр пользователей графа" value={filter} onChange={(event) => { setFocusOnly(false); setFilter(event.target.value); }}>
+        <option value="all">Все пользователи</option><option value="friends">Мои друзья</option>
+        <option value="online">Сейчас в сети</option><option value="game">В VRChat</option><option value="web">На сайте</option>
+        <option value="offline">Не в сети</option><option value="unknown">Присутствие неизвестно</option>
+      </select></label>
     </div>
     {ctx.friends.error && <ErrorState error={ctx.friends.error} retry={ctx.friends.reload} />}
     {cacheError && <ErrorState error={cacheError} retry={saveAgain} />}
-    <div className="network-counts"><span><Users size={14} />{graph.nodes.length} известных пользователей</span><span><GitBranch size={14} />{graph.edges.length} известных связей</span><span>Показано: {visible.length}{matches.length > limit ? ` из ${matches.length}` : ''}</span></div>
-    {!visible.length ? <Empty icon={<Search size={30} />} title="Пользователи не найдены" text="Измените поиск или фильтр. Новые связи можно загрузить для выбранного друга." /> : <div className="network-frame card">
+    <div className="network-selection card" role="region" aria-label="Выбранный пользователь">
+      {selectedNode ? <>
+        <div className="network-person-heading">
+          <AvatarImage name={selectedNode.displayName} src={selectedProfile && imageOf(selectedProfile)} fallbackSrc={selectedProfile?.currentAvatarThumbnailImageUrl || selectedProfile?.currentAvatarImageUrl} user={selectedProfile} size={48} />
+          <div><h3>{selectedNode.displayName}</h3><p>{presenceText(selectedNode)} · {connections.length} известных связей</p></div>
+          <button className="icon-button" aria-label="Снять выбор пользователя" disabled={busy} onClick={() => { setSelected(''); setFocusOnly(false); }}><X size={18} /></button>
+        </div>
+        <div className="network-person-actions">
+          <button className="button secondary compact" onClick={() => ctx.openUser(selectedNode.id)}><ArrowUpRight size={16} />Открыть профиль</button>
+          <button className="button secondary compact" onClick={focusConnections}><LocateFixed size={16} />Показать связи</button>
+          {selectedNode.friend && <button className="button compact" disabled={busy || ctx.demo || !ctx.online} onClick={() => void scan()}><RefreshCw size={16} className={busy ? 'spin' : ''} />{busy ? `Получено: ${progress}` : 'Проверить общих друзей'}</button>}
+        </div>
+        {!selectedNode.friend && !selectedNode.self && <p className="muted small network-person-note">Из сохранённого списка общих друзей. Актуальное присутствие неизвестно.</p>}
+        {selectedObservation && <p className="muted small network-person-note">Общие друзья: {selectedObservation.mutuals.length} · Проверено {dateLabel(selectedObservation.observedAt)}{selectedObservation.complete ? '' : ' · Неполный снимок'}</p>}
+      </> : <div className="network-select-prompt"><Users size={24} /><div><strong>Выберите человека</strong><p>Нажмите на имя в списке или круг на графе. Профиль откроется отдельной кнопкой.</p></div></div>}
+    </div>
+    {scanError && <ErrorState error={scanError} />}{notice && <p className="network-notice" role="status">{notice}</p>}
+    <div className="network-counts"><span><Users size={14} />{graph.nodes.length} пользователей</span><span><GitBranch size={14} />{graph.edges.length} известных связей</span><span>Показано: {visible.length}{candidates.length > limit ? ` из ${candidates.length}` : ''}</span></div>
+    {mode === 'graph' && needle && <div className="network-search-results" role="region" aria-label="Результаты поиска в графе">
+      <p className="muted small">Найдено: {matches.length}. Выберите имя — окружающие связи останутся на графе.</p>
+      <div>{matches.slice(0, 8).map((node) => <button className="button secondary compact" key={node.id} disabled={busy} aria-label={`Выбрать ${node.displayName}`} onClick={() => selectPerson(node.id)}>{node.displayName}</button>)}</div>
+      {matches.length > 8 && <button className="text-button" onClick={() => setMode('list')}>Все результаты списком</button>}
+    </div>}
+    {!visible.length ? <Empty icon={<Search size={30} />} title="Пользователи не найдены" text="Измените поиск или фильтр." /> : mode === 'list' ? <div className="network-people" role="list" aria-label="Пользователи сети друзей">
+      {visible.map((node) => {
+        const profile = liveProfiles.get(node.id);
+        const count = degrees.get(node.id) || 0;
+        return <div role="listitem" key={node.id}><button className={`network-person-row ${selected === node.id ? 'selected' : ''}`} aria-label={`Выбрать ${node.displayName}`} aria-pressed={selected === node.id} disabled={busy} onClick={() => selectPerson(node.id)}>
+          <AvatarImage name={node.displayName} src={profile && imageOf(profile)} fallbackSrc={profile?.currentAvatarThumbnailImageUrl || profile?.currentAvatarImageUrl} user={profile} size={44} />
+          <span><strong>{node.displayName}{node.self ? ' · Вы' : ''}</strong><small>{presenceText(node)}{!node.friend && !node.self ? ' · Сохранённый список' : ''}</small></span>
+          <span className="network-person-count" title="Известные связи"><GitBranch size={14} />{count}</span>
+        </button></div>;
+      })}
+    </div> : <div className="network-frame card">
       <div className="network-zoom"><button className="icon-button" aria-label="Увеличить граф" onClick={() => zoom(1.25)}><Plus size={18} /></button><span aria-live="polite">{Math.round(view.scale * 100)}%</span><button className="icon-button" aria-label="Уменьшить граф" onClick={() => zoom(.8)}><Minus size={18} /></button><button className="icon-button" aria-label="Сбросить граф" onClick={resetView}><RotateCcw size={16} /></button></div>
       <svg ref={svg} role="img" aria-label="Граф общих друзей" viewBox="0 0 800 600" tabIndex={0} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={(event) => pointerEnd(event)} onPointerCancel={(event) => pointerEnd(event, true)} onLostPointerCapture={(event) => pointerEnd(event, true)} onKeyDown={keyboard}>
         <g className="network-scene" transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
-          <g className="network-edges">{edges.map((edge) => { const from = points.get(edge.source)!, to = points.get(edge.target)!; return <line key={[edge.source, edge.target].sort().join(':')} x1={from.x} y1={from.y} x2={to.x} y2={to.y} className={edge.sourceType === 'friends' ? 'self-edge' : 'mutual-edge'} stroke={edge.sourceType === 'friends' ? '#70809b' : colorOf(from.component)}><title>{liveNodes.get(edge.source)?.displayName} — {liveNodes.get(edge.target)?.displayName}{edge.observedAt ? ` · Проверено ${dateLabel(edge.observedAt)}` : ' · Список друзей'}</title></line>; })}</g>
-          {layout.map((position) => { const node = liveNodes.get(position.id)!; return <g key={node.id} role="button" tabIndex={0} aria-label={`Открыть профиль ${node.displayName}`} data-network-id={node.id} className={`network-node ${node.self ? 'self' : ''}`} transform={`translate(${position.x} ${position.y})`} onClick={(event) => { if (event.detail === 0) ctx.openUser(node.id); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); ctx.openUser(node.id); } }}>
-            <title>{node.displayName}{node.self ? ' · Вы' : ''}{node.statusDescription ? ` · ${node.statusDescription}` : ''}</title><circle className="network-hit" r={Math.max(node.self ? 32 : 28, 52 / Math.max(1, view.scale))} /><circle className="network-node-disc" r={node.self ? 29 : 24} fill={node.self ? '#282941' : colorOf(node.component)} stroke={node.self ? '#b3a4ff' : '#10131c'} /><text className="network-initials" textAnchor="middle" y="5" fill={node.self ? '#eeeef5' : '#18202b'}>{initials(node.displayName)}</text><text className="network-label" textAnchor="middle" y={node.self ? 48 : 43}>{shortName(node.displayName)}{node.self ? ' · Вы' : ''}</text>
-          </g>; })}
+          <g className="network-edges">{edges.map((edge) => {
+            const from = points.get(edge.source)!, to = points.get(edge.target)!;
+            const direct = selected === edge.source || selected === edge.target;
+            return <line key={[edge.source, edge.target].sort().join(':')} x1={from.x} y1={from.y} x2={to.x} y2={to.y} data-source={edge.source} data-target={edge.target} className={`${edge.sourceType === 'friends' ? 'self-edge' : 'mutual-edge'} ${selectedNode ? direct ? 'selected-edge' : 'dimmed' : ''}`} stroke={edge.sourceType === 'friends' ? '#70809b' : colorOf(from.component)}><title>{liveNodes.get(edge.source)?.displayName} — {liveNodes.get(edge.target)?.displayName}{edge.observedAt ? ` · Проверено ${dateLabel(edge.observedAt)}` : ' · Список друзей'}</title></line>;
+          })}</g>
+          {layout.map((position) => {
+            const node = liveNodes.get(position.id)!;
+            const radius = Math.max(node.self ? 29 : 24, layout.length <= 12 ? 20 / actualScale : 0);
+            return <g key={node.id} role="button" tabIndex={0} aria-label={`Выбрать ${node.displayName}`} aria-pressed={selected === node.id} aria-disabled={busy} data-network-id={node.id} className={`network-node ${node.self ? 'self' : ''} ${selected === node.id ? 'selected' : selectedNode ? neighborhood.has(node.id) ? 'neighbor' : 'dimmed' : ''}`} transform={`translate(${position.x} ${position.y})`} onClick={(event) => { if (event.detail === 0) selectPerson(node.id); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); selectPerson(node.id); } }}>
+              <title>{node.displayName}{node.self ? ' · Вы' : ''}{node.statusDescription ? ` · ${node.statusDescription}` : ''}</title><circle className="network-hit" r={Math.max(node.self ? 32 : 28, 52 / Math.max(1, view.scale))} /><circle className="network-node-disc" r={radius} fill={node.self ? '#282941' : colorOf(node.component)} stroke={node.self ? '#b3a4ff' : '#10131c'} /><text className="network-initials" style={{ fontSize: layout.length <= 12 ? 14 / actualScale : 14 }} textAnchor="middle" y={5 / actualScale} fill={node.self ? '#eeeef5' : '#18202b'}>{initials(node.displayName)}</text><text className={`network-label ${layout.length > 9 && selected !== node.id ? 'network-label-hidden' : ''}`} style={{ fontSize: 12 / actualScale, strokeWidth: 3 / actualScale }} textAnchor="middle" y={radius + 18 / actualScale}>{shortName(node.displayName)}{node.self ? ' · Вы' : ''}</text>
+            </g>;
+          })}
         </g>
       </svg>
     </div>}
-    <p className="network-gesture-help muted small">Перемещайте граф пальцем, масштабируйте двумя пальцами. Нажатие открывает профиль. Клавиатура: стрелки, +/− и 0.</p>
-    {matches.length > limit && <button className="button secondary load-more" disabled={limit >= 600} onClick={() => setLimit((count) => Math.min(600, count + 100))}>{limit >= 600 ? 'Для остальных пользователей используйте поиск' : `Показать ещё (${matches.length - limit})`}</button>}
+    {mode === 'graph' && <p className="network-gesture-help muted small">Перемещение — одним пальцем, масштаб — двумя. Нажатие выбирает человека. Кнопка «Показать связи» убирает лишние узлы. Клавиатура: стрелки, +/− и 0.</p>}
+    {candidates.length > limit && <button className="button secondary load-more" disabled={limit >= 600} onClick={() => setLimit((count) => Math.min(600, count + 100))}>{limit >= 600 ? 'Для остальных пользователей используйте поиск' : `Показать ещё (${candidates.length - limit})`}</button>}
+    <details className="network-legend"><summary>Что означают линии и цвета</summary><p className="muted small">Линии к вам известны из списка друзей. Другие линии добавляются после проверки общих друзей. Пропущенная линия означает отсутствие данных. Цвета объединяют известные связанные группы людей. Сохранённые проверки могут устареть.</p></details>
     <div className="network-scan card">
       <h3>Проверить общих друзей</h3>
-      <p className="muted small">Один выбранный друг за запрос. Снимки сохраняются локально, кеш действует 15 минут. Статус в сохранённом снимке относится к моменту его получения.</p>
-      <label className="field">Друг<select aria-label="Друг для проверки связей" value={selected} disabled={busy} onChange={(event) => { setSelected(event.target.value); setScanError(''); setNotice(''); }}><option value="">Выберите друга</option>{selected && !scanCandidates.some((friend) => friend.id === selected) && <option value={selected}>{ctx.friends.data.find((friend) => friend.id === selected)?.displayName || selected}</option>}{scanCandidates.slice(0, 1000).map((friend) => <option key={friend.id} value={friend.id}>{friend.displayName}</option>)}</select></label>
+      <p className="muted small">Выберите одного друга. Проверка начинается только по кнопке. Результат сохраняется на устройстве на 15 минут перед следующим запросом.</p>
+      <label className="field">Друг<select aria-label="Друг для проверки связей" value={selectedNode?.friend ? selected : ''} disabled={busy} onChange={(event) => selectPerson(event.target.value)}><option value="">Выберите друга</option>{selectedNode?.friend && !scanCandidates.some((friend) => friend.id === selected) && <option value={selected}>{selectedNode.displayName}</option>}{scanCandidates.slice(0, 1000).map((friend) => <option key={friend.id} value={friend.id}>{friend.displayName}</option>)}</select></label>
       {scanCandidates.length > 1000 && <p className="muted small">Для остальных друзей введите имя в поиск графа.</p>}
       <label className="network-force"><input type="checkbox" checked={force} onChange={(event) => setForce(event.target.checked)} disabled={busy} />Запросить заново</label>
-      <div className="network-scan-actions"><button className="button secondary" disabled={busy || !selected || ctx.demo || !ctx.online} onClick={() => void scan()}><RefreshCw className={busy ? 'spin' : ''} size={16} />{busy ? `Получено: ${progress}` : 'Проверить связи'}</button>{busy && <button className="button secondary" onClick={cancelScan}><Square size={14} />Остановить</button>}</div>
+      <div className="network-scan-actions"><button className="button secondary" disabled={busy || !selectedNode?.friend || ctx.demo || !ctx.online} onClick={() => void scan()}><RefreshCw className={busy ? 'spin' : ''} size={16} />{busy ? `Получено: ${progress}` : 'Проверить связи'}</button>{busy && <button className="button secondary" onClick={cancelScan}><Square size={14} />Остановить</button>}</div>
       {ctx.demo && <p className="muted small">Деморежим показывает только пример списка друзей. Взаимные связи не придуманы и не запрашиваются.</p>}
       {selectedObservation && <p className="network-observation muted small">Последний снимок: {dateLabel(selectedObservation.observedAt)} · {selectedObservation.mutuals.length} общих друзей{selectedObservation.complete ? '' : ' · Неполные данные'}{isObservationFresh(selectedObservation) ? '' : ' · Требуется обновление'}</p>}
-      {scanError && <ErrorState error={scanError} />}{notice && <p className="network-notice" role="status">{notice}</p>}
-      {observations.length > 0 && <details className="network-snapshots"><summary>Сохранённые проверки ({observations.length})</summary>{observations.map((observation) => <p className="muted small" key={observation.userId}><button className="text-button" onClick={() => ctx.openUser(observation.userId)}>{observation.displayName || ctx.friends.data.find((friend) => friend.id === observation.userId)?.displayName || observation.userId}</button> · {dateLabel(observation.observedAt)} · {observation.mutuals.length}{observation.complete ? '' : ' · неполный снимок'}</p>)}</details>}
+      {observations.length > 0 && <details className="network-snapshots"><summary>Сохранённые проверки ({observations.length})</summary>{observations.map((observation) => <p className="muted small" key={observation.userId}><button className="text-button" onClick={() => selectPerson(observation.userId)}>{observation.displayName || ctx.friends.data.find((friend) => friend.id === observation.userId)?.displayName || observation.userId}</button> · {dateLabel(observation.observedAt)} · {observation.mutuals.length}{observation.complete ? '' : ' · неполный снимок'}</p>)}</details>}
     </div>
   </section>;
 }

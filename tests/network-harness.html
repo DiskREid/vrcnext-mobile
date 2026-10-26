@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mobile network synthetic fixture only</title></head>
+<body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import '/src/styles.css';
+const {api,createApi}=await import('/src/api/index.ts');
+const self={id:'usr_graph-self',displayName:'Network Self',state:'offline',location:'offline',status:'active'};
+const website={id:'usr_graph-website',displayName:'Website Friend',location:'offline',status:'busy'};
+const game={id:'usr_graph-game',displayName:'Game Friend',location:'private',status:'ask me'};
+const offline={id:'usr_graph-offline',displayName:'Offline Friend',location:'offline',status:'busy'};
+const outsider={id:'usr_graph-outsider',displayName:'Historical Outsider',status:'active'};
+window.__networkTest={requests:[],actions:[],unexpected:[]};
+const transport={async request(options){
+ window.__networkTest.requests.push({path:options.path,method:options.method||'GET'});
+ const url=new URL(options.path,'https://synthetic.invalid');
+ if(url.pathname==='/auth/user/friends')return{status:200,data:url.searchParams.get('offline')==='false'?[website,game]:[offline]};
+ if(url.pathname===`/users/${website.id}/mutuals/friends`)return{status:200,data:[offline,outsider]};
+ const known=[website,game,offline,outsider].find(person=>url.pathname===`/users/${person.id}`);
+ if(known)return{status:200,data:{...known,state:known.id===website.id?'active':known.id===game.id?'online':'offline'}};
+ if(url.pathname.startsWith('/profile/'))return{status:200,data:{id:url.pathname.split('/').pop(),bio:'Synthetic network fixture.'}};
+ window.__networkTest.unexpected.push(options.path);
+ return{status:500,data:{error:{message:'Unexpected network fixture route'}}};
+},sessionState:async()=>({hasAuth:false}),clearSession:async()=>{},disconnectPipeline:async()=>{}};
+Object.assign(api,createApi(transport));
+const friends=await api.allFriends();
+const {AppProvider}=await import('/src/state.tsx');
+const {FriendNetwork}=await import('/src/components/FriendNetwork.tsx');
+const {UserDetails}=await import('/src/pages/Details.tsx');
+const noop=()=>{};
+const history={events:[],visits:[],sessions:[],loading:false,error:'',observePipeline:noop,observeProfile:noop,seedUsers:noop,recordModeration:noop,recordFriendAction:noop,retry:noop,clear:async()=>{},pause:noop,observeSession:noop,friendStats:()=>({encounters:0,totalMs:0})};
+function Fixture(){
+ const [selected,setSelected]=React.useState(null);
+ const value={user:self,onUserUpdated:noop,demo:false,online:true,refresh:0,pageActive:true,notificationsRefresh:0,friends:{data:friends,loading:false,refreshing:false,error:'',apply:noop,reload:noop},history,calendarSync:{events:[],reminders:[],loading:false,error:'',refresh:noop,dismissReminder:noop},observation:{status:'active',error:'',refresh:noop},notify:noop,act:async()=>undefined,openUser:person=>{window.__networkTest.actions.push({type:'profile',id:typeof person==='string'?person:person.id});setSelected(person);},openWorld:noop,openGroup:noop,openCalendarEvent:noop,onRefresh:noop,logout:noop,activity:[]};
+ return React.createElement(AppProvider,{value},React.createElement('div',{className:'app-shell'},React.createElement('main',{className:'main-content'},React.createElement(FriendNetwork)),selected&&React.createElement(UserDetails,{target:selected,onClose:()=>setSelected(null)})));
+}
+createRoot(document.getElementById('root')).render(React.createElement(Fixture));
+</script></body></html>

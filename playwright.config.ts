@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 import { existsSync } from 'node:fs';
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'ui.spec.ts',
+  testMatch: ['ui.spec.ts', 'groups.spec.ts'],
   fullyParallel: false,
   workers: 1,
   timeout: 45000,

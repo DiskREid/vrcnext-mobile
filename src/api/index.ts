@@ -3,6 +3,7 @@ import type { Print } from './prints';
 import { normalizeCalendarEvent, normalizeCalendarPage } from './calendar';
 import { instanceCreationOptions } from './instances';
 import { normalizeFriendPresence } from './friends';
+import { normalizeGroups } from './groups';
 import type { NativeBridge, NativeResponse } from './native';
 import type {
   Avatar,
@@ -517,7 +518,7 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
     friendRequest: (id: string) => request('/user/' + segment(id) + '/friendRequest', 'POST', {}),
     unfriend: (id: string) => request('/auth/user/friends/' + segment(id), 'DELETE'),
     note: (id: string, note: string) => request('/userNotes', 'POST', { targetUserId: id, note }),
-    userGroups: (id: string) => list<Group>('/users/' + segment(id) + '/groups'),
+    userGroups: async (id: string) => normalizeGroups(await list<Group>('/users/' + segment(id) + '/groups')),
     mutualFriends: (id: string, offset = 0) =>
       list<User>('/users/' + segment(id) + '/mutuals/friends' + query({ n: 100, offset })),
     moderations: (type: 'block' | 'mute') =>
@@ -588,7 +589,7 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
         ...(messageSlot === undefined ? { instanceId: '' } : { messageSlot }),
       }),
     async groups(userId: string): Promise<Group[]> {
-      return (await list<Group>('/users/' + segment(userId) + '/groups')).map((group) => ({
+      return normalizeGroups(await list<Group>('/users/' + segment(userId) + '/groups')).map((group) => ({
         ...group,
         id: group.groupId || group.id,
         membershipStatus: group.membershipStatus || 'member',

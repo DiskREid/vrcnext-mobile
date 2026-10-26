@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api';
 import type { User } from '../api';
 import {
-  buildKnownGraph, isObservationFresh, normalizeGraphPerson, readNetworkCache,
+  buildKnownGraph, isObservationFresh, knownConnections, normalizeGraphPerson, readNetworkCache,
   scanMutualFriends, writeNetworkCache,
 } from './friend-network';
 import type { GraphObservation, GraphPerson } from './friend-network';
@@ -57,6 +57,23 @@ describe('known social edges only', () => {
     expect(graph.edges.every((edge) => edge.source !== edge.target)).toBe(true);
     expect(graph.nodes.map((node) => node.id)).toEqual([alice.id, bob.id, self.id].sort());
     expect(normalizeGraphPerson({id:'https://other.test',displayName:'bad'})).toBeUndefined();
+  });
+  it('uses current presence for friends and never presents saved preferred statuses as current online', () => {
+    const graph = buildKnownGraph(self, [
+      { ...alice, state: 'active', location: 'offline', status: 'busy' },
+      { ...bob, state: 'offline', location: 'offline', status: 'busy' },
+    ], [observed(alice.id, [{ ...charlie, status: 'active' }, { ...bob, status: 'active' }])]);
+    expect(graph.nodes.find((node) => node.id === alice.id)?.presence).toBe('website');
+    expect(graph.nodes.find((node) => node.id === bob.id)?.presence).toBe('offline');
+    expect(graph.nodes.find((node) => node.id === charlie.id)?.presence).toBe('unknown');
+    expect(graph.nodes.find((node) => node.id === self.id)?.presence).toBe('unknown');
+  });
+  it('focuses exactly known neighbors, without interpreting missing links as friendships', () => {
+    const graph = buildKnownGraph(self, [alice, bob], [observed(alice.id, [bob, charlie])]);
+    expect(knownConnections(graph, alice.id).map((node) => node.id).sort()).toEqual([self.id, bob.id, charlie.id].sort());
+    expect(knownConnections(graph, charlie.id).map((node) => node.id).sort()).toEqual([self.id, alice.id].sort());
+    expect(knownConnections(graph, 'usr_unknown')).toEqual([]);
+    expect(edgeIds(graph)).not.toContain('usr_bob|usr_charlie');
   });
 });
 
