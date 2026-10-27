@@ -2,30 +2,33 @@
 <html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Feed profile history synthetic transport fixture only</title></head>
 <body><div id="root"></div><script type="module">
 // This isolated test entry renders the real App, API client, scheduler and IndexedDB journal.
-// Mutable server snapshots below are synthetic. No fabricated HistoryEvent is injected.
+// Mutable server snapshots below are synthetic. New activity comes from observed responses; one regression also seeds explicitly historical pre-upgrade rows.
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {Capacitor,registerPlugin} from '@capacitor/core';
 import '/src/styles.css';
 const picture='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 const selfId='usr_feed-self',friendId='usr_feed-friend';
-const initial={id:friendId,displayName:'Synthetic Feed Friend',bio:'Привет 👋\nИграю в 22:22',currentAvatar:'avtr_feed-old',currentAvatarName:'Старый Лис',currentAvatarAuthorName:'Synthetic Avatar Author',currentAvatarImageUrl:'https://api.vrchat.cloud/api/1/file/file_feed-old/1/file',currentAvatarThumbnailImageUrl:'https://api.vrchat.cloud/api/1/image/file_feed-old/1/256'};
+const initial={trustTags:['system_trust_known'],id:friendId,displayName:'Synthetic Feed Friend',bio:'Привет 👋\nИграю в 22:22',currentAvatar:'avtr_feed-old',currentAvatarName:'Старый Лис',currentAvatarAuthorName:'Synthetic Avatar Author',currentAvatarImageUrl:'https://api.vrchat.cloud/api/1/file/file_feed-old/1/file',currentAvatarThumbnailImageUrl:'https://api.vrchat.cloud/api/1/image/file_feed-old/1/256'};
 let saved;
 try{saved=JSON.parse(sessionStorage.getItem('synthetic-feed-server')||'null');}catch{}
 let profile={...initial,...saved?.profile};
 let listImage=saved?.listImage||initial.currentAvatarImageUrl;
-const persist=()=>sessionStorage.setItem('synthetic-feed-server',JSON.stringify({profile,listImage}));
+let listTags=saved?.listTags||[];
+const persist=()=>sessionStorage.setItem('synthetic-feed-server',JSON.stringify({profile,listImage,listTags}));
 const self={id:selfId,displayName:'Synthetic Feed Self',state:'offline',location:'offline',status:'active',friends:[friendId],activeFriends:[friendId],onlineFriends:[],offlineFriends:[]};
-const friend=()=>({id:friendId,displayName:'Synthetic Feed Friend',location:'offline',status:'active',isFriend:true,tags:[],currentAvatarImageUrl:listImage});
+const friend=()=>({id:friendId,displayName:'Synthetic Feed Friend',location:'offline',status:'active',isFriend:true,tags:listTags,currentAvatarImageUrl:listImage});
 const pipelineListeners=new Map(),appListeners=new Set();
 let active=true,nextFailure,holdNext=false,releaseHeld;
 const fixture=window.__feedTest={selfId,friendId,requests:[],profileReplies:[],searches:[],unexpected:[],connected:false,held:false,
  changeProfile:(change)=>{profile={...profile,...change};persist();},
  emitAvatar:()=>{listImage=profile.currentAvatarImageUrl;persist();pipelineListeners.get('pipeline')?.({type:'friend-update',content:{userId:friendId,user:{id:friendId,displayName:'Synthetic Feed Friend',currentAvatarImageUrl:listImage}}});},
+ emitTags:(tags)=>{listTags=tags;persist();pipelineListeners.get('pipeline')?.({type:'friend-update',content:{userId:friendId,user:{id:friendId,displayName:'Synthetic Feed Friend',tags}}});},
  emitSignal:()=>pipelineListeners.get('pipeline')?.({type:'friend-update',content:{userId:friendId,user:{id:friendId,displayName:'Synthetic Feed Friend'}}}),
  failNextProfile:(status=503,retryAfter)=>{nextFailure={status,retryAfter};},
  holdNextProfile:()=>{holdNext=true;},releaseProfile:()=>releaseHeld?.(),
  setActive:(value)=>{active=value;for(const listener of appListeners)listener({isActive:value});},
+ seedStored:async(events)=>new Promise((resolve,reject)=>{const request=indexedDB.open('vrcnext-mobile-history',2);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('events','readwrite');for(const event of events)tx.objectStore('events').put({...event,account:selfId});tx.oncomplete=()=>{resolve();db.close();};tx.onabort=tx.onerror=()=>{reject(tx.error);db.close();};};}),
  stored:async()=>new Promise((resolve,reject)=>{const request=indexedDB.open('vrcnext-mobile-history',2);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('events','readonly');const rows=tx.objectStore('events').index('accountTime').getAll(IDBKeyRange.bound([selfId,''],[selfId,'\uffff']));rows.onsuccess=()=>{resolve(rows.result);db.close();};rows.onerror=()=>{reject(rows.error);db.close();};};}),
 };
 const bridge={

@@ -1,12 +1,23 @@
 # VRCNext Mobile
 
 Неофициальная Android-адаптация [VRCNext](https://github.com/shinyflvre/VRCNext)
-от shinyflvre и участников VRCNext. Версия 0.2.9, Android 8.0+ (API26), Android System WebView109+, target API35.
+от shinyflvre и участников VRCNext. Версия 0.2.10, Android 8.0+ (API26), Android System WebView109+, target API35.
 Исходная ПК-версия изучена на коммите `0bfb467f89caa21893769f6495abe334febe08a3`.
 
 Это самостоятельная мобильная реализация с сохранением текущего дизайна. **Полный паритет с ПК не заявляется**: часть данных недоступна мобильному API.
 Интерфейс и протоколы реализованы в коде; работа с реальным VRChat-аккаунтом,
 Keystore и устройством требует отдельного приёмочного тестирования.
+
+## Исправление ложных событий Trust Rank 0.2.10
+
+- Пустые теги списка друзей больше не считаются сменой ранга. Лента сравнивает
+  подтверждённый ранг, а не набор служебных тегов разных ответов API.
+- Старые неподтверждённые записи скрыты из ленты; исходные локальные записи
+  сохранены. Настоящие изменения между известными рангами остаются видны.
+- Кнопка «Обновить био и аватары» понятнее объясняет повторную проверку.
+  Автоматическое получение био и аватаров продолжает работать.
+
+[Подробности](docs/FIXES_0.2.10.md).
 
 ## Лента аватаров и био 0.2.9
 
@@ -185,11 +196,11 @@ Keystore и устройством требует отдельного приё�
 
 [Все версии в GitHub Releases](https://github.com/DiskREid/vrcnext-mobile/releases).
 
-- [Скачать APK 0.2.9](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.9/VRCNext-Mobile-0.2.9.apk)
-- [Скачать архив исходников](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.9/VRCNext-Mobile-0.2.9-source.zip)
-- [SHA256](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.9/SHA256SUMS.txt) · [Снимки интерфейса](releases/v0.2.9/screenshots)
+- [Скачать APK 0.2.10](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/VRCNext-Mobile-0.2.10.apk)
+- [Скачать архив исходников](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/VRCNext-Mobile-0.2.10-source.zip)
+- [SHA256](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/SHA256SUMS.txt) · [Снимки интерфейса](releases/v0.2.10/screenshots)
 
-APK, архив и снимки находятся в каталоге `releases/v0.2.9` этого репозитория.
+APK, архив и снимки находятся в каталоге `releases/v0.2.10` этого репозитория.
 Это тестовая debug-сборка. Реальный вход в VRChat и операции аккаунта на телефоне
 ещё не проверены; полный статус функций указан ниже и в документации.
 
@@ -200,12 +211,12 @@ npm ci
 npm run android:build
 ```
 
-Результат: `artifacts/VRCNext-Mobile-0.2.9.apk`, рядом SHA256.
+Результат: `artifacts/VRCNext-Mobile-0.2.10.apk`, рядом SHA256.
 Скрипт проверяет подпись с помощью `apksigner`. Это подписанная **debug-сборка
 для тестирования**, не production/store-релиз. Ключ debug-сборки генерируется
 локально и не входит в исходный код; APK из другого окружения может потребовать
-удалить ранее установленную сборку. Опубликованная0.2.9 использует ту же подпись,
-что0.1.1/0.2.0/0.2.1/0.2.2/0.2.3/0.2.4/0.2.5/0.2.6/0.2.7/0.2.8; устанавливайте обновление поверх неё, без удаления приложения.
+удалить ранее установленную сборку. Опубликованная 0.2.10 использует ту же подпись,
+что 0.1.1/0.2.0/0.2.1/0.2.2/0.2.3/0.2.4/0.2.5/0.2.6/0.2.7/0.2.8/0.2.9; устанавливайте обновление поверх неё, без удаления приложения.
 Для стабильных обновлений выпуска нужен
 собственный release keystore через Android Studio, вне репозитория.
 
@@ -269,7 +280,7 @@ Copyright (c)2026 VRCNext Contributors. Исходный проект — shinyf
 Mobile — отдельная неофициальная адаптация для DiskREid/vrcnext-mobile.
 Оригинальная [LICENSE](LICENSE) VNCOL сохранена дословно; производные части
 некоммерческие. Отдельный User-Agent:
-`Mobile-VRCNext/0.2.9 (https://github.com/DiskREid/vrcnext-mobile/issues)`.
+`Mobile-VRCNext/0.2.10 (https://github.com/DiskREid/vrcnext-mobile/issues)`.
 В оригинальном тексте версия заголовка1.3 и ссылка на1.2 в разделе3 сохранены
 как у правообладателей. Лицензии зависимостей остаются у их авторов
 (Capacitor/React/Vite/Lucide/OkHttp и др.).

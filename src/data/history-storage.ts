@@ -1,5 +1,6 @@
 import type { HistoryEvent } from './history';
 import type { GameData } from './game-history';
+import { isUnverifiedLegacyTrustEvent } from './trust-rank';
 
 export interface HistoryStore {
   read(account: string): Promise<HistoryEvent[]>;
@@ -46,7 +47,8 @@ export class IndexedHistoryStore implements HistoryStore {
       const range = IDBKeyRange.bound([account, ''], [account, '\uffff']);
       const request = tx.objectStore('events').index('accountTime').getAll(range);
       request.onsuccess = () => resolve((request.result as (HistoryEvent & { account: string })[])
-        .map(({ account: _account, ...event }) => event).reverse());
+        .map(({ account: _account, ...event }) => event)
+        .filter(event => !isUnverifiedLegacyTrustEvent(event)).reverse());
       request.onerror = () => reject(new Error('Не удалось прочитать локальную историю.'));
       tx.onabort = () => reject(new Error('Чтение истории прервано.'));
     });
@@ -109,7 +111,8 @@ export class IndexedHistoryStore implements HistoryStore {
 export class MemoryHistoryStore implements HistoryStore {
   private accounts = new Map<string, Map<string, HistoryEvent>>();
   private games = new Map<string, GameData>();
-  async read(account: string) { return [...this.accounts.get(account)?.values() || []].sort((a,b) => b.time.localeCompare(a.time)); }
+  async read(account: string) { return [...this.accounts.get(account)?.values() || []]
+    .filter(event => !isUnverifiedLegacyTrustEvent(event)).sort((a,b) => b.time.localeCompare(a.time)); }
   async append(account: string, events: HistoryEvent[]) {
     let values = this.accounts.get(account);
     if (!values) { values = new Map(); this.accounts.set(account, values); }

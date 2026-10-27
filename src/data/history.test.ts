@@ -13,6 +13,63 @@ function observer() {let id=0;return new HistoryObserver(()=> '2026-10-25T12:00:
 function sample(id='event_1'):HistoryEvent {return {id,time:'2026-10-25T12:00:00.000Z',kind:'online',userId:alice.id,displayName:alice.displayName,detail:'Observed online',source:'pipeline'};}
 
 describe('observed friend history',()=>{
+  it('does not treat empty friend tags and the first public Trust Rank as a change',()=>{
+    const history=observer();
+    const friend={id:alice.id,displayName:alice.displayName,tags:[]};
+    expect(history.observeUsers([friend])).toEqual([]);
+    const profile={id:alice.id,displayName:alice.displayName,tags:['system_trust_trusted']};
+    expect(history.observeProfile(profile,'sync')).toEqual([]);
+    expect(history.observeUsers([friend])).toEqual([]);
+    expect(history.observeProfile(profile,'sync')).toEqual([]);
+    expect(history.observeUsers([friend])).toEqual([]);
+    expect(history.observeProfile(profile)).toEqual([]);
+  });
+  it('compares the displayed rank rather than reordered, duplicated or partially available tag sets',()=>{
+    const history=observer();
+    history.seedUsers([{...alice,tags:['system_trust_basic','system_trust_known','system_trust_trusted','system_trust_intermediate']}]);
+    for(const tags of [
+      ['system_trust_trusted'],
+      ['system_trust_trusted','system_trust_trusted','system_probable_troll','language_rus'],
+      ['system_trust_known','system_trust_basic','system_trust_trusted'],
+    ]) expect(history.observeProfile({...alice,tags},'sync')).toEqual([]);
+  });
+  it('retains a known Trust Rank across empty, missing and unrelated tags without guessing Visitor',()=>{
+    const history=observer();history.seedUsers([alice]);
+    for(const tags of [undefined,[],['language_rus'],['system_trust_intermediate','system_probable_troll'],['system_trust_basic_extra']])
+      expect(history.observeProfile({...alice,tags},'sync')).toEqual([]);
+    expect(history.observeProfile({...alice,tags:['system_trust_basic']},'sync')).toEqual([]);
+    expect(history.observeProfile({...alice,tags:['system_trust_known']},'sync')).toMatchObject([
+      {kind:'trust',source:'sync',before:'New User',after:'User',detail:'Trust Rank: New User → User'},
+    ]);
+  });
+  it('records a confirmed rank promotion and demotion once across profile, pipeline and list refreshes',()=>{
+    const history=observer();history.seedUsers([alice]);
+    const promoted={...alice,tags:['system_trust_trusted']};
+    expect(history.observeProfile(promoted,'sync')).toMatchObject([{kind:'trust',before:'New User',after:'Known'}]);
+    expect(history.observeUsers([{...alice,tags:[]}])).toEqual([]);
+    expect(history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{tags:['system_trust_trusted']}}},[promoted],self)).toEqual([]);
+    expect(history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{tags:['system_trust_known']}}},[promoted],self))
+      .toMatchObject([{kind:'trust',source:'pipeline',before:'Known',after:'User',detail:'Trust Rank: Known → User'}]);
+    expect(history.observeProfile({...alice,tags:['system_trust_known']})).toEqual([]);
+  });
+  it('does not invent a rank change when incomplete tags become available for the first time',()=>{
+    const history=observer();
+    history.seedUsers([{...alice,tags:[]}]);
+    expect(history.observeProfile({...alice,tags:['system_trust_advanced']},'sync')).toEqual([]);
+    expect(history.observeProfile({...alice,tags:['system_trust_veteran']},'sync')).toEqual([]);
+    expect(history.observeProfile({...alice,tags:['system_trust_trusted']},'sync'))
+      .toMatchObject([{kind:'trust',before:'Trusted',after:'Known'}]);
+  });
+  it('does not reset an observed rank from a later seed or infer changes over a paused period',()=>{
+    const history=observer();history.seedUsers([alice]);
+    history.observeProfile({...alice,tags:['system_trust_trusted']},'sync');
+    history.seedUsers([alice]);
+    expect(history.observeProfile({...alice,tags:['system_trust_trusted']},'sync')).toEqual([]);
+    history.pause();
+    expect(history.observeProfile({...alice,tags:['system_trust_veteran']},'sync')).toEqual([]);
+    expect(history.observeProfile({...alice,tags:['system_trust_trusted']},'sync'))
+      .toMatchObject([{kind:'trust',before:'Trusted',after:'Known'}]);
+  });
   it('establishes the first profile as baseline without inventing past changes',()=>{
     const history=observer();
     expect(history.observeProfile(alice)).toEqual([]);

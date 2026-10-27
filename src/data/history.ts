@@ -5,6 +5,7 @@ import type { HistoryStore } from './history-storage';
 import { closeInterrupted, friendStatistics, GameObserver } from './game-history';
 import type { GameData, GameSession, GameVisit, ObservationSource } from './game-history';
 import { presenceMode } from './presence';
+import { observedTrustRank } from './trust-rank';
 
 export type HistoryKind = 'online' | 'offline' | 'world' | 'instance' | 'status' | 'avatar' | 'bio'
   | 'friend-add' | 'friend-remove' | 'name' | 'trust' | 'profile' | 'moderation';
@@ -70,9 +71,6 @@ function snapshot(user: Partial<User>): Snapshot {
 function object(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
-function trust(tags: string[] | undefined) {
-  return tags?.filter((tag) => /^system_(?:trust_|probable_troll|troll)/.test(tag)).sort().join(',');
-}
 function displayLocation(value: string) {
   return value === 'private' ? 'Приватный инстанс' : value === 'offline' ? 'Не в сети' : value || 'Местоположение скрыто';
 }
@@ -83,16 +81,21 @@ export class HistoryObserver {
   private presence = new Map<string, 'online'|'offline'|'website'>();
   private membership = new Map<string, boolean>();
   private avatars = new Map<string, AvatarSnapshot>();
+  // Friend-list tags are currently always empty, while /profile returns only
+  // trustTags. Their different tag sets are not proof of a rank transition.
+  private trustRanks = new Map<string, string>();
   // One recent event per user can await public-profile metadata. Older,
   // already superseded images must never receive a later avatar's name.
   private pendingAvatars = new Map<string, PendingAvatar>();
   constructor(private readonly now: () => string = () => new Date().toISOString(), private readonly id: () => string = () => crypto.randomUUID()) {}
-  pause() { this.known.clear(); this.presence.clear(); this.membership.clear(); this.avatars.clear(); this.pendingAvatars.clear(); }
+  pause() { this.known.clear(); this.presence.clear(); this.membership.clear(); this.avatars.clear(); this.trustRanks.clear(); this.pendingAvatars.clear(); }
   seedUsers(users: User[]) {
     for (const user of users) {
       const prior = this.known.get(user.id) || {};
       this.known.set(user.id, { ...snapshot(user), ...prior });
       if (!this.avatars.has(user.id)) this.avatars.set(user.id, avatarSnapshot(this.known.get(user.id)!));
+      const rank = observedTrustRank(user.tags);
+      if (rank && !this.trustRanks.has(user.id)) this.trustRanks.set(user.id, rank);
     }
   }
   observeUsers(users: User[], source: HistoryEvent['source'] = 'refresh'): HistoryEvent[] {
@@ -104,6 +107,9 @@ export class HistoryObserver {
   observeProfile(user: User, source: HistoryEvent['source'] = 'profile'): HistoryEvent[] {
     const old = this.known.get(user.id);
     const incoming = snapshot(user);
+    const previousRank = this.trustRanks.get(user.id);
+    const freshRank = observedTrustRank(incoming.tags);
+    if (freshRank) this.trustRanks.set(user.id, freshRank);
     const previousAvatar = this.avatars.get(user.id) || (old ? avatarSnapshot(old) : undefined);
     const freshAvatar = avatarSnapshot(incoming);
     const pendingAvatar = this.pendingAvatars.get(user.id);
@@ -180,7 +186,7 @@ export class HistoryObserver {
     if (statusChanged || descriptionChanged) events.push(this.event('status',user.id,next,source,
       [next.status,next.statusDescription].filter(Boolean).join(' · '),
       {before:[old.status,old.statusDescription].filter(Boolean).join(' · '),after:[next.status,next.statusDescription].filter(Boolean).join(' · ')}));
-    change('trust',trust(old.tags),trust(incoming.tags),'Изменились доступные Trust Rank теги');
+    change('trust',previousRank,freshRank,`Trust Rank: ${previousRank} → ${freshRank}`);
     const oldFields = {pronouns:old.pronouns,bioLinks:old.bioLinks,languages:old.languages};
     const changedFields = (Object.keys(oldFields) as (keyof typeof oldFields)[])
       .filter((key) => oldFields[key] !== undefined && incoming[key] !== undefined && JSON.stringify(oldFields[key]) !== JSON.stringify(incoming[key]));
