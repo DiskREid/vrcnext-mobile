@@ -1,0 +1,26 @@
+.user-platform-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  flex: none;
+  vertical-align: middle;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  border-radius: 9px;
+}
+.user-platform-icon > svg {
+  display: block;
+  flex: none;
+}
+.user-platform-android {
+  color: #88d6bc;
+}
+.user-platform-ios {
+  color: #a8c8ef;
+}
+.user-platform-unknown {
+  color: var(--muted);
+}

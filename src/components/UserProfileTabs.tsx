@@ -42,6 +42,7 @@ import {
   Segmented,
 } from './ui';
 import SecureImage from './SecureImage';
+import { UserPlatformIcon } from './UserPlatformIcon';
 import './UserProfileTabs.css';
 
 export const userProfileTabs = [
@@ -96,11 +97,11 @@ export function ProfileInformation({ user, profile }: { user: User; profile?: Js
         <Metadata label="Регистрация">{profileDate(user.date_joined)}</Metadata>
         <Metadata label="Последний вход">{profileDate(user.last_login)}</Metadata>
         <Metadata label="Последняя активность">{profileDate(user.last_activity)}</Metadata>
-        {asString(raw.last_platform) && (
-          <Metadata label="Последняя платформа">{asString(raw.last_platform)}</Metadata>
+        {asString(raw.last_platform).trim() && (
+          <Metadata label="Последняя платформа"><UserPlatformIcon value={raw.last_platform} context="last" /></Metadata>
         )}
-        {asString(raw.platform) && (
-          <Metadata label="Текущая платформа">{asString(raw.platform)}</Metadata>
+        {asString(raw.platform).trim() && (
+          <Metadata label="Текущая платформа"><UserPlatformIcon value={raw.platform} context="current" /></Metadata>
         )}
         {typeof raw.allowAvatarCopying === 'boolean' && (
           <Metadata label="Копирование аватара">

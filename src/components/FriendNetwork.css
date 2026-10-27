@@ -40,6 +40,7 @@
 .network-person-count { display: inline-flex; align-items: center; gap: 5px; flex: none; color: var(--muted); font-size: 11px; }
 .network-frame { position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 50%, #272b402e, transparent 70%), var(--surface); }
 .network-frame > svg { display: block; width: 100%; height: clamp(300px, 58vh, 450px); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.network-frame > svg { -webkit-touch-callout: none; }
 .network-frame > svg:active { cursor: grabbing; }
 .network-zoom { position: absolute; right: 9px; top: 9px; z-index: 1; display: flex; align-items: center; gap: 2px; background: #10131ce8; border: 1px solid var(--border); padding: 4px; border-radius: 11px; }
 .network-zoom > span { min-width: 42px; text-align: center; color: var(--muted); font-size: 11px; }
@@ -78,6 +79,18 @@
 .network-legend { margin: 16px 0; color: var(--muted); }
 .network-legend > summary { padding: 12px 0; font-size: 12px; min-height: 44px; cursor: pointer; }
 .network-legend > p { max-width: 800px; line-height: 1.7; }
+/* Portal escapes the scrolling container; profiles (100) remain above the map (90). */
+.network-fullscreen-host > .modal-backdrop { z-index: 90; padding: 0; backdrop-filter: none; }
+.modal.fullscreen-network { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); display: flex; flex-direction: column; overflow: hidden; }
+.modal.fullscreen-network { animation: none; }
+.fullscreen-network .modal-heading { position: static; flex: none; margin: 0 0 6px; padding: 0; gap: 8px; }
+.fullscreen-network .modal-heading h2 { font-size: 13px; }
+.fullscreen-network .modal-heading > .icon-button { width: 44px; height: 44px; min-width: 44px; }
+.fullscreen-network .network-frame { flex: 1; min-height: 0; margin: 0; }
+.fullscreen-network .network-frame > svg { height: 100%; }
+.network-fullscreen-caption { display: flex; flex: none; align-items: center; gap: 8px; min-height: 44px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.network-fullscreen-caption > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.network-fullscreen-caption > .icon-button { flex: none; min-width: 44px; min-height: 44px; }
 @media (max-width: 480px) {
   .network-filters > .field { width: 100%; }
   .network-scan { padding: 15px; }

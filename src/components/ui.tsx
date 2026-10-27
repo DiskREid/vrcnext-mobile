@@ -148,6 +148,7 @@ export function Modal({
   wide = false,
   className = '',
   closeOnBackdrop = true,
+  closeLabel = 'Закрыть',
 }: {
   title: string;
   children: ReactNode;
@@ -155,6 +156,7 @@ export function Modal({
   wide?: boolean;
   className?: string;
   closeOnBackdrop?: boolean;
+  closeLabel?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null),
     titleId = useId();
@@ -200,8 +202,8 @@ export function Modal({
       const index = modalStack.indexOf(root);
       if (index !== -1) modalStack.splice(index, 1);
       if (!modalStack.length) document.body.style.overflow = previousOverflow;
-      if (before?.isConnected) before.focus();
-      else modalStack.at(-1)?.focus();
+      if (before?.isConnected) before.focus({ preventScroll: true });
+      else modalStack.at(-1)?.focus({ preventScroll: true });
     };
   }, []);
   return (
@@ -221,7 +223,7 @@ export function Modal({
       >
         <div className="modal-heading">
           <h2 id={titleId}>{title}</h2>
-          <button className="icon-button" onClick={onClose} aria-label="Закрыть">
+          <button className="icon-button" onClick={onClose} aria-label={closeLabel}>
             <X size={22} />
           </button>
         </div>
