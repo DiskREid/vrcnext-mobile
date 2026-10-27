@@ -19,8 +19,12 @@ export interface HistoryEvent {
   after?: string;
   location?: string;
   worldId?: string;
-  source: 'pipeline' | 'profile' | 'action';
+  source: 'pipeline' | 'profile' | 'refresh' | 'sync' | 'action';
   avatarUrl?: string;
+  avatarId?: string;
+  avatarName?: string;
+  avatarAuthorName?: string;
+  avatarEvidence?: 'id' | 'image';
 }
 export const historyLabels: Record<HistoryKind, string> = {
   online: 'Зашёл в VRChat', offline: 'Вышел из VRChat', world: 'Местоположение', instance: 'Сменил инстанс',
@@ -28,12 +32,37 @@ export const historyLabels: Record<HistoryKind, string> = {
   'friend-remove': 'Удалён из друзей', name: 'Изменил имя', trust: 'Изменил Trust Rank',
   profile: 'Обновил профиль', moderation: 'Модерация',
 };
-type Snapshot = Partial<Pick<User, 'id'|'displayName'|'status'|'statusDescription'|'location'|'currentAvatar'|'bio'|'pronouns'|'bioLinks'|'languages'|'tags'>>;
+type Snapshot = Partial<Pick<User, 'id'|'displayName'|'status'|'statusDescription'|'location'|'currentAvatar'|'currentAvatarName'|'currentAvatarAuthorName'|'currentAvatarImageUrl'|'currentAvatarThumbnailImageUrl'|'bio'|'pronouns'|'bioLinks'|'languages'|'tags'>>;
+type AvatarImage = { url: string; identity: string };
+type AvatarSnapshot = { id?: string; full?: AvatarImage; thumbnail?: AvatarImage; awaitingIdentity?: boolean };
+type PendingAvatar = { event: HistoryEvent; beforeId?: string; images: Set<string> };
+const imageHosts = new Set(['api.vrchat.cloud','api.vrchat.com','files.vrchat.cloud','file-variants.vrchat.com','assets.vrchat.com','vrchat.com','cloud.vrchat.com']);
+/** Compare file/version, not auth queries, thumbnail resolution, or the chosen VRChat CDN. */
+function avatarImage(value: unknown): AvatarImage | undefined {
+  if (typeof value !== 'string' || !value || value.length > 4096) return;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || !imageHosts.has(url.hostname)) return;
+    url.search = ''; url.hash = '';
+    const file = url.pathname.match(/\/(file_[A-Za-z0-9_-]+)\/(\d{1,9})(?:\/|$)/);
+    return { url:url.href, identity:file ? `${file[1]}:${Number(file[2])}` : `${url.hostname.replace('api.vrchat.com','api.vrchat.cloud')}${url.pathname}` };
+  } catch { return; }
+}
+function avatarSnapshot(user: Snapshot): AvatarSnapshot {
+  return {
+    id: typeof user.currentAvatar === 'string' && /^avtr_[A-Za-z0-9_-]+$/.test(user.currentAvatar) ? user.currentAvatar : undefined,
+    full: avatarImage(user.currentAvatarImageUrl), thumbnail:avatarImage(user.currentAvatarThumbnailImageUrl),
+  };
+}
 function snapshot(user: Partial<User>): Snapshot {
   const result: Snapshot = {};
   // Never persist arbitrary server objects, credentials, cookies, or auth fields.
-  for (const key of ['id','displayName','status','statusDescription','location','currentAvatar','bio','pronouns'] as const)
+  for (const key of ['id','displayName','status','statusDescription','location','currentAvatar','currentAvatarName','currentAvatarAuthorName','bio','pronouns'] as const)
     if (typeof user[key] === 'string') result[key] = user[key].slice(0, key === 'bio' ? 8192 : 2048);
+  for (const key of ['currentAvatarImageUrl','currentAvatarThumbnailImageUrl'] as const) {
+    const image = avatarImage(user[key]);
+    if (image) result[key] = image.url;
+  }
   for (const key of ['bioLinks','languages','tags'] as const)
     if (Array.isArray(user[key])) result[key] = user[key].filter((v):v is string => typeof v === 'string').slice(0,100).map((s)=>s.slice(0,2048));
   return result;
@@ -53,13 +82,21 @@ export class HistoryObserver {
   private known = new Map<string, Snapshot>();
   private presence = new Map<string, 'online'|'offline'|'website'>();
   private membership = new Map<string, boolean>();
+  private avatars = new Map<string, AvatarSnapshot>();
+  // One recent event per user can await public-profile metadata. Older,
+  // already superseded images must never receive a later avatar's name.
+  private pendingAvatars = new Map<string, PendingAvatar>();
   constructor(private readonly now: () => string = () => new Date().toISOString(), private readonly id: () => string = () => crypto.randomUUID()) {}
-  pause() { this.known.clear(); this.presence.clear(); this.membership.clear(); }
+  pause() { this.known.clear(); this.presence.clear(); this.membership.clear(); this.avatars.clear(); this.pendingAvatars.clear(); }
   seedUsers(users: User[]) {
     for (const user of users) {
       const prior = this.known.get(user.id) || {};
       this.known.set(user.id, { ...snapshot(user), ...prior });
+      if (!this.avatars.has(user.id)) this.avatars.set(user.id, avatarSnapshot(this.known.get(user.id)!));
     }
+  }
+  observeUsers(users: User[], source: HistoryEvent['source'] = 'refresh'): HistoryEvent[] {
+    return users.flatMap((user) => this.observeProfile(user, source));
   }
   private event(kind: HistoryKind, userId: string, user: Snapshot, source: HistoryEvent['source'], detail: string, extra: Partial<HistoryEvent> = {}): HistoryEvent {
     return { id:this.id(), time:this.now(), kind,userId,displayName:user.displayName || userId,detail,source,...extra };
@@ -67,6 +104,27 @@ export class HistoryObserver {
   observeProfile(user: User, source: HistoryEvent['source'] = 'profile'): HistoryEvent[] {
     const old = this.known.get(user.id);
     const incoming = snapshot(user);
+    const previousAvatar = this.avatars.get(user.id) || (old ? avatarSnapshot(old) : undefined);
+    const freshAvatar = avatarSnapshot(incoming);
+    const pendingAvatar = this.pendingAvatars.get(user.id);
+    const freshImages = [freshAvatar.full, freshAvatar.thumbnail].filter((image): image is AvatarImage => !!image);
+    const matchesPendingImage = !!pendingAvatar && freshImages.some(image => pendingAvatar.images.has(image.identity));
+    // A refreshed friend row can still carry an older merged ID. Once the image
+    // changes, resolve its identity only from a fresh profile or pipeline field.
+    if (previousAvatar?.awaitingIdentity && source === 'refresh') freshAvatar.id = undefined;
+    // An ID arriving without its image cannot resolve an earlier image-only
+    // event: the user may already have switched again during that request.
+    if (previousAvatar?.awaitingIdentity && !freshImages.length) freshAvatar.id = undefined;
+    const idChanged = !!previousAvatar?.id && !!freshAvatar.id && previousAvatar.id !== freshAvatar.id;
+    const fullChanged = !!previousAvatar?.full && !!freshAvatar.full && previousAvatar.full.identity !== freshAvatar.full.identity;
+    const thumbnailChanged = !!previousAvatar?.thumbnail && !!freshAvatar.thumbnail && previousAvatar.thumbnail.identity !== freshAvatar.thumbnail.identity;
+    const imageChanged = fullChanged || thumbnailChanged;
+    this.avatars.set(user.id, {
+      id:freshAvatar.id || (!idChanged && !imageChanged ? previousAvatar?.id : undefined),
+      full:freshAvatar.full || (!idChanged && !imageChanged ? previousAvatar?.full : undefined),
+      thumbnail:freshAvatar.thumbnail || (!idChanged && !imageChanged ? previousAvatar?.thumbnail : undefined),
+      awaitingIdentity: imageChanged && !freshAvatar.id || !!previousAvatar?.awaitingIdentity && !freshAvatar.id,
+    });
     this.known.set(user.id, {...old,...incoming});
     if (!old) return [];
     const events: HistoryEvent[] = [];
@@ -77,9 +135,46 @@ export class HistoryObserver {
     };
     change('name',old.displayName,incoming.displayName,`${old.displayName} → ${incoming.displayName}`);
     change('bio',old.bio,incoming.bio,'Биография обновлена');
-    // An image may change without the avatar changing. Only a real avatar ID is evidence.
-    if (old.currentAvatar?.startsWith('avtr_') && incoming.currentAvatar?.startsWith('avtr_'))
-      change('avatar',old.currentAvatar,incoming.currentAvatar,`${old.currentAvatar} → ${incoming.currentAvatar}`);
+    if (idChanged || imageChanged) {
+      const beforeImage = fullChanged ? previousAvatar?.full : previousAvatar?.thumbnail;
+      const afterImage = fullChanged ? freshAvatar.full : freshAvatar.thumbnail;
+      const name = incoming.currentAvatarName?.trim().slice(0,256);
+      const author = incoming.currentAvatarAuthorName?.trim().slice(0,256);
+      const avatarEvent = this.event('avatar',user.id,next,source,
+        idChanged ? 'Сменил аватар' : 'Обновилось изображение аватара', {
+          before:idChanged ? previousAvatar?.id : beforeImage?.url,
+          after:idChanged ? freshAvatar.id : afterImage?.url,
+          avatarEvidence:idChanged ? 'id' : 'image',
+          ...(freshAvatar.id ? {avatarId:freshAvatar.id} : {}),
+          ...((freshAvatar.thumbnail || freshAvatar.full) ? {avatarUrl:(freshAvatar.thumbnail || freshAvatar.full)!.url} : {}),
+          ...(name ? {avatarName:name} : {}), ...(author ? {avatarAuthorName:author} : {}),
+        });
+      events.push(avatarEvent);
+      this.pendingAvatars.delete(user.id);
+      this.pendingAvatars.set(user.id, {
+        event: avatarEvent,
+        beforeId: previousAvatar?.id,
+        images: new Set(freshImages.map(image => image.identity)),
+      });
+      while (this.pendingAvatars.size > 1000) this.pendingAvatars.delete(this.pendingAvatars.keys().next().value!);
+    } else if (pendingAvatar && source !== 'refresh' && (matchesPendingImage || !!freshAvatar.id && freshAvatar.id === pendingAvatar.event.avatarId)) {
+      // Upsert the original row after its exact public-profile data arrives.
+      // Only add absent metadata: a later rename must not rewrite an old name.
+      const original = pendingAvatar.event;
+      const enriched: HistoryEvent = { ...original };
+      if (!enriched.avatarId && freshAvatar.id) enriched.avatarId = freshAvatar.id;
+      if (!enriched.avatarName && incoming.currentAvatarName?.trim()) enriched.avatarName = incoming.currentAvatarName.trim().slice(0,256);
+      if (!enriched.avatarAuthorName && incoming.currentAvatarAuthorName?.trim()) enriched.avatarAuthorName = incoming.currentAvatarAuthorName.trim().slice(0,256);
+      if (!enriched.avatarUrl && freshImages.length) enriched.avatarUrl = (freshAvatar.thumbnail || freshAvatar.full)!.url;
+      if (original.avatarEvidence === 'image' && pendingAvatar.beforeId && freshAvatar.id && pendingAvatar.beforeId !== freshAvatar.id) {
+        enriched.avatarEvidence = 'id'; enriched.before = pendingAvatar.beforeId; enriched.after = freshAvatar.id;
+        enriched.detail = 'Сменил аватар';
+      }
+      if ((Object.keys(enriched) as (keyof HistoryEvent)[]).some(key => enriched[key] !== original[key])) {
+        pendingAvatar.event = enriched;
+        events.push(enriched);
+      }
+    }
     const statusChanged = old.status !== undefined && incoming.status !== undefined && old.status !== incoming.status;
     const descriptionChanged = old.statusDescription !== undefined && incoming.statusDescription !== undefined && old.statusDescription !== incoming.statusDescription;
     if (statusChanged || descriptionChanged) events.push(this.event('status',user.id,next,source,
@@ -135,7 +230,10 @@ export class HistoryObserver {
     } else if (event.type === 'friend-offline') next.location = 'offline';
     else if (typeof content.location === 'string') next.location = content.location;
     // Only compare fields actually present in an update; absent data never erases a known value.
-    output.push(...this.observeProfile(next,'pipeline'));
+    // Do not present inherited avatar IDs/URLs as fresh API evidence. A public
+    // friend update often has only its new image, with no avatar ID or Bio.
+    output.push(...this.observeProfile({...snapshot(partial),id:userId,displayName:next.displayName,
+      ...(typeof next.location === 'string' ? {location:next.location} : {})},'pipeline'));
     return output;
   }
   recordModeration(userId:string,displayName:string,action:string):HistoryEvent {
@@ -195,7 +293,7 @@ export class HistoryJournal {
   append(events:HistoryEvent[]) {
     if(!events.length)return;
     this.queue.push(...events);
-    this.publish({events:sortEvents([...events,...this.state.events])});
+    this.publish({events:sortEvents([...this.state.events,...events])});
     void this.flush();
   }
   observeSession(self:User,friends:User[],source:ObservationSource) {this.updateGame(this.game.observe(self,friends,source));}
@@ -275,7 +373,8 @@ export function useHistory(account:string|undefined,demo:boolean) {
     return () => { unsubscribe(); journal.pause(); };
   },[journal]);
   const observePipeline=useCallback((event:PipelineEvent,friends:User[],self:User) => { if(journal)journal.append(journal.observer.observePipeline(event,friends,self)); },[journal]);
-  const observeProfile=useCallback((user:User) => { if(journal)journal.append(journal.observer.observeProfile(user)); },[journal]);
+  const observeProfile=useCallback((user:User,source:HistoryEvent['source']='profile') => { if(journal)journal.append(journal.observer.observeProfile(user,source)); },[journal]);
+  const observeUsers=useCallback((users:User[],source:HistoryEvent['source']='refresh') => { if(journal)journal.append(journal.observer.observeUsers(users,source)); },[journal]);
   const seedUsers=useCallback((users:User[])=>journal?.observer.seedUsers(users),[journal]);
   const recordModeration=useCallback((id:string,name:string,action:string)=>{if(journal)journal.append([journal.observer.recordModeration(id,name,action)]);},[journal]);
   const recordFriendAction=useCallback((id:string,name:string,kind:'friend-add'|'friend-remove')=>{if(journal)journal.append(journal.observer.recordFriendAction(id,name,kind));},[journal]);
@@ -286,6 +385,6 @@ export function useHistory(account:string|undefined,demo:boolean) {
   const friendStats=useCallback((id:string)=>friendStatistics(journal?.state.visits||[],id),[journal,state.visits]);
   // A synchronous account render gate prevents a previous account's history flashing before effects.
   const visible = journal && state===journal.state ? state : journal?.state || {events:[],visits:[],sessions:[],loading:false,error:''};
-  return {...visible,observePipeline,observeProfile,seedUsers,recordModeration,recordFriendAction,retry,clear,pause,observeSession,friendStats};
+  return {...visible,observePipeline,observeProfile,observeUsers,seedUsers,recordModeration,recordFriendAction,retry,clear,pause,observeSession,friendStats};
 }
 export type HistoryState = ReturnType<typeof useHistory>;

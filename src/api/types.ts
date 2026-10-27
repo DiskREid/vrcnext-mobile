@@ -24,6 +24,8 @@ export interface User {
   currentAvatarImageUrl?: string;
   currentAvatarThumbnailImageUrl?: string;
   currentAvatar?: string;
+  currentAvatarName?: string;
+  currentAvatarAuthorName?: string;
   currentAvatarTags?: string[];
   profileBannerUrl?: string;
   isFriend?: boolean;

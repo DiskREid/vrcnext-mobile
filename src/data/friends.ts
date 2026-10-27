@@ -79,7 +79,7 @@ export function useFriends(account: string | undefined, demo: boolean, revision:
       .finally(() => { if (live) { events.current = null; setLoading(false); setRefreshing(false); } });
     return () => { live = false; events.current = null; };
   }, [account, demo, revision, retry]);
-  return { data, loading, refreshing, error, apply, reload: () => setRetry((v) => v + 1) };
+  return { data: owner.current === `${account}:${demo}` ? data : [], loading, refreshing, error, apply, reload: () => setRetry((v) => v + 1) };
 }
 
 export type FriendState = ReturnType<typeof useFriends>;

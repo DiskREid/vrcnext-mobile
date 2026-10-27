@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Avatar history search synthetic fixture only</title></head>
+<body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import '/src/styles.css';
+const params=new URLSearchParams(location.search),mode=params.get('mode')||'normal';
+const {api,createApi}=await import('/src/api/index.ts');
+const picture='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#926bf0"/></svg>');
+const avatar=(id,name)=>({vrc_id:id,name,image_url:picture,author:{vrc_id:'usr_avatar-author',name:'Synthetic Creator'}});
+window.__avatarHistorySearch={searches:[],requests:[],actions:[],resolveSearch:null};
+let failed=false;
+const transport={
+ async request(options){window.__avatarHistorySearch.requests.push(options.path);const id=options.path.split('/').pop();return{status:200,data:{id,name:'Synthetic Exact Avatar',authorId:'usr_avatar-author',authorName:'Synthetic Creator',imageUrl:picture}};},
+ async searchPublicAvatars(options){
+  window.__avatarHistorySearch.searches.push(options);
+  if(mode==='delay')await new Promise(resolve=>{window.__avatarHistorySearch.resolveSearch=resolve;});
+  if(mode==='rate'&&!failed){failed=true;return{status:429,data:{},retryAfter:1};}
+  if(mode==='paging'&&options.page===1&&!failed){failed=true;return{status:500,data:{}};}
+  if(mode==='paging'&&options.page===0)return{status:200,data:Array.from({length:20},(_,i)=>avatar(i===7?'avtr_exact':`avtr_result-${i}`,i===7?'Synthetic Exact Avatar':`Synthetic Search Result ${i}`))};
+  return{status:200,data:[avatar(options.page?'avtr_later':'avtr_exact',options.page?'Synthetic Next Avatar':'Synthetic Exact Avatar')]};
+ },
+ sessionState:async()=>({hasAuth:false}),clearSession:async()=>{},disconnectPipeline:async()=>{},
+};
+Object.assign(api,createApi(transport));
+const {AppProvider}=await import('/src/state.tsx');
+const {Modal}=await import('/src/components/ui.tsx');
+const {HistoryAvatarSearch}=await import('/src/components/HistoryAvatarSearch.tsx');
+const noop=()=>{};
+function Fixture(){
+ const [parent,setParent]=React.useState(params.has('parent')),[author,setAuthor]=React.useState(false);
+ const value={user:{id:'usr_avatar-viewer',displayName:'Synthetic Viewer'},demo:params.has('demo'),online:true,pageActive:true,refresh:0,friends:{data:[]},history:{events:[],friendStats:()=>({encounters:0,totalMs:0})},notify:noop,act:async operation=>operation(),onRefresh:noop,openUser:user=>{window.__avatarHistorySearch.actions.push({type:'user',id:user});setAuthor(true);}};
+ const search=React.createElement(HistoryAvatarSearch,{name:params.has('long')?'x'.repeat(101):'Reilynn The Werewolf',avatarId:params.has('noid')?undefined:'avtr_exact'});
+ return React.createElement(AppProvider,{value},React.createElement('div',{className:'app-shell'},React.createElement('main',{className:'main-content'},React.createElement('h1',null,'Synthetic Avatar History Search'),parent?React.createElement(Modal,{title:'Профиль: родитель',onClose:()=>setParent(false)},search):search),author&&React.createElement(Modal,{title:'Профиль автора',onClose:()=>setAuthor(false)},React.createElement('h2',null,'Synthetic Creator'))));
+}
+createRoot(document.getElementById('root')).render(React.createElement(Fixture));
+</script></body></html>

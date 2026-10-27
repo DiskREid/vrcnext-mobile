@@ -20,6 +20,8 @@ export function mergePublicProfile(user: User, profile?: Record<string, unknown>
     'userIcon',
     'iconUrl',
     'currentAvatar',
+    'currentAvatarName',
+    'currentAvatarAuthorName',
     'currentAvatarImageUrl',
     'currentAvatarThumbnailImageUrl',
     'ageVerificationStatus',

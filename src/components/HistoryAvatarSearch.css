@@ -1,0 +1,18 @@
+.history-avatar-search { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.history-avatar-search-trigger { min-height: 44px; max-width: 100%; padding: 6px 0; text-align: left; }
+.history-avatar-search-trigger > span { min-width: 0; overflow-wrap: anywhere; }
+.history-avatar-search-trigger > svg { flex: none; }
+.history-avatar-search > small { line-height: 1.5; }
+.history-avatar-search-host { position: relative; }
+.history-avatar-query { font-weight: 600; overflow-wrap: anywhere; }
+.history-avatar-search-dialog > .muted { line-height: 1.6; }
+.history-avatar-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; margin: 14px 0; }
+.history-avatar-results > div { min-width: 0; }
+.history-avatar-result { display: flex; align-items: flex-start; gap: 12px; width: 100%; min-height: 90px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.history-avatar-result:hover, .history-avatar-result:focus-visible { border-color: var(--accent); }
+.history-avatar-result > img { width: 64px; height: 64px; flex: none; object-fit: cover; border-radius: 9px; }
+.history-avatar-result > span { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.history-avatar-result strong { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.history-avatar-result small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.history-avatar-search-error { margin: 12px 0; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
+.history-avatar-search-error > p { overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }

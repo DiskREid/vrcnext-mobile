@@ -1,12 +1,25 @@
 # VRCNext Mobile
 
 Неофициальная Android-адаптация [VRCNext](https://github.com/shinyflvre/VRCNext)
-от shinyflvre и участников VRCNext. Версия 0.2.8, Android 8.0+ (API26), Android System WebView109+, target API35.
+от shinyflvre и участников VRCNext. Версия 0.2.9, Android 8.0+ (API26), Android System WebView109+, target API35.
 Исходная ПК-версия изучена на коммите `0bfb467f89caa21893769f6495abe334febe08a3`.
 
 Это самостоятельная мобильная реализация с сохранением текущего дизайна. **Полный паритет с ПК не заявляется**: часть данных недоступна мобильному API.
 Интерфейс и протоколы реализованы в коде; работа с реальным VRChat-аккаунтом,
 Keystore и устройством требует отдельного приёмочного тестирования.
+
+## Лента аватаров и био 0.2.9
+
+- Данные аватара и био поступают из публичных профилей, которые проверяются
+  по очереди при активном приложении. Обновления списка друзей тоже сравниваются.
+- Название, автор и превью аватара сохраняются в событии. При получении
+  точных данных существующая запись дополняется без дублирования.
+- Нажатие на название открывает поиск в AvatarDB. Запрос выполняется только
+  после нажатия; результат поиска можно открыть в карточке аватара.
+- Для био показаны добавленные и удалённые фрагменты, с сохранением Unicode
+  и переносов. Первые снимки не выдаются за изменения до начала наблюдения.
+
+[Подробности и ограничения](docs/FIXES_0.2.9.md).
 
 ## Исправление нажатия в графе 0.2.8
 
@@ -172,11 +185,11 @@ Keystore и устройством требует отдельного приё�
 
 [Все версии в GitHub Releases](https://github.com/DiskREid/vrcnext-mobile/releases).
 
-- [Скачать APK 0.2.8](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/VRCNext-Mobile-0.2.8.apk)
-- [Скачать архив исходников](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/VRCNext-Mobile-0.2.8-source.zip)
-- [SHA256](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/SHA256SUMS.txt) · [Снимки интерфейса](releases/v0.2.8/screenshots)
+- [Скачать APK 0.2.9](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.9/VRCNext-Mobile-0.2.9.apk)
+- [Скачать архив исходников](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.9/VRCNext-Mobile-0.2.9-source.zip)
+- [SHA256](https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.9/SHA256SUMS.txt) · [Снимки интерфейса](releases/v0.2.9/screenshots)
 
-APK, архив и снимки находятся в каталоге `releases/v0.2.8` этого репозитория.
+APK, архив и снимки находятся в каталоге `releases/v0.2.9` этого репозитория.
 Это тестовая debug-сборка. Реальный вход в VRChat и операции аккаунта на телефоне
 ещё не проверены; полный статус функций указан ниже и в документации.
 
@@ -187,12 +200,12 @@ npm ci
 npm run android:build
 ```
 
-Результат: `artifacts/VRCNext-Mobile-0.2.8.apk`, рядом SHA256.
+Результат: `artifacts/VRCNext-Mobile-0.2.9.apk`, рядом SHA256.
 Скрипт проверяет подпись с помощью `apksigner`. Это подписанная **debug-сборка
 для тестирования**, не production/store-релиз. Ключ debug-сборки генерируется
 локально и не входит в исходный код; APK из другого окружения может потребовать
-удалить ранее установленную сборку. Опубликованная0.2.8 использует ту же подпись,
-что0.1.1/0.2.0/0.2.1/0.2.2/0.2.3/0.2.4/0.2.5/0.2.6/0.2.7; устанавливайте обновление поверх неё, без удаления приложения.
+удалить ранее установленную сборку. Опубликованная0.2.9 использует ту же подпись,
+что0.1.1/0.2.0/0.2.1/0.2.2/0.2.3/0.2.4/0.2.5/0.2.6/0.2.7/0.2.8; устанавливайте обновление поверх неё, без удаления приложения.
 Для стабильных обновлений выпуска нужен
 собственный release keystore через Android Studio, вне репозитория.
 
@@ -256,7 +269,7 @@ Copyright (c)2026 VRCNext Contributors. Исходный проект — shinyf
 Mobile — отдельная неофициальная адаптация для DiskREid/vrcnext-mobile.
 Оригинальная [LICENSE](LICENSE) VNCOL сохранена дословно; производные части
 некоммерческие. Отдельный User-Agent:
-`Mobile-VRCNext/0.2.8 (https://github.com/DiskREid/vrcnext-mobile/issues)`.
+`Mobile-VRCNext/0.2.9 (https://github.com/DiskREid/vrcnext-mobile/issues)`.
 В оригинальном тексте версия заголовка1.3 и ссылка на1.2 в разделе3 сохранены
 как у правообладателей. Лицензии зависимостей остаются у их авторов
 (Capacitor/React/Vite/Lucide/OkHttp и др.).
