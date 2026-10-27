@@ -436,6 +436,49 @@
           "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.7/release-files.zip"
         }
       ]
+    },
+    {
+      "tag": "v0.2.8",
+      "targetCommit": "8f66f2bc8932c9835f964e614f638f7d30003bec",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.8",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3146,
+          "sha256": "79412c109a5191e38c3339ac4d30739d73b37b92c2bd7df85277a6d6775129a2",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 863,
+          "sha256": "4748ea0454ee7137a1806ff7522feb338d69357d91e054856606390b063da2c9",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.8-source.zip",
+          "bytes": 1438512,
+          "sha256": "18aa7619144266990708e6bbf62eca65bdae33a7bc6fcca4a89750afc78d3273",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/VRCNext-Mobile-0.2.8-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.8.apk",
+          "bytes": 5511769,
+          "sha256": "0579bd02cbcceca3b165d0dda5f2e0960cff7a62eb8942ada6f886b9df3f9f63",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/VRCNext-Mobile-0.2.8.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 1781,
+          "sha256": "f69496a0252d5b52ea9406aa1a0c12faa1cf218f6699653a1a33a428b5c2bd90",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6904924,
+          "sha256": "f029d13539b94678113c64f2aa3a5412cf38012098b2e3741a0a71c36a6136b4",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.8/release-files.zip"
+        }
+      ]
     }
   ]
 }
