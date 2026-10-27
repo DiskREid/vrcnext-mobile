@@ -1,0 +1,58 @@
+{
+  "version": "0.2.13",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 16,
+  "apk": {
+    "name": "VRCNext-Mobile-0.2.13.apk",
+    "bytes": 5522257,
+    "sha256": "156d63b55ebbe79d31fd194950679eca1a304d1b1efd61cb65cc59c5c4159cc8",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0212": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 363,
+    "playwrightPassed": 8,
+    "fullUiSuite": false,
+    "uiScope": "Dashboard and existing friend/profile presence regressions",
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 30,
+    "testAndDevMarkersAbsent": true
+  },
+  "regressions": {
+    "preFixDashboardFailures": 4,
+    "preFixTravelingLabelFailure": true,
+    "privateAndTravelingInGame": true,
+    "websiteWithOfflineLocationVisible": true,
+    "gameCounterExcludesWebsite": true,
+    "profileAndHomePresenceAgree": true,
+    "pipelineUpdatesApplied": true,
+    "olderRefreshCannotOverwriteNewerEvent": true,
+    "noProfilePolling": true
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "instrumentationExecuted": false
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.2.13-source.zip",
+    "sourceCommit": "0884365d3a71e5d194b5c10ed377c24d4393c817",
+    "trackedFiles": 247,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "4f6f1213bd498fa77bec442fbc6ae859e2606f7d6707036f7d426b4ad33de8a2"
+  }
+}
