@@ -1,0 +1,58 @@
+{
+  "version": "0.2.8",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 11,
+  "apk": {
+    "name": "VRCNext-Mobile-0.2.8.apk",
+    "bytes": 5511769,
+    "sha256": "0579bd02cbcceca3b165d0dda5f2e0960cff7a62eb8942ada6f886b9df3f9f63",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished027": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 286,
+    "playwrightPassed": 32,
+    "playwrightScope": {
+      "networkGestureAndRealTouch": 22,
+      "appGraphIntegrationAndPlatformIcons": 10,
+      "fullSuiteRerun": false
+    },
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 32,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 30,
+    "testAndDevMarkersAbsent": true,
+    "instrumentationExecuted": false
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "instrumentationExecutedFor028": false,
+    "note": "Browser UI and native compilation are separate checks. Historical 0.1.1 software emulator WebView renderer failure is not a 0.2.8 physical-device result."
+  },
+  "screenProtection": {
+    "defaultEnabled": false,
+    "storedNatively": true,
+    "appliedImmediately": true,
+    "deviceScreenshotCaptureVerified": false
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.2.8-source.zip",
+    "sourceCommit": "e89ed47ad9f89a6e1136a97fc113938dfd64589b",
+    "trackedFiles": 222,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "18aa7619144266990708e6bbf62eca65bdae33a7bc6fcca4a89750afc78d3273"
+  }
+}
