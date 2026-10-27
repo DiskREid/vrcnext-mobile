@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, PointerEvent, RefObject } from 'react';
+import type { KeyboardEvent, MouseEvent, PointerEvent, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { App as AndroidApp } from '@capacitor/app';
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -72,7 +72,7 @@ const NetworkScene = memo(function NetworkScene({ sceneRef, layout, nodes, image
       const node = nodes.get(position.id)!;
       const avatar = images.get(node.id);
       const radius = Math.max(node.self ? 29 : 24, layout.length <= 12 ? 20 / actualScale : 0);
-      return <g key={node.id} role="button" tabIndex={0} aria-label={`Открыть профиль ${node.displayName}`} aria-disabled={busy} data-network-id={node.id} className={`network-node ${node.self ? 'self' : ''} ${selected === node.id ? 'selected' : selected ? neighborhood.has(node.id) ? 'neighbor' : 'dimmed' : ''}`} transform={`translate(${position.x} ${position.y})`} onClick={(event) => { if (event.detail === 0 && !busy) openProfile(node.id); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!busy) openProfile(node.id); } }}>
+      return <g key={node.id} role="button" tabIndex={0} aria-label={`Открыть профиль ${node.displayName}`} aria-disabled={busy} data-network-id={node.id} className={`network-node ${node.self ? 'self' : ''} ${selected === node.id ? 'selected' : selected ? neighborhood.has(node.id) ? 'neighbor' : 'dimmed' : ''}`} transform={`translate(${position.x} ${position.y})`} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!busy) openProfile(node.id); } }}>
         <title>{node.displayName}{node.self ? ' · Вы' : ''}</title>
         <circle className="network-hit" r={Math.max(node.self ? 32 : 28, radius, 52 / Math.max(1, actualScale))} />
         <circle className="network-node-disc" r={radius + 2} fill={node.self ? '#282941' : colorOf(node.component)} stroke={node.self ? '#b3a4ff' : '#10131c'} />
@@ -116,6 +116,7 @@ export function FriendNetwork() {
   const pointers = useRef(new Map<number, Point>());
   const gesture = useRef<{ view: Transform; points: Point[]; client: Point[]; node?: string; moved: boolean; held: boolean } | undefined>(undefined);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pendingClick = useRef<{ node?: string; expiresAt: number } | undefined>(undefined);
   const busyRef = useRef(busy);
   busyRef.current = busy;
   const observations = cache.account === account ? cache.observations : [];
@@ -123,7 +124,7 @@ export function FriendNetwork() {
   observationRef.current = observations;
 
   function cancelHold() { clearTimeout(holdTimer.current); holdTimer.current = undefined; }
-  function cancelGesture() { cancelHold(); pointers.current.clear(); gesture.current = undefined; }
+  function cancelGesture() { cancelHold(); pointers.current.clear(); gesture.current = undefined; pendingClick.current = undefined; }
   useEffect(() => {
     const cancel = () => { cancelGesture(); };
     window.addEventListener('blur', cancel);
@@ -325,6 +326,7 @@ export function FriendNetwork() {
     if (event.button !== 0 && event.pointerType === 'mouse') return;
     event.preventDefault();
     cancelHold();
+    pendingClick.current = undefined;
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const node = (event.target as Element).closest('[data-network-id]')?.getAttribute('data-network-id') || undefined;
     beginGesture(node, gesture.current?.moved || false);
@@ -370,9 +372,29 @@ export function FriendNetwork() {
     else {
       gesture.current = undefined;
       changeView(viewRef.current);
-      if (!cancelled && before?.node && !before.moved && !before.held && !busy) ctx.openUser(before.node);
+      // Wait for the browser click: opening on pointerup lets that same click hit
+      // a new profile's backdrop, close button, or invitation controls instead.
+      pendingClick.current = {
+        node: !cancelled && before?.node && !before.moved && !before.held && !busy ? before.node : undefined,
+        expiresAt: performance.now() + 1000,
+      };
     }
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+  function canvasClick(event: MouseEvent<SVGSVGElement>) {
+    event.preventDefault(); event.stopPropagation();
+    const pending = pendingClick.current;
+    pendingClick.current = undefined;
+    if (busy) return;
+    if (pending && performance.now() <= pending.expiresAt) {
+      if (pending.node) ctx.openUser(pending.node);
+      return; // Holds, drags, pinch and cancelled pointers also consume their click.
+    }
+    // Assistive technology can activate a node without sending pointer events.
+    if (event.detail === 0) {
+      const node = (event.target as Element).closest('[data-network-id]')?.getAttribute('data-network-id');
+      if (node) ctx.openUser(node);
+    }
   }
   function zoom(factor: number) {
     const current = viewRef.current, scale = clamp(current.scale * factor, .15, 5);
@@ -389,7 +411,7 @@ export function FriendNetwork() {
 
   const graphCanvas = <div className="network-frame card">
     <div className="network-zoom"><button className="icon-button" aria-label="Увеличить граф" onClick={() => zoom(1.25)}><Plus size={18} /></button><span ref={zoomLabel} aria-live="polite">{Math.round(view.scale * 100)}%</span><button className="icon-button" aria-label="Уменьшить граф" onClick={() => zoom(.8)}><Minus size={18} /></button><button className="icon-button" aria-label="Сбросить граф" onClick={resetView}><RotateCcw size={16} /></button>{!fullscreen && <button className="icon-button" aria-label="На весь экран" onClick={() => setFullscreen(true)}><Maximize2 size={18} /></button>}</div>
-    <svg ref={svg} role="img" aria-label="Граф общих друзей" viewBox="0 0 800 600" tabIndex={0} onContextMenu={(event) => event.preventDefault()} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={(event) => pointerEnd(event)} onPointerCancel={(event) => pointerEnd(event, true)} onLostPointerCapture={(event) => pointerEnd(event, true)} onKeyDown={keyboard}>
+    <svg ref={svg} role="img" aria-label="Граф общих друзей" viewBox="0 0 800 600" tabIndex={0} onClick={canvasClick} onContextMenu={(event) => event.preventDefault()} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={(event) => pointerEnd(event)} onPointerCancel={(event) => pointerEnd(event, true)} onLostPointerCapture={(event) => pointerEnd(event, true)} onKeyDown={keyboard}>
       <NetworkScene sceneRef={scene} layout={layout} nodes={liveNodes} images={images} paths={edgePaths} selected={emphasized} neighborhood={emphasizedNeighborhood} actualScale={actualScale} busy={busy} openProfile={openGraphProfile} />
     </svg>
   </div>;

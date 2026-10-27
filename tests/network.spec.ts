@@ -18,11 +18,20 @@ async function nodePoint(node:Locator){
 async function pointer(target:Locator,type:string,id:number,point:{x:number;y:number}){
  await target.dispatchEvent(type,{bubbles:true,cancelable:true,pointerId:id,pointerType:'touch',clientX:point.x,clientY:point.y,button:0,buttons:type==='pointerup'||type==='pointercancel'?0:1});
 }
+async function compatibilityClick(svg:Locator,point:{x:number;y:number}){
+ await svg.dispatchEvent('click',{bubbles:true,cancelable:true,detail:1,clientX:point.x,clientY:point.y,button:0});
+}
+async function shortTap(svg:Locator,node:Locator,id:number){
+ const point=await nodePoint(node);
+ await pointer(node,'pointerdown',id,point);await pointer(svg,'pointerup',id,point);
+ await compatibilityClick(svg,point);
+}
 async function holdNode(page:Page,svg:Locator,node:Locator,id=41){
  const point=await nodePoint(node);
  await pointer(node,'pointerdown',id,point);
  await expect(node).toHaveClass(/\bselected\b/);
  await pointer(svg,'pointerup',id,point);
+ await compatibilityClick(svg,point);
  await expect(page.getByRole('dialog',{name:'Профиль',exact:true})).toHaveCount(0);
 }
 async function graphPlacement(svg:Locator){
@@ -93,8 +102,8 @@ test('pointer frames move only the scene transform and never rebuild graph conte
 });
 
 test('a short touch opens the full profile, while a hold highlights only direct connections and does not open a profile on release',async({page})=>{
- const svg=await graphFixture(page),friend=websiteOf(svg),point=await nodePoint(friend);
- await pointer(friend,'pointerdown',40,point);await pointer(svg,'pointerup',40,point);
+ const svg=await graphFixture(page),friend=websiteOf(svg);
+ await shortTap(svg,friend,40);
  const profile=page.getByRole('dialog',{name:'Профиль',exact:true});
  await expect(profile.getByRole('heading',{name:'Website Friend',exact:true})).toBeVisible();
  await profile.getByRole('button',{name:'Закрыть',exact:true}).click();
@@ -110,7 +119,7 @@ test('a short touch opens the full profile, while a hold highlights only direct 
  expect(paths.filter(path=>path.selected).reduce((count,path)=>count+path.count,0)).toBe(1);
  expect(paths.filter(path=>path.dimmed).reduce((count,path)=>count+path.count,0)).toBe(2);
  // A completed hold must not disable the next ordinary tap on that same person.
- const afterHold=await nodePoint(friend);await pointer(friend,'pointerdown',42,afterHold);await pointer(svg,'pointerup',42,afterHold);
+ await shortTap(svg,friend,42);
  await expect(profile.getByRole('heading',{name:'Website Friend',exact:true})).toBeVisible();
 });
 
@@ -146,6 +155,7 @@ for(const interruption of ['drag','second touch','pointer cancel'] as const){
   await expect(svg.locator('.network-node.selected')).toHaveCount(0);
   if(interruption==='second touch')await pointer(svg,'pointerup',52,{x:start.x+70,y:start.y});
   if(interruption!=='pointer cancel')await pointer(svg,'pointerup',51,interruption==='drag'?{x:start.x+24,y:start.y+8}:start);
+  await compatibilityClick(svg,start);
   await expect(page.getByRole('dialog',{name:'Профиль',exact:true})).toHaveCount(0);
  });
 }
@@ -167,7 +177,7 @@ test('full-screen graph fills the viewport, keeps focus and touch controls, and 
  await holdNode(page,svg,friend,61);
  await expect(svg.locator('.network-node.selected')).toHaveCount(1);
  await page.screenshot({path:`artifacts/regressions/${info.project.name}-network-fullscreen-hold-synthetic-fixture.png`});
- const point=await nodePoint(friend);await pointer(friend,'pointerdown',62,point);await pointer(svg,'pointerup',62,point);
+ await shortTap(svg,friend,62);
  const profile=page.getByRole('dialog',{name:'Профиль',exact:true});
  await expect(profile.getByRole('heading',{name:'Website Friend',exact:true})).toBeVisible();
  // A dialog can be DOM-visible while another fixed layer covers it. Check the real hit target.
@@ -185,4 +195,74 @@ test('full-screen graph fills the viewport, keeps focus and touch controls, and 
  await fullscreen.getByRole('button',{name:'Выйти из полного экрана',exact:true}).click();
  await expect(fullscreen).toHaveCount(0);
  expect(errors).toEqual([]);
+});
+
+for(const fullscreen of [false,true]){
+ test(`real touch at the canvas edge opens one persistent profile in ${fullscreen?'full-screen':'inline'} graph`,async({page})=>{
+  let svg=await graphFixture(page);
+  if(fullscreen){await page.getByRole('button',{name:'На весь экран',exact:true}).click();svg=graphOf(page);}
+  await svg.scrollIntoViewIfNeeded();
+  // Put the node outside the future landscape profile bounds. Opening on pointerup
+  // made the browser's following click hit that new backdrop and close it again.
+  const friend=websiteOf(svg),frame=await svg.boundingBox();
+  expect(frame).not.toBeNull();
+  const before=await nodePoint(friend),desired=frame!.x+12;
+  const start={x:frame!.x+frame!.width-12,y:Math.max(frame!.y+10,Math.min(page.viewportSize()!.height/2,frame!.y+frame!.height-10))};
+  await page.mouse.move(start.x,start.y);await page.mouse.down();
+  await page.mouse.move(start.x+desired-before.x,start.y,{steps:12});await page.mouse.up();
+  await expect.poll(async()=>Math.abs((await nodePoint(friend)).x-desired)).toBeLessThan(1);
+  await expect(page.getByRole('dialog',{name:'Профиль',exact:true})).toHaveCount(0);
+  await page.evaluate(()=>{
+   (window as unknown as {__graphOpeningClicks:boolean[]}).__graphOpeningClicks=[];
+   document.addEventListener('click',event=>{
+    (window as unknown as {__graphOpeningClicks:boolean[]}).__graphOpeningClicks.push((event.target as Element).classList.contains('modal-backdrop'));
+   },true);
+  });
+  const point=await nodePoint(friend);
+  await page.touchscreen.tap(point.x,point.y);
+  const profile=page.getByRole('dialog',{name:'Профиль',exact:true});
+  await expect(profile.getByRole('heading',{name:'Website Friend',exact:true})).toBeVisible();
+  await page.waitForTimeout(350);
+  await expect(profile).toBeVisible();
+  expect(await page.evaluate(()=>(window as unknown as {__networkTest:{actions:unknown[]}}).__networkTest.actions)).toEqual([{type:'profile',id:'usr_graph-website'}]);
+  expect(await page.evaluate(()=>(window as unknown as {__graphOpeningClicks:boolean[]}).__graphOpeningClicks)).not.toContain(true);
+  await profile.getByRole('button',{name:'Закрыть',exact:true}).tap();
+  await expect(profile).toHaveCount(0);
+ });
+}
+
+test('real touch hold, drag and pinch do not open profiles and a following tap remains usable',async({page})=>{
+ const client=await page.context().newCDPSession(page);
+ const touch=(type:'touchStart'|'touchMove'|'touchEnd',points:{id:number;x:number;y:number}[])=>client.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(point=>({...point,radiusX:1,radiusY:1,force:1}))});
+ for(const fullscreen of [false,true]){
+  let svg=await graphFixture(page);
+  if(fullscreen){await page.getByRole('button',{name:'На весь экран',exact:true}).click();svg=graphOf(page);}
+  const friend=websiteOf(svg);await friend.scrollIntoViewIfNeeded();
+  const point=await nodePoint(friend);
+  await touch('touchStart',[{id:1,...point}]);
+  await expect(friend).toHaveClass(/\bselected\b/);
+  await touch('touchEnd',[]);
+  await page.waitForTimeout(150);
+  await expect(page.getByRole('dialog',{name:'Профиль',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Снять выделение связей',exact:true}).tap();
+  const drag=await nodePoint(friend);
+  await touch('touchStart',[{id:1,...drag}]);
+  await touch('touchMove',[{id:1,x:drag.x-20,y:drag.y-8}]);
+  await touch('touchEnd',[]);
+  const pinch=await nodePoint(friend);
+  const second={id:2,x:pinch.x-45,y:pinch.y};
+  await touch('touchStart',[{id:1,...pinch},second]);
+  await touch('touchMove',[{id:1,x:pinch.x+15,y:pinch.y},{...second,x:second.x-15}]);
+  await touch('touchEnd',[]);
+  await page.waitForTimeout(650);
+  await expect(svg.locator('.network-node.selected')).toHaveCount(0);
+  await expect(page.getByRole('dialog',{name:'Профиль',exact:true})).toHaveCount(0);
+  expect(await page.evaluate(()=>(window as unknown as {__networkTest:{actions:unknown[]}}).__networkTest.actions)).toEqual([]);
+  await friend.scrollIntoViewIfNeeded();
+  const tap=await nodePoint(friend);await page.touchscreen.tap(tap.x,tap.y);
+  const profile=page.getByRole('dialog',{name:'Профиль',exact:true});
+  await expect(profile.getByRole('heading',{name:'Website Friend',exact:true})).toBeVisible();
+  await profile.getByRole('button',{name:'Закрыть',exact:true}).tap();
+ }
+ await client.detach();
 });
