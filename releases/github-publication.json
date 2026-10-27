@@ -565,6 +565,49 @@
           "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/release-files.zip"
         }
       ]
+    },
+    {
+      "tag": "v0.2.11",
+      "targetCommit": "5b6ca11e3873064f6961224253a9fee7fa4bba4f",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.11",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 4556,
+          "sha256": "1f44fee2eea8bfbc97d01cff866a713216d4c199b20a3402d9ea601de01145ab",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.11/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 612,
+          "sha256": "ef6ecbe436f0d46cc35b087838722b8a9812e8138c28221a78495c1ab4c3261b",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.11/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.11-source.zip",
+          "bytes": 1490538,
+          "sha256": "764d2326812c5183fd8261233b5473de38335c805becf72395e6c5c568eba5d6",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.11/VRCNext-Mobile-0.2.11-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.11.apk",
+          "bytes": 5519757,
+          "sha256": "2f20c26f737b0d981b55bd9fa6995ae239745fdbb6620a00854ec1419c752730",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.11/VRCNext-Mobile-0.2.11.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 2378,
+          "sha256": "74cf32b50478d3fb1505b7001f8e59348ccda8a478d3e1fccb5a58f244123dd8",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.11/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6749176,
+          "sha256": "6e921f1ab18e01497be8181151431ad5e57cf46ade526c404e7c354be7d1adc1",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.11/release-files.zip"
+        }
+      ]
     }
   ]
 }
