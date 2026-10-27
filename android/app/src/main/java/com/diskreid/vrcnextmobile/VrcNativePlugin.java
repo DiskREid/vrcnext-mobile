@@ -57,7 +57,7 @@ import org.json.JSONTokener;
         @Permission(alias = "legacyPictures", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE })
 })
 public class VrcNativePlugin extends Plugin {
-    private static final String USER_AGENT = "Mobile-VRCNext/0.2.10 (https://github.com/DiskREid/vrcnext-mobile/issues)";
+    private static final String USER_AGENT = "Mobile-VRCNext/0.2.11 (https://github.com/DiskREid/vrcnext-mobile/issues)";
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -272,6 +272,16 @@ public class VrcNativePlugin extends Plugin {
                 .addQueryParameter("limit", "20").addQueryParameter("page", String.valueOf(page)).build();
         execute(call, new Request.Builder().url(url).header("User-Agent", USER_AGENT)
                 .header("Accept", "application/json").get().build(), publicDbHttp);
+    }
+
+    @PluginMethod public void resolvePublicAvatar(PluginCall call) {
+        final Request request;
+        try { request = AvatarDatabaseEndpoint.resolve(call.getString("fileId", ""), USER_AGENT); }
+        catch (IllegalArgumentException invalid) {
+            reject(call, "Invalid avatar file ID", "INVALID_ARGUMENT");
+            return;
+        }
+        execute(call, request, publicDbHttp);
     }
 
     @PluginMethod public void uploadImage(PluginCall call) {

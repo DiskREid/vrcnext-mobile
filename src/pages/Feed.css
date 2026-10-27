@@ -13,9 +13,4 @@
 .history-avatar-change > div { flex:1; min-width:0; }
 .history-avatar-preview { width:76px; height:76px; object-fit:cover; flex:none; border-radius:12px; background:var(--bg); }
 .history-bio-current { white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.history-profile-sync { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px; margin-bottom:16px; }
-.history-profile-sync > div { min-width:0; }
-.history-profile-sync p { margin:7px 0 0; line-height:1.6; }
-.history-profile-sync > button { flex:none; min-height:44px; }
-@media(max-width:600px) { .history-profile-sync { align-items:stretch; flex-direction:column; } .history-profile-sync > button { align-self:flex-start; } }
 @media(max-width:450px) { .history-row { padding:12px;gap:9px; } .history-heading { flex-direction:column; gap:3px; } }

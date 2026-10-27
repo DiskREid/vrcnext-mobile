@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Activity, RefreshCw } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { useApp } from '../state';
 import { historyLabels } from '../data/history';
 import type { HistoryEvent, HistoryKind } from '../data/history';
@@ -46,7 +46,7 @@ export function HistoryRows({ events, limit = 100 }: { events:HistoryEvent[];lim
             {event.worldId && event.kind!=='world' && event.kind!=='instance' && <ActivityWorldChange worldId={event.worldId}/>}
             {event.source==='profile' && <span className="muted small">Замечено при просмотре профиля</span>}
             {event.source==='refresh' && <span className="muted small">Замечено при обновлении списка друзей</span>}
-            {event.source==='sync' && <span className="muted small">Замечено при проверке профиля</span>}
+            {event.source==='sync' && <span className="muted small">Событие сохранено предыдущей версией</span>}
           </div>
         </article>;
       })}
@@ -66,13 +66,8 @@ export default function Feed() {
     <PageHeader eyebrow="ВАШ КРУГ" title="Лента" subtitle="Наблюдаемые события друзей на этом устройстве"/>
     <SearchField value={query} onChange={setQuery} placeholder="Поиск в ленте"/>
     <Segmented value={filter} onChange={(value)=>setFilter(value as FeedFilter)} items={[{id:'all',label:'Все'},{id:'gps',label:'GPS'},{id:'online',label:'Онлайн'},{id:'offline',label:'Офлайн'},{id:'status',label:'Статус'},{id:'avatar',label:'Аватар'},{id:'bio',label:'Био'}]}/>
+    {filter==='bio' && <p className="muted small history-note">Новые записи Bio доступны, только если VRChat передаёт изменение. Сохранённая история остаётся доступна.</p>}
     <p className="muted small history-note">История сохраняется локально для этого аккаунта. Время — момент обнаружения изменения. Пропуски во время остановки приложения не восстанавливаются.</p>
-    {ctx.profileSync?.available && <div className="history-profile-sync card" role="region" aria-label="Проверка профилей друзей">
-      <div><strong>Обновление био и аватаров</strong><p className="muted small" role="status">{ctx.friends.loading ? 'Загрузка списка друзей…' : `Проверено: ${ctx.profileSync.checked || 0} из ${ctx.profileSync.total || 0}`}{ctx.profileSync.running ? ' · Проверка…' : ''}</p>
-        <p className="muted small">Обновляется автоматически по очереди, пока приложение открыто. Первая проверка запоминает исходные данные. Кнопка повторяет обновление — нажимать её для работы ленты не нужно.</p></div>
-      <button className="button secondary compact" disabled={!ctx.online || ctx.profileSync.running} onClick={ctx.profileSync.refresh}><RefreshCw size={16} className={ctx.profileSync.running ? 'spin' : ''} />Обновить био и аватары</button>
-    </div>}
-    {ctx.profileSync?.error && <ErrorState error={ctx.profileSync.error} retry={ctx.profileSync.refresh} />}
     {ctx.history.error && <ErrorState error={ctx.history.error} retry={ctx.history.retry}/>}
     {ctx.history.loading && !events.length?<Loading/>:events.length?<HistoryRows key={`${filter}:${query}`} events={events}/>:<Empty icon={<Activity size={32}/>} title={query?'События не найдены':'Новая история'} text={query?'Измените поиск или фильтр.':'Здесь появятся реальные события, полученные приложением. История до установки приложения недоступна.'}/>}
   </>;

@@ -43,7 +43,7 @@ import { demoUser, demoWorlds, demoEvents } from './demo';
 import { useFriends } from './data/friends';
 import { clearFriendFavoritesCache, invalidateFriendFavoritesCache, useFriendFavorites } from './data/favorite-friends';
 import { useHistory } from './data/history';
-import { useProfileHistorySync } from './data/use-profile-history-sync';
+import { useAvatarHistoryResolver } from './data/use-avatar-history-resolver';
 import { useObservation } from './data/observation';
 import { useCalendarSync } from './data/calendar-sync';
 import { presenceLabel } from './data/locations';
@@ -132,15 +132,16 @@ export default function App() {
     pipelineConnected = useRef(false);
   const friends = useFriends(user?.id, demo, revision);
   const history = useHistory(user?.id, demo);
-  const profileSync = useProfileHistorySync(user?.id, demo, online, friends.data, history);
+  const avatarHistory = useAvatarHistoryResolver(user?.id, demo, online, history);
   const calendarSync = useCalendarSync(user?.id, demo, online);
   const observation = useObservation(user, demo, online, pipeline === 'connected', friends, history, setUser);
-  const pipelineSnapshot = useRef({friends, user, history, profileSync});
-  pipelineSnapshot.current = {friends, user, history, profileSync};
+  const pipelineSnapshot = useRef({friends, user, history, avatarHistory});
+  pipelineSnapshot.current = {friends, user, history, avatarHistory};
   useEffect(() => {
-    if (demo) history.seedUsers(friends.data);
-    else history.observeUsers(friends.data, 'refresh');
-  }, [friends.data, demo, history.seedUsers, history.observeUsers]);
+    // The list establishes missing baselines. Feed changes are observed from
+    // the actual update event, not manufactured by checking the whole list.
+    history.seedUsers(friends.data);
+  }, [friends.data, history.seedUsers]);
   const notify = (text: string) => {
     clearTimeout(toastTimer.current);
     setToast(text);
@@ -160,7 +161,6 @@ export default function App() {
     setPageRevisions((current) => ({ ...current, [screen]: (current[screen] || 0) + 1 }));
     if (screen === 'charts') observation.refresh();
     if (screen === 'calendar' || screen === 'notifications') calendarSync.refresh();
-    if (screen === 'feed') profileSync.refresh();
   };
   const login = (u: User) => {
     clearImageCache();
@@ -259,8 +259,7 @@ export default function App() {
           const item = pipelineActivity(event, latest.friends.data, latest.user);
           if (item) record(item.title, item.detail, item);
         }
-        if (latest.user) latest.history.observePipeline(event, latest.friends.data, latest.user);
-        latest.profileSync.handlePipeline(event);
+        if (latest.user) latest.avatarHistory.observe(latest.history.observePipeline(event, latest.friends.data, latest.user));
         latest.friends.apply(event);
         if (event.type === 'user-update' && latest.user) {
           const partial = event.content.user as Partial<User> | undefined;
@@ -362,7 +361,6 @@ export default function App() {
         refresh: revision,
         friends,
         history,
-        profileSync,
         observation,
         calendarSync,
         notificationsRefresh,

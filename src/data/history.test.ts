@@ -13,6 +13,50 @@ function observer() {let id=0;return new HistoryObserver(()=> '2026-10-25T12:00:
 function sample(id='event_1'):HistoryEvent {return {id,time:'2026-10-25T12:00:00.000Z',kind:'online',userId:alice.id,displayName:alice.displayName,detail:'Observed online',source:'pipeline'};}
 
 describe('observed friend history',()=>{
+  it('does not log hidden/loading placeholder images or their return to the same real avatar',()=>{
+    const history=observer();const initial={...alice,currentAvatarImageUrl:avatarFile('actual')};history.seedUsers([initial]);
+    for (const placeholder of ['0e8c4e32-7444-44ea-ade4-313c010d4bae','31255e6b-696e-4c11-b007-595fa1142467']) {
+      expect(history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarImageUrl:avatarFile(placeholder)}}},[initial],self)).toEqual([]);
+      expect(history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarImageUrl:avatarFile('actual')}}},[initial],self)).toEqual([]);
+    }
+    expect(history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatar:'avtr_new',currentAvatarImageUrl:avatarFile('31255e6b-696e-4c11-b007-595fa1142467')}}},[initial],self))
+      .toMatchObject([{kind:'avatar',avatarEvidence:'id',before:'avtr_old',after:'avtr_new'}]);
+  });
+  it('enriches the received avatar event by its exact file without changing its identity or creating a second row',()=>{
+    const history=observer();history.seedUsers([{id:alice.id,displayName:alice.displayName,currentAvatarImageUrl:avatarFile('old')}]);
+    const event=history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarImageUrl:avatarFile('new')}}},[alice],self)[0];
+    const avatar={id:'avtr_new',name:'New Avatar',authorName:'Author'};
+    expect(history.enrichAvatar(event.id,'file_other',avatar)).toEqual([]);
+    const enriched=history.enrichAvatar(event.id,'file_new',avatar);
+    expect(enriched).toEqual([{...event,avatarId:'avtr_new',avatarName:'New Avatar',avatarAuthorName:'Author'}]);
+    expect(history.enrichAvatar(event.id,'file_new',avatar)).toEqual([]);
+  });
+  it('uses the changed full image as evidence when a thumbnail is still stale',()=>{
+    const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('old'),currentAvatarThumbnailImageUrl:avatarThumbnail('old')}]);
+    const event=history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarImageUrl:avatarFile('new'),currentAvatarThumbnailImageUrl:avatarThumbnail('old')}}},[alice],self)[0];
+    expect(event.avatarUrl).toBe(avatarFile('new'));
+    expect(history.enrichAvatar(event.id,'file_old',{id:'avtr_old',name:'Wrong old avatar'})).toEqual([]);
+    expect(history.enrichAvatar(event.id,'file_new',{id:'avtr_new',name:'New avatar'}))
+      .toMatchObject([{id:event.id,avatarEvidence:'id',before:'avtr_old',after:'avtr_new',avatarName:'New avatar'}]);
+  });
+  it('keeps a resolved ID for the next actual change while ignoring inherited stale IDs in friend refreshes',()=>{
+    const history=observer();const initial={...alice,currentAvatarImageUrl:avatarFile('old')};history.seedUsers([initial]);
+    const update=(image:string)=>history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarImageUrl:avatarFile(image)}}},[initial],self)[0];
+    const first=update('one');
+    expect(history.enrichAvatar(first.id,'file_one',{id:'avtr_one',name:'One'})).toMatchObject([{avatarEvidence:'id',before:'avtr_old',after:'avtr_one'}]);
+    expect(history.observeUsers([{...initial,currentAvatarImageUrl:avatarFile('one')}])).toEqual([]);
+    const second=update('two');
+    expect(history.enrichAvatar(second.id,'file_two',{id:'avtr_two',name:'Two'})).toMatchObject([{avatarEvidence:'id',before:'avtr_one',after:'avtr_two'}]);
+  });
+  it('does not apply resolved metadata to superseded, paused or mismatched-ID events',()=>{
+    const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('old')}]);
+    const update=(image:string,id?:string)=>history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarImageUrl:avatarFile(image),...(id?{currentAvatar:id}:{})}}},[alice],self)[0];
+    const first=update('one'),second=update('two','avtr_two');
+    expect(history.enrichAvatar(first.id,'file_one',{id:'avtr_one',name:'Late one'})).toEqual([]);
+    expect(history.enrichAvatar(second.id,'file_two',{id:'avtr_wrong',name:'Wrong ID'})).toEqual([]);
+    history.pause();
+    expect(history.enrichAvatar(second.id,'file_two',{id:'avtr_two',name:'Late two'})).toEqual([]);
+  });
   it('does not treat empty friend tags and the first public Trust Rank as a change',()=>{
     const history=observer();
     const friend={id:alice.id,displayName:alice.displayName,tags:[]};

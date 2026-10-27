@@ -3,7 +3,6 @@ import type { FriendState } from './data/friends';
 import type { HistoryState } from './data/history';
 import type { ObservationState } from './data/observation';
 import type { CalendarSync } from './data/calendar-sync';
-import type { ProfileHistorySync } from './data/use-profile-history-sync';
 import type { ReactNode } from 'react';
 import type { User, World, Group, CalendarEvent } from './api';
 export type Activity = {
@@ -20,7 +19,6 @@ export type AppState = {
   pageActive?: boolean;
   friends: FriendState;
   history: HistoryState;
-  profileSync?: ProfileHistorySync;
   observation: ObservationState;
   calendarSync: CalendarSync;
   notificationsRefresh: number;

@@ -25,6 +25,7 @@ export interface NativeBridge {
   downloadImage(options: { url: string; fileName: string }): Promise<{ saved: boolean; fileName: string }>;
   request(options: NativeRequest): Promise<NativeResponse>;
   searchPublicAvatars(options: { query: string; page: number }): Promise<NativeResponse>;
+  resolvePublicAvatar(options: { fileId: string }): Promise<NativeResponse>;
   clearSession(): Promise<void>;
   connectPipeline(): Promise<void>;
   disconnectPipeline(): Promise<void>;

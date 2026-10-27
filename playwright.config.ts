@@ -9,7 +9,7 @@ export default defineConfig({
   timeout: 45000,
   expect: { timeout: 6000 },
   reporter: [['list']],
-  outputDir: 'test-results/ui',
+  outputDir: process.env.VRCNEXT_UI_OUTPUT_DIR || `test-results/ui-${uiPort}`,
   use: {
     baseURL: `http://127.0.0.1:${uiPort}`,
     browserName: 'chromium',
