@@ -1,0 +1,6 @@
+371fa31bc2f957ad28e86976b43993467a3bc2c8c9947991ba2508c60875fdab  README.md
+52a3bbbee47d440551cddec378c8dbcdeca3c19df3f639a45935e8aebd18e8a1  VRCNext-Mobile-0.2.10-source.zip
+a73da1f0a229d5d1e280826cae9fed159a7556a89e9692031fbf7ef161135072  VRCNext-Mobile-0.2.10.apk
+b2145633c5ee9f10730fee3fa618f286d5b18c9d937bbad49b60fd05006e9c0d  screenshots/landscape-feed-sync-trust-synthetic-fixture.png
+65f0519caa76bc1958213a17fea518941be21e4bfb66414b86e54bd156bfa5e0  screenshots/portrait-feed-sync-trust-synthetic-fixture.png
+55b593e1bec4aa1c7bd8e617479b2e75b2fe7c48e89487f6ff74706781ffa61a  validation.json
