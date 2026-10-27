@@ -1,0 +1,75 @@
+{
+  "version": "0.2.12",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 15,
+  "apk": {
+    "name": "VRCNext-Mobile-0.2.12.apk",
+    "bytes": 5522273,
+    "sha256": "742e421c7ff08b9c0451440a88967d5b2f7221657f22f371fe1cfddd86db61c9",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0211": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 362,
+    "playwrightPassed": 142,
+    "fullUiSuite": true,
+    "latestFeedUiPassed": 20,
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 30,
+    "testAndDevMarkersAbsent": true
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "instrumentationExecuted": false,
+    "avatarDbPublicExactLookupVerified": true,
+    "icuLiveLookupVerified": false,
+    "authenticatedFileLookupLiveVerified": false
+  },
+  "publicAvatarDbProbe": {
+    "httpStatus": 200,
+    "fileId": "file_73bdcab2-a4f6-4652-a13a-45202d4c210d",
+    "avatarId": "avtr_5fd7f38a-c3d4-4f41-aada-8cc20a9633e3",
+    "name": "VRoomba-gen",
+    "exactKeyMatched": true,
+    "vrchatCredentialsUsed": false
+  },
+  "avatarFeed": {
+    "modernIconUrlSupported": true,
+    "customIconsRequireProof": true,
+    "unverifiedPreviousPhotoWithheld": true,
+    "canonicalFullThumbnailFileBaseline": true,
+    "beforeAndAfterMetadata": true,
+    "nameOnlyOfficialFileSupported": true,
+    "profileScanningEnabled": false,
+    "gamePauseKeepsAvatarBaseline": true,
+    "candidateEventsPersisted": false
+  },
+  "screenProtection": {
+    "defaultEnabled": false,
+    "storedNatively": true,
+    "appliedImmediately": true,
+    "deviceScreenshotCaptureVerified": false
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.2.12-source.zip",
+    "sourceCommit": "801891e026eca2a52ef34a15897c9fe5062b6842",
+    "trackedFiles": 244,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "7c8e27f1b161c55c1862b781f48c82ac412d243bec9a9ac3d95dcef7685a9680"
+  }
+}
