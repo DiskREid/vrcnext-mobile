@@ -522,6 +522,49 @@
           "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.9/release-files.zip"
         }
       ]
+    },
+    {
+      "tag": "v0.2.10",
+      "targetCommit": "f87c49d2ec1ebbb3637ff7c3207e05d71ceaeac4",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.2.10",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 3781,
+          "sha256": "371fa31bc2f957ad28e86976b43993467a3bc2c8c9947991ba2508c60875fdab",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 600,
+          "sha256": "d529c18abcc447fc5af3eb7d2225d4fefe1c45690fbaebec5e2211c7ecdd56aa",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.10-source.zip",
+          "bytes": 1480517,
+          "sha256": "52a3bbbee47d440551cddec378c8dbcdeca3c19df3f639a45935e8aebd18e8a1",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/VRCNext-Mobile-0.2.10-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.2.10.apk",
+          "bytes": 5519525,
+          "sha256": "a73da1f0a229d5d1e280826cae9fed159a7556a89e9692031fbf7ef161135072",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/VRCNext-Mobile-0.2.10.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 1834,
+          "sha256": "55b593e1bec4aa1c7bd8e617479b2e75b2fe7c48e89487f6ff74706781ffa61a",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 6762787,
+          "sha256": "788ef80ad4961908f2aaedea94a8bbbe4f3fac8f59a67203a9805e64ec69201d",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.2.10/release-files.zip"
+        }
+      ]
     }
   ]
 }
