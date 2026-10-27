@@ -51,7 +51,7 @@ export function useObservation(user: User | null, demo: boolean, online: boolean
         setLastSync(new Date().toISOString()); setStatus('observing'); setError('');
       } catch (failure) {
         if (!live || epoch !== visibilityEpoch) return;
-        latest.current.history.pause();
+        latest.current.history.pauseSession();
         expired = failure instanceof ApiError && failure.status === 401;
         if (failure instanceof ApiError && failure.status === 429) delay = Math.max(delay, (failure.retryAfter || 60) * 1000);
         setStatus('error'); setError(failure instanceof Error ? failure.message : 'Не удалось получить текущее местоположение.');
@@ -60,11 +60,11 @@ export function useObservation(user: User | null, demo: boolean, online: boolean
     refreshAction.current = () => { expired = false; clearTimeout(timer); void sample(); };
     const visibility = () => {
       if (visible()) { if (!expired) void sample(); }
-      else { visibilityEpoch++; clearTimeout(timer); latest.current.history.pause(); setStatus('paused'); }
+      else { visibilityEpoch++; clearTimeout(timer); latest.current.history.pauseSession(); setStatus('paused'); }
     };
     if (!user) { initialAccount.current = undefined; setLastSync(undefined); setError(''); setStatus('paused'); }
     else if (demo) { setLastSync(undefined); setError(''); setStatus('demo'); }
-    else if (!online || !visible()) { history.pause(); setStatus('paused'); }
+    else if (!online || !visible()) { history.pauseSession(); setStatus('paused'); }
     else if (initialAccount.current !== user.id) {
       // Auth just returned this real snapshot; avoid a duplicate /auth/user request on login.
       initialAccount.current = user.id;
@@ -72,8 +72,8 @@ export function useObservation(user: User | null, demo: boolean, online: boolean
       setLastSync(new Date().toISOString()); setStatus('observing'); schedule();
     } else void sample();
     document.addEventListener('visibilitychange', visibility);
-    return () => { live = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visibility); history.pause(); refreshAction.current = () => {}; };
-  }, [user?.id, demo, online, foreground, history.observeSession, history.pause]);
+    return () => { live = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visibility); history.pauseSession(); refreshAction.current = () => {}; };
+  }, [user?.id, demo, online, foreground, history.observeSession, history.pauseSession]);
   const refresh = useCallback(() => refreshAction.current(), []);
   return { status, error, lastSync, refresh };
 }

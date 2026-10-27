@@ -101,6 +101,16 @@ export interface GroupPost {
   authorId?: string;
   visibility?: string;
 }
+/** Verified avatar-file metadata can have a real name without a discoverable avatar ID. */
+export interface AvatarMetadata {
+  id?: string;
+  name: string;
+  authorName?: string;
+  authorId?: string;
+  imageUrl?: string;
+  thumbnailImageUrl?: string;
+  source?: 'avtrdb' | 'icu' | 'vrchat-file';
+}
 export interface Avatar {
   id: string;
   name: string;

@@ -277,7 +277,7 @@ export default function App() {
       }
       handles.push(h);
       const c = await native.addListener('connection', (event) => {
-        if (live) { setPipeline(event.state); if (event.state !== 'connected') pipelineSnapshot.current.history.pause(); else if (pipelineConnected.current) pipelineSnapshot.current.friends.reload(); }
+        if (live) { setPipeline(event.state); if (event.state !== 'connected') pipelineSnapshot.current.history.pauseSession(); else if (pipelineConnected.current) pipelineSnapshot.current.friends.reload(); }
       });
       if (!live) {
         await c.remove();

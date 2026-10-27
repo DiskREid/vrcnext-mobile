@@ -12,6 +12,105 @@ const avatarThumbnail = (id:string,version=1) => `https://api.vrchat.cloud/api/1
 function observer() {let id=0;return new HistoryObserver(()=> '2026-10-25T12:00:00.000Z',()=>`event_${++id}`);}
 function sample(id='event_1'):HistoryEvent {return {id,time:'2026-10-25T12:00:00.000Z',kind:'online',userId:alice.id,displayName:alice.displayName,detail:'Observed online',source:'pipeline'};}
 
+describe('canonical avatar change observations',()=>{
+  const update=(history:HistoryObserver,patch:Partial<User>,friend:User=alice)=>history.observePipeline({type:'friend-update',content:{userId:alice.id,user:patch}},[friend],self);
+  it('compares the same file baseline across full and thumbnail fields in either direction',()=>{
+    for(const [before,after] of [['currentAvatarImageUrl','currentAvatarThumbnailImageUrl'],['currentAvatarThumbnailImageUrl','currentAvatarImageUrl']] as const) {
+      const history=observer();history.seedUsers([{id:alice.id,displayName:alice.displayName,[before]:avatarFile('old')}]);
+      const events=update(history,{[after]:avatarThumbnail('new')});
+      expect(events).toMatchObject([{kind:'avatar',previousAvatarFileId:'file_old',avatarFileId:'file_new',before:avatarFile('old'),after:avatarThumbnail('new')}]);
+      expect(update(history,{currentAvatarImageUrl:avatarFile('new',3)})).toEqual([]);
+      expect(update(history,{currentAvatarThumbnailImageUrl:avatarThumbnail('new',4)})).toEqual([]);
+    }
+  });
+  it('keeps modern icon candidates private until exact after-file metadata names the avatar, including name-only results',async()=>{
+    const storage=new MemoryHistoryStore(),journal=new HistoryJournal('usr_one',storage);
+    const initial={...alice,currentAvatarImageUrl:avatarFile('old')};journal.observer.seedUsers([initial]);
+    const candidate=update(journal.observer,{iconUrl:avatarFile('new')},initial)[0];
+    expect(candidate).toMatchObject({avatarEvidence:'candidate',previousAvatarFileId:'file_old',avatarFileId:'file_new'});
+    journal.append([candidate]);expect(journal.state.events).toEqual([]);expect(await storage.read('usr_one')).toEqual([]);
+    const before=journal.observer.enrichAvatar(candidate.id,'file_old',{name:'Предыдущий',source:'vrchat-file'},'before');
+    expect(before).toEqual([]);
+    const after=journal.observer.enrichAvatar(candidate.id,'file_new',{name:'Новый',source:'vrchat-file'});
+    expect(after).toMatchObject([{id:candidate.id,time:candidate.time,avatarEvidence:'file',avatarName:'Новый',previousAvatarName:'Предыдущий'}]);
+    expect(after[0].avatarId).toBeUndefined();
+    journal.append(after);await vi.waitFor(async()=>expect(await storage.read('usr_one')).toHaveLength(1));
+    expect(journal.state.events).toEqual(after);
+  });
+  it('accepts a verified new avatar from an icon-only baseline without requiring an indexed old avatar',()=>{
+    const history=observer();history.seedUsers([{id:alice.id,displayName:alice.displayName,iconUrl:avatarFile('unknown-old')}]);
+    const event=update(history,{iconUrl:avatarFile('known-new')})[0];
+    expect(event.avatarEvidence).toBe('candidate');
+    const enriched=history.enrichAvatar(event.id,'file_known-new',{id:'avtr_new',name:'Verified new avatar'});
+    expect(enriched).toMatchObject([{id:event.id,avatarName:'Verified new avatar',avatarId:'avtr_new',avatarEvidence:'file'}]);
+    expect(enriched[0].previousAvatarName).toBeUndefined();
+    expect(enriched[0].previousAvatarUrl).toBeUndefined();
+    expect(enriched[0].before).toBeUndefined();
+    expect(enriched[0].previousAvatarFileId).toBe('file_unknown-old');
+  });
+  it('does not publish an unresolved custom icon or a false return to the unchanged avatar',async()=>{
+    const storage=new MemoryHistoryStore(),journal=new HistoryJournal('usr_one',storage);
+    const initial={...alice,currentAvatarImageUrl:avatarFile('actual')};journal.observer.seedUsers([initial]);
+    const custom=update(journal.observer,{iconUrl:avatarFile('user-photo')},initial)[0];
+    journal.append([custom]);
+    expect(journal.observer.enrichAvatar(custom.id,'file_actual',{id:'avtr_old',name:'Actual'},'before')).toEqual([]);
+    const returned=update(journal.observer,{iconUrl:avatarFile('actual')},initial);
+    journal.append(returned);
+    if(returned[0])journal.append(journal.observer.enrichAvatar(returned[0].id,'file_actual',{id:'avtr_old',name:'Actual'}));
+    expect(journal.state.events).toEqual([]);expect(await storage.read('usr_one')).toEqual([]);
+  });
+  it('publishes a verified new avatar without presenting an unresolved intervening custom icon as the old avatar',()=>{
+    const history=observer(),initial={...alice,currentAvatarImageUrl:avatarFile('actual')};history.seedUsers([initial]);
+    const custom=update(history,{iconUrl:avatarFile('custom-photo')},initial)[0];
+    expect(custom.avatarEvidence).toBe('candidate');
+    const real=update(history,{iconUrl:avatarFile('real-new')},initial)[0];
+    expect(real.previousAvatarFileId).toBe('file_custom-photo');
+    const known=history.enrichAvatar(real.id,'file_real-new',{id:'avtr_real',name:'Real new'});
+    expect(known).toMatchObject([{id:real.id,avatarName:'Real new',avatarId:'avtr_real'}]);
+    expect(known[0].previousAvatarUrl).toBeUndefined();expect(known[0].before).toBeUndefined();
+    expect(known[0].previousAvatarName).toBeUndefined();expect(known[0].previousAvatarId).toBeUndefined();
+  });
+  it('reveals an earlier icon image only after matching before-file metadata verifies that it was an avatar',()=>{
+    const history=observer();history.seedUsers([{id:alice.id,displayName:alice.displayName,iconUrl:avatarFile('icon-old')}]);
+    const event=update(history,{iconUrl:avatarFile('icon-new')})[0];
+    const current=history.enrichAvatar(event.id,'file_icon-new',{name:'New',source:'vrchat-file'})[0];
+    expect(current.previousAvatarUrl).toBeUndefined();expect(current.before).toBeUndefined();
+    const complete=history.enrichAvatar(event.id,'file_icon-old',{name:'Old',source:'vrchat-file'},'before')[0];
+    expect(complete).toMatchObject({id:event.id,avatarName:'New',previousAvatarName:'Old',previousAvatarUrl:avatarFile('icon-old'),before:avatarFile('icon-old')});
+  });
+  it('restores a missing avatar baseline from the existing friend row after a pause or an earlier status-only update',()=>{
+    const initial={...alice,currentAvatarThumbnailImageUrl:avatarThumbnail('old')};
+    const history=observer();history.pause();
+    expect(update(history,{currentAvatarImageUrl:avatarFile('new')},initial)).toMatchObject([{previousAvatarFileId:'file_old',avatarFileId:'file_new'}]);
+    const later=observer();later.observeProfile({id:alice.id,displayName:alice.displayName,status:'active'});
+    later.seedUsers([initial]);
+    expect(update(later,{currentAvatarImageUrl:avatarFile('new')},initial)).toMatchObject([{previousAvatarFileId:'file_old',avatarFileId:'file_new'}]);
+  });
+  it('binds both sides of rapid changes to their own event IDs and never replaces the current avatar with late metadata',()=>{
+    const history=observer();const initial={...alice,currentAvatarImageUrl:avatarFile('old')};history.seedUsers([initial]);
+    const first=update(history,{currentAvatarImageUrl:avatarFile('one')},initial)[0];
+    const second=update(history,{currentAvatarImageUrl:avatarFile('two')},initial)[0];
+    expect(history.enrichAvatar(second.id,'file_two',{id:'avtr_two',name:'Two'})).toMatchObject([{id:second.id,avatarName:'Two'}]);
+    expect(history.enrichAvatar(first.id,'file_one',{id:'avtr_one',name:'One'})).toMatchObject([{id:first.id,avatarName:'One'}]);
+    expect(history.enrichAvatar(second.id,'file_one',{id:'avtr_one',name:'One'},'before')).toMatchObject([{id:second.id,previousAvatarName:'One',avatarName:'Two'}]);
+    const third=update(history,{currentAvatarImageUrl:avatarFile('three')},initial)[0];
+    expect(third.previousAvatarId).toBe('avtr_two');expect(third.previousAvatarName).toBe('Two');
+  });
+  it('does not borrow the previous avatar ID when an icon change resolves to a name without an ID',()=>{
+    const history=observer();const initial={...alice,currentAvatarImageUrl:avatarFile('old')};history.seedUsers([initial]);
+    const first=update(history,{iconUrl:avatarFile('one')},initial)[0];
+    expect(history.enrichAvatar(first.id,'file_one',{name:'One',source:'vrchat-file'})[0].avatarId).toBeUndefined();
+    const second=update(history,{iconUrl:avatarFile('two')},initial)[0];
+    expect(second.previousAvatarId).toBeUndefined();expect(second.previousAvatarName).toBe('One');
+  });
+  it('pauses game sampling without discarding avatar evidence while the pipeline is still active',()=>{
+    const journal=new HistoryJournal('usr_one',new MemoryHistoryStore());
+    const initial={...alice,currentAvatarImageUrl:avatarFile('old')};journal.observer.seedUsers([initial]);
+    journal.pauseSession();
+    expect(update(journal.observer,{currentAvatarImageUrl:avatarFile('new')},initial)).toMatchObject([{previousAvatarFileId:'file_old',avatarFileId:'file_new'}]);
+  });
+});
+
 describe('observed friend history',()=>{
   it('does not log hidden/loading placeholder images or their return to the same real avatar',()=>{
     const history=observer();const initial={...alice,currentAvatarImageUrl:avatarFile('actual')};history.seedUsers([initial]);
@@ -28,7 +127,7 @@ describe('observed friend history',()=>{
     const avatar={id:'avtr_new',name:'New Avatar',authorName:'Author'};
     expect(history.enrichAvatar(event.id,'file_other',avatar)).toEqual([]);
     const enriched=history.enrichAvatar(event.id,'file_new',avatar);
-    expect(enriched).toEqual([{...event,avatarId:'avtr_new',avatarName:'New Avatar',avatarAuthorName:'Author'}]);
+    expect(enriched).toEqual([{...event,avatarEvidence:'file',detail:'Сменил аватар',avatarId:'avtr_new',avatarName:'New Avatar',avatarAuthorName:'Author'}]);
     expect(history.enrichAvatar(event.id,'file_new',avatar)).toEqual([]);
   });
   it('uses the changed full image as evidence when a thumbnail is still stale',()=>{
@@ -48,11 +147,11 @@ describe('observed friend history',()=>{
     const second=update('two');
     expect(history.enrichAvatar(second.id,'file_two',{id:'avtr_two',name:'Two'})).toMatchObject([{avatarEvidence:'id',before:'avtr_one',after:'avtr_two'}]);
   });
-  it('does not apply resolved metadata to superseded, paused or mismatched-ID events',()=>{
+  it('binds historical metadata to its event and rejects paused or mismatched-ID results',()=>{
     const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('old')}]);
     const update=(image:string,id?:string)=>history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarImageUrl:avatarFile(image),...(id?{currentAvatar:id}:{})}}},[alice],self)[0];
     const first=update('one'),second=update('two','avtr_two');
-    expect(history.enrichAvatar(first.id,'file_one',{id:'avtr_one',name:'Late one'})).toEqual([]);
+    expect(history.enrichAvatar(first.id,'file_one',{id:'avtr_one',name:'Late one'})).toMatchObject([{id:first.id,avatarName:'Late one'}]);
     expect(history.enrichAvatar(second.id,'file_two',{id:'avtr_wrong',name:'Wrong ID'})).toEqual([]);
     history.pause();
     expect(history.enrichAvatar(second.id,'file_two',{id:'avtr_two',name:'Late two'})).toEqual([]);
@@ -183,9 +282,10 @@ describe('observed friend history',()=>{
     history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('same')+'?authToken=secret#preview'}]);
     expect(history.observeProfile({...alice,currentAvatarImageUrl:avatarThumbnail('same')+'?width=1024&token=different'})).toEqual([]);
     expect(history.observeProfile({...alice,currentAvatarImageUrl:'https://file-variants.vrchat.com/file_same/1/256'})).toEqual([]);
-    const events=history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('same',2)+'?token=do-not-persist'});
-    expect(events).toMatchObject([{kind:'avatar',avatarEvidence:'image',avatarUrl:avatarFile('same',2)}]);
-    expect(events[0].before).not.toContain('?');expect(events[0].after).toBe(avatarFile('same',2));
+    expect(history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('same',2)+'?token=do-not-persist'})).toEqual([]);
+    const events=history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('new')+'?token=do-not-persist'});
+    expect(events).toMatchObject([{kind:'avatar',avatarEvidence:'image',avatarUrl:avatarFile('new')}]);
+    expect(events[0].before).not.toContain('?');expect(events[0].after).toBe(avatarFile('new'));
     expect(JSON.stringify(events)).not.toContain('do-not-persist');expect(JSON.stringify(events)).not.toContain('secret');
   });
   it('uses avatar fields only and does not confuse a profile photo, invalid URL or first image with a switch',()=>{
@@ -200,18 +300,18 @@ describe('observed friend history',()=>{
     const history=observer();history.seedUsers([{...alice,currentAvatarName:'Old Avatar',currentAvatarAuthorName:'Old Author',currentAvatarImageUrl:avatarFile('old')}]);
     const changed={...alice,currentAvatar:'avtr_new',currentAvatarName:'New Avatar',currentAvatarAuthorName:'New Author',currentAvatarImageUrl:avatarFile('new'),currentAvatarThumbnailImageUrl:avatarThumbnail('new')};
     const events=history.observeProfile(changed,'sync');
-    expect(events).toMatchObject([{kind:'avatar',avatarEvidence:'id',before:'avtr_old',after:'avtr_new',avatarName:'New Avatar',avatarAuthorName:'New Author',avatarUrl:avatarThumbnail('new'),source:'sync'}]);
+    expect(events).toMatchObject([{kind:'avatar',avatarEvidence:'id',before:'avtr_old',after:'avtr_new',avatarName:'New Avatar',avatarAuthorName:'New Author',avatarUrl:avatarFile('new'),source:'sync'}]);
     expect(history.observeProfile(changed)).toEqual([]);
     expect(history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatar:'avtr_third'}}},[changed],self)).toMatchObject([{kind:'avatar',avatarEvidence:'id',before:'avtr_new',after:'avtr_third'}]);
     const fourth=history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatar:'avtr_fourth'}}},[changed],self);
     expect(fourth[0].avatarUrl).toBeUndefined();expect(fourth[0].avatarName).toBeUndefined();expect(fourth[0].avatarAuthorName).toBeUndefined();
   });
   it('does not misreport a same-ID image edit as another avatar identity',()=>{
-    const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('same',1)}]);
-    const events=history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('same',2)});
+    const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('same-old')}]);
+    const events=history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('same-new')});
     expect(events).toMatchObject([{kind:'avatar',avatarEvidence:'image',detail:'Обновилось изображение аватара'}]);
     expect(events[0].before).not.toBe('avtr_old');
-    expect(history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('same',2)})).toEqual([]);
+    expect(history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('same-new')})).toEqual([]);
   });
   it('deduplicates an image-only pipeline change and later exact profile hydration without trusting an inherited ID',()=>{
     const history=observer();const initial={...alice,currentAvatarImageUrl:avatarFile('old'),currentAvatarThumbnailImageUrl:avatarThumbnail('old')};
@@ -226,25 +326,25 @@ describe('observed friend history',()=>{
     expect(history.observeProfile({...hydrated,currentAvatar:'avtr_next',currentAvatarImageUrl:avatarFile('next'),currentAvatarThumbnailImageUrl:avatarThumbnail('next')},'sync')).toMatchObject([{kind:'avatar',avatarEvidence:'id',before:'avtr_new',after:'avtr_next'}]);
   });
   it('does not replay a partial thumbnail change when the full image arrives later',()=>{
-    const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('oldFull'),currentAvatarThumbnailImageUrl:avatarThumbnail('oldThumb')}]);
-    const observed=history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarThumbnailImageUrl:avatarThumbnail('newThumb')}}},[alice],self);
-    expect(observed).toMatchObject([{kind:'avatar',avatarEvidence:'image',avatarUrl:avatarThumbnail('newThumb')}]);
-    expect(history.observeProfile({...alice,currentAvatar:'avtr_new',currentAvatarImageUrl:avatarFile('newFull'),currentAvatarThumbnailImageUrl:avatarThumbnail('newThumb')},'sync')).toMatchObject([{id:observed[0].id,avatarId:'avtr_new',avatarEvidence:'id'}]);
+    const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('old'),currentAvatarThumbnailImageUrl:avatarThumbnail('old')}]);
+    const observed=history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatarThumbnailImageUrl:avatarThumbnail('new')}}},[alice],self);
+    expect(observed).toMatchObject([{kind:'avatar',avatarEvidence:'image',avatarUrl:avatarThumbnail('new')}]);
+    expect(history.observeProfile({...alice,currentAvatar:'avtr_new',currentAvatarImageUrl:avatarFile('new'),currentAvatarThumbnailImageUrl:avatarThumbnail('new')},'sync')).toMatchObject([{id:observed[0].id,avatarId:'avtr_new',avatarEvidence:'id'}]);
   });
   it('enriches a precise ID event with a later name, author and preview without creating another row',()=>{
     const history=observer();history.seedUsers([alice]);
     const observed=history.observePipeline({type:'friend-update',content:{userId:alice.id,user:{currentAvatar:'avtr_new'}}},[alice],self)[0];
     expect(observed.avatarName).toBeUndefined();expect(observed.avatarUrl).toBeUndefined();
     const hydrated={...alice,currentAvatar:'avtr_new',currentAvatarName:'Настоящий аватар',currentAvatarAuthorName:'Автор',currentAvatarImageUrl:avatarFile('new')};
-    expect(history.observeProfile(hydrated,'sync')).toEqual([{...observed,avatarName:'Настоящий аватар',avatarAuthorName:'Автор',avatarUrl:avatarFile('new')}]);
+    expect(history.observeProfile(hydrated,'sync')).toEqual([{...observed,avatarName:'Настоящий аватар',avatarAuthorName:'Автор',avatarUrl:avatarFile('new'),avatarFileId:'file_new'}]);
     expect(history.observeProfile(hydrated,'sync')).toEqual([]);
     expect(history.observeProfile({...hydrated,currentAvatarName:'Позднее переименование'},'sync')).toEqual([]);
   });
   it('keeps image edits honest while still adding the confirmed searchable ID and name',()=>{
-    const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('same',1)}]);
-    const observed=history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('same',2)})[0];
-    const enriched=history.observeProfile({...alice,currentAvatarName:'Тот же аватар',currentAvatarAuthorName:'Автор',currentAvatarImageUrl:avatarFile('same',2)},'sync');
-    expect(enriched).toMatchObject([{id:observed.id,avatarEvidence:'image',avatarId:'avtr_old',avatarName:'Тот же аватар',before:avatarFile('same',1),after:avatarFile('same',2)}]);
+    const history=observer();history.seedUsers([{...alice,currentAvatarImageUrl:avatarFile('same-old')}]);
+    const observed=history.observeProfile({...alice,currentAvatarImageUrl:avatarFile('same-new')})[0];
+    const enriched=history.observeProfile({...alice,currentAvatarName:'Тот же аватар',currentAvatarAuthorName:'Автор',currentAvatarImageUrl:avatarFile('same-new')},'sync');
+    expect(enriched).toMatchObject([{id:observed.id,avatarEvidence:'image',avatarId:'avtr_old',avatarName:'Тот же аватар',before:avatarFile('same-old'),after:avatarFile('same-new')}]);
     expect(enriched[0].detail).toBe('Обновилось изображение аватара');
   });
   it('only attaches names to the latest matching image when several avatar images change before hydration',()=>{

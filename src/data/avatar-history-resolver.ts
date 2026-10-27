@@ -1,4 +1,4 @@
-import type { Avatar } from '../api/types';
+import type { AvatarMetadata } from '../api/types';
 import type { HistoryEvent } from './history';
 
 const imageHosts = new Set([
@@ -16,7 +16,9 @@ export function fileIdOfAvatarImage(value: unknown): string | undefined {
   try {
     const url = new URL(value);
     if (url.protocol !== 'https:' || url.username || url.password || url.port || !imageHosts.has(url.hostname)) return;
-    const match = url.pathname.match(/\/(file_[A-Za-z0-9_-]{1,120})\/\d{1,9}(?:\/|$)/);
+    // VRChat also sends versionless thumbnail paths. The file ID is independent
+    // of version, resolution and the host's chosen path layout.
+    const match = url.pathname.match(/\/(file_[A-Za-z0-9_-]{1,120})(?=\/|\.|$)/i);
     const id = match?.[1];
     if (id && !placeholderFiles.has(id.toLowerCase())) return id;
   } catch { /* Invalid or unsupported images need no external lookup. */ }
@@ -24,16 +26,16 @@ export function fileIdOfAvatarImage(value: unknown): string | undefined {
 
 type Timer = ReturnType<typeof setTimeout>;
 export interface AvatarHistoryResolverDependencies {
-  resolve: (fileId: string) => Promise<Avatar | undefined>;
-  enrich: (eventId: string, fileId: string, avatar: Avatar) => void;
+  resolve: (fileId: string) => Promise<AvatarMetadata | undefined>;
+  enrich: (eventId: string, fileId: string, avatar: AvatarMetadata, side: 'before' | 'after') => void;
   now?: () => number;
   setTimer?: (callback: () => void, delay: number) => Timer;
   clearTimer?: (timer: Timer) => void;
 }
-type Waiter = { eventId: string; userId: string };
+type Waiter = { eventId: string; side: 'before' | 'after' };
 type Job = { fileId: string; waiters: Map<string, Waiter>; attempts: number };
-type Cached = { avatar?: Avatar; expiresAt: number };
-const requestSpacing = 10_000;
+type Cached = { avatar?: AvatarMetadata; expiresAt: number };
+const requestSpacing = 1_000;
 const positiveTtl = 600_000;
 const negativeTtl = 120_000;
 const maxJobs = 100;
@@ -51,7 +53,6 @@ export class AvatarHistoryResolver {
   private pending?: Promise<void>;
   private currentJob?: Job;
   private jobs = new Map<string, Job>();
-  private latest = new Map<string, string>();
   private cache = new Map<string, Cached>();
   private nextRequestAt = 0;
   private retryAt = 0;
@@ -72,7 +73,6 @@ export class AvatarHistoryResolver {
     this.cancelTimer();
     if (!active) {
       this.jobs.clear();
-      this.latest.clear();
       this.currentJob = undefined;
       // Keep the physical pending request until it settles. Its older generation
       // cannot deliver metadata or overlap a new request after foregrounding.
@@ -83,18 +83,18 @@ export class AvatarHistoryResolver {
     if (this.disposed || !this.active) return;
     for (const event of events) {
       if (event.kind !== 'avatar' || event.source !== 'pipeline') continue;
-      // Even a fully named new event invalidates an older image's pending lookup.
-      this.latest.delete(event.userId);
-      this.latest.set(event.userId, event.id);
-      while (this.latest.size > maxWaiters) this.latest.delete(this.latest.keys().next().value!);
-      this.prune();
-      if (event.avatarName?.trim()) continue;
-      // The preview may still be the previous thumbnail while the full image has
-      // changed. For image evidence, only the changed URL can identify this event.
-      const fileId = fileIdOfAvatarImage(event.after)
-        || (event.avatarEvidence !== 'image' ? fileIdOfAvatarImage(event.avatarUrl) : undefined);
-      if (!fileId) continue;
-      const waiter = { eventId: event.id, userId: event.userId };
+      // Each side belongs to this exact historical event/file pair. A later
+      // user's switch must not discard the names of an earlier real switch.
+      const sides = [
+        { side:'after' as const, name:event.avatarName, fileId:event.avatarFileId || fileIdOfAvatarImage(event.after)
+          || (event.avatarEvidence !== 'image' ? fileIdOfAvatarImage(event.avatarUrl) : undefined) },
+        { side:'before' as const, name:event.previousAvatarName, fileId:event.previousAvatarFileId
+          || fileIdOfAvatarImage(event.before) || fileIdOfAvatarImage(event.previousAvatarUrl) },
+      ];
+      for (const {side,name,fileId} of sides) {
+      if (name?.trim() || !fileId || !/^file_[A-Za-z0-9_-]{1,120}$/.test(fileId) || placeholderFiles.has(fileId.toLowerCase())) continue;
+      const waiter = { eventId:event.id, side };
+      const key = `${event.id}:${side}`;
       const cached = this.cache.get(fileId);
       if (cached && cached.expiresAt > this.now()) {
         this.cache.delete(fileId);
@@ -105,11 +105,12 @@ export class AvatarHistoryResolver {
       if (cached) this.cache.delete(fileId);
       const job = this.currentJob?.fileId === fileId ? this.currentJob : this.jobs.get(fileId);
       if (job) {
-        job.waiters.set(event.id, waiter);
+        job.waiters.set(key, waiter);
         while (job.waiters.size > maxWaiters) job.waiters.delete(job.waiters.keys().next().value!);
       } else {
-        this.jobs.set(fileId, { fileId, waiters: new Map([[event.id, waiter]]), attempts: 0 });
+        this.jobs.set(fileId, { fileId, waiters: new Map([[key, waiter]]), attempts: 0 });
         while (this.jobs.size > maxJobs) this.jobs.delete(this.jobs.keys().next().value!);
+      }
       }
     }
     this.schedule();
@@ -122,24 +123,9 @@ export class AvatarHistoryResolver {
     this.cache.clear();
   }
 
-  private current(waiter: Waiter) {
-    return this.latest.get(waiter.userId) === waiter.eventId;
-  }
-
-  private deliver(waiter: Waiter, fileId: string, avatar: Avatar) {
-    if (this.active && !this.disposed && this.current(waiter))
-      this.dependencies.enrich(waiter.eventId, fileId, { ...avatar });
-  }
-
-  private prune() {
-    const pruneJob = (job: Job) => {
-      for (const [id, waiter] of job.waiters) if (!this.current(waiter)) job.waiters.delete(id);
-    };
-    if (this.currentJob) pruneJob(this.currentJob);
-    for (const [fileId, job] of this.jobs) {
-      pruneJob(job);
-      if (!job.waiters.size) this.jobs.delete(fileId);
-    }
+  private deliver(waiter: Waiter, fileId: string, avatar: AvatarMetadata) {
+    if (this.active && !this.disposed)
+      this.dependencies.enrich(waiter.eventId, fileId, { ...avatar }, waiter.side);
   }
 
   private cancelTimer() {
@@ -149,13 +135,12 @@ export class AvatarHistoryResolver {
 
   private schedule() {
     this.cancelTimer();
-    this.prune();
     if (!this.active || this.disposed || this.pending || !this.jobs.size) return;
     const due = Math.max(this.nextRequestAt, this.retryAt);
     this.timer = this.setTimer(() => { this.timer = undefined; this.run(); }, Math.max(0, due - this.now()));
   }
 
-  private remember(fileId: string, avatar?: Avatar) {
+  private remember(fileId: string, avatar?: AvatarMetadata) {
     this.cache.delete(fileId);
     this.cache.set(fileId, { avatar, expiresAt: this.now() + (avatar ? positiveTtl : negativeTtl) });
     while (this.cache.size > 100) this.cache.delete(this.cache.keys().next().value!);
@@ -163,7 +148,6 @@ export class AvatarHistoryResolver {
 
   private run() {
     if (!this.active || this.disposed || this.pending) return;
-    this.prune();
     const job = this.jobs.values().next().value as Job | undefined;
     if (!job) return;
     this.jobs.delete(job.fileId);
@@ -177,9 +161,10 @@ export class AvatarHistoryResolver {
         if (this.disposed || !this.active || generation !== this.generation) return;
         // History needs only these bounded fields. Do not retain full public DB
         // descriptions, package arrays, arbitrary extra fields, or image blobs.
-        const avatar: Avatar | undefined = result && /^avtr_[A-Za-z0-9_-]{1,120}$/.test(result.id)
+        const avatar: AvatarMetadata | undefined = result && (!result.id || /^avtr_[A-Za-z0-9_-]{1,120}$/.test(result.id))
           && typeof result.name === 'string' && result.name.trim() ? {
-            id: result.id, name: result.name.trim().slice(0, 256),
+            ...(result.id ? {id:result.id} : {}), name: result.name.trim().slice(0, 256),
+            ...(result.source ? {source:result.source} : {}),
             ...(typeof result.authorName === 'string' && result.authorName.trim()
               ? { authorName: result.authorName.trim().slice(0, 256) } : {}),
           } : undefined;
@@ -193,7 +178,6 @@ export class AvatarHistoryResolver {
             ? Math.min(86_400, Math.max(0, failure.retryAfter)) : 60;
           this.retryAt = this.now() + Math.max(requestSpacing, seconds * 1000);
           if (job.attempts < 2) {
-            this.prune();
             if (job.waiters.size) this.jobs = new Map([[job.fileId, job] as [string, Job], ...this.jobs].slice(0, maxJobs));
           } else this.remember(job.fileId);
         } else this.remember(job.fileId);

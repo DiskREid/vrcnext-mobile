@@ -12,5 +12,14 @@
 .history-avatar-change { display:flex; gap:12px; align-items:flex-start; margin:12px 0; min-width:0; }
 .history-avatar-change > div { flex:1; min-width:0; }
 .history-avatar-preview { width:76px; height:76px; object-fit:cover; flex:none; border-radius:12px; background:var(--bg); }
+.history-avatar-transition { display:grid; grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr); gap:8px; min-width:0; margin:12px 0; }
+.history-avatar-side { display:flex; flex-direction:column; align-items:flex-start; gap:8px; min-width:0; padding:10px; border-radius:12px; background:var(--bg); }
+.history-avatar-side .history-avatar-preview { width:56px; height:56px; max-width:100%; }
+.history-avatar-side .history-avatar-search { min-width:0; max-width:100%; }
+.history-avatar-side .history-avatar-search-trigger { text-align:left; max-width:100%; overflow-wrap:anywhere; }
+.history-avatar-side .history-avatar-search-trigger > span { overflow-wrap:anywhere; }
+.history-avatar-side-label { font-size:10px; overflow-wrap:anywhere; }
+.history-avatar-author, .history-avatar-unknown { overflow-wrap:anywhere; font-size:11px; }
+.history-avatar-arrow { align-self:center; text-align:center; color:var(--muted); }
 .history-bio-current { white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 @media(max-width:450px) { .history-row { padding:12px;gap:9px; } .history-heading { flex-direction:column; gap:3px; } }

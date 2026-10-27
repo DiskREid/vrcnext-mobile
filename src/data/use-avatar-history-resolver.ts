@@ -12,8 +12,8 @@ export function useAvatarHistoryResolver(account: string | undefined, demo: bool
   destination.current = { account, enrich: history.enrichAvatar };
   const controller = useMemo(() => account && !demo ? new AvatarHistoryResolver(account, {
     resolve: fileId => api.resolvePublicAvatar(fileId),
-    enrich: (eventId, fileId, avatar) => {
-      if (destination.current.account === account) destination.current.enrich(eventId, fileId, avatar);
+    enrich: (eventId, fileId, avatar, side) => {
+      if (destination.current.account === account) destination.current.enrich(eventId, fileId, avatar, side);
     },
   }) : undefined, [account, demo]);
   const [nativeActive, setNativeActive] = useState(!isNative);

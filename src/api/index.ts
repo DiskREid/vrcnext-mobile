@@ -9,6 +9,7 @@ import type { BoopSelection } from './boop';
 import type { NativeBridge, NativeResponse } from './native';
 import type {
   Avatar,
+  AvatarMetadata,
   CalendarEvent,
   CreateInstanceOptions,
   Favorite,
@@ -665,41 +666,62 @@ export function createApi(transport: NativeBridge, available: () => boolean = ()
         .map(normalizePublicAvatar)
         .filter((a): a is Avatar => a !== undefined);
     },
-    async resolvePublicAvatar(fileId: string): Promise<Avatar | undefined> {
+    async resolvePublicAvatar(fileId: string): Promise<AvatarMetadata | undefined> {
       ensureNative();
       if (!/^file_[A-Za-z0-9_-]{1,120}$/.test(fileId))
         throw new ApiError('Некорректный идентификатор файла аватара.');
-      // VRChat uses these images while hiding/loading the actual avatar. They
-      // cannot identify a user's selection and must not become a Robot event.
-      if (fileId === 'file_0e8c4e32-7444-44ea-ade4-313c010d4bae'
-        || fileId === 'file_31255e6b-696e-4c11-b007-595fa1142467') return undefined;
-      let response: NativeResponse;
-      try {
-        response = await transport.resolvePublicAvatar({ fileId });
-      } catch {
-        throw new ApiError('Не удалось получить сведения об аватаре из avtrdb.com.');
+      if (fileId.toLowerCase() === 'file_0e8c4e32-7444-44ea-ade4-313c010d4bae'
+        || fileId.toLowerCase() === 'file_31255e6b-696e-4c11-b007-595fa1142467') return undefined;
+      // Match the PC resolver chain. Each public database receives just one
+      // observed file ID, through the separate cookie-free native transport.
+      for (const source of ['avtrdb', 'icu'] as const) {
+        let response: NativeResponse;
+        try {
+          response = await transport.resolvePublicAvatar(source === 'avtrdb' ? { fileId } : { fileId, source });
+        } catch {
+          continue;
+        }
+        // Both databases share the native public-transport cooldown. Preserve it
+        // instead of hammering the next service or hiding the rate limit.
+        if (response.status === 429)
+          throw new ApiError('Лимит базы аватаров. Повторите позже.', 429, response.retryAfter);
+        if (response.status < 200 || response.status >= 300) continue;
+        const result = record(response.data);
+        const match = result && record(Object.prototype.hasOwnProperty.call(result, fileId) ? result[fileId] : undefined);
+        if (!match || typeof match.name !== 'string' || !match.name.trim()) continue;
+        const id = source === 'icu' ? match.id : match.vrc_id;
+        if (typeof id !== 'string' || !/^avtr_[A-Za-z0-9_-]{1,120}$/.test(id)
+          || id.toLowerCase() === 'avtr_c38a1615-5bf5-42b4-84eb-a8b6c37cbd11') continue;
+        const author = record(match.author);
+        const authorName = source === 'icu' ? match.authorName : author?.name;
+        const authorId = source === 'icu' ? match.authorId : author?.vrc_id;
+        const image = source === 'icu' ? match.imageUrl : match.image_url;
+        return {
+          id, name: match.name.trim().slice(0, 256), source,
+          ...(typeof authorName === 'string' && authorName.trim() ? { authorName: authorName.trim().slice(0, 256) } : {}),
+          ...(typeof authorId === 'string' && /^usr_[A-Za-z0-9_-]{1,120}$/.test(authorId) ? { authorId } : {}),
+          ...(typeof image === 'string' && image.length <= 4096 ? { imageUrl: image, thumbnailImageUrl: image } : {}),
+        };
       }
-      if (response.status < 200 || response.status >= 300)
-        throw new ApiError(
-          response.status === 429
-            ? 'Лимит avtrdb.com. Повторите позже.'
-            : 'База avtrdb.com временно недоступна.',
-          response.status,
-          response.retryAfter,
-        );
-      const result = record(response.data);
-      if (!result) throw new ApiError('База avtrdb.com вернула некорректный ответ.');
-      // Resolve is a map keyed by exact file ID, never a fuzzy search result.
-      // An absent mapping remains unresolved instead of borrowing another key.
-      const match = record(Object.prototype.hasOwnProperty.call(result, fileId) ? result[fileId] : undefined);
-      if (!match || typeof match.name !== 'string' || !match.name.trim()) return undefined;
-      const avatar = normalizePublicAvatar(match);
-      if (!avatar || !/^avtr_[A-Za-z0-9_-]{1,120}$/.test(avatar.id)
-        || avatar.id === 'avtr_c38a1615-5bf5-42b4-84eb-a8b6c37cbd11') return undefined;
-      // Resolution of a file also works for indexed private metadata. Do not
-      // reuse public-search's default as evidence of its current visibility.
-      const visibility = match.release_status ?? match.releaseStatus;
-      return { ...avatar, releaseStatus: visibility === 'public' || visibility === 'private' ? visibility : undefined };
+      // A real VRChat avatar image file carries its name even when no public
+      // database knows an avtr_ ID. A profile icon or arbitrary image must not
+      // become an avatar event just because its URL contains a file ID.
+      let file: unknown;
+      try {
+        file = await request<unknown>('/file/' + segment(fileId));
+      } catch (error) {
+        if (error instanceof ApiError && (error.status === 403 || error.status === 404)) return undefined;
+        throw error;
+      }
+      const value = record(file);
+      if (!value || value.id !== undefined && value.id !== fileId || typeof value.name !== 'string') return undefined;
+      const matched = value.name.match(/^Avatar - (.+) - (?:Image|Asset bundle|Unity package) -/i);
+      const name = matched?.[1]?.trim();
+      if (!name) return undefined;
+      return {
+        name: name.slice(0, 256), source: 'vrchat-file',
+        ...(typeof value.ownerId === 'string' && /^usr_[A-Za-z0-9_-]{1,120}$/.test(value.ownerId) ? { authorId: value.ownerId } : {}),
+      };
     },
     avatar: (id: string) => request<Avatar>('/avatars/' + segment(id)),
     selectAvatar: (id: string) => request('/avatars/' + segment(id) + '/select', 'PUT', {}),

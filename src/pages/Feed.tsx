@@ -18,6 +18,37 @@ function BioChanges({ before, after }: { before?: string; after?: string }) {
   </details>;
 }
 
+function AvatarSide({ name, id, image, author, previous = false }: {
+  name?: string; id?: string; image?: string; author?: string; previous?: boolean;
+}) {
+  const label = previous ? 'Предыдущий аватар' : 'Новый аватар';
+  return <div className={`history-avatar-side history-avatar-${previous ? 'before' : 'after'}`} role="group" aria-label={label}>
+    <span className="muted small history-avatar-side-label">{label}</span>
+    {image && <SecureImage className="history-avatar-preview" src={image} alt={name || label} maxDimension={256} />}
+    {name || id ? <HistoryAvatarSearch name={name} avatarId={id} /> : <span className="history-avatar-unknown">Название неизвестно</span>}
+    {author && <span className="muted small history-avatar-author">Автор: {author}</span>}
+  </div>;
+}
+
+function AvatarChange({ event }: { event: HistoryEvent }) {
+  const previousId = event.previousAvatarId || (event.before?.startsWith('avtr_') ? event.before : undefined);
+  const previousImage = event.previousAvatarUrl || (event.before?.startsWith('https://') ? event.before : undefined);
+  const id = event.avatarId || (event.after?.startsWith('avtr_') ? event.after : undefined);
+  const hasPrevious = !!(event.previousAvatarName || previousId || previousImage || event.previousAvatarFileId);
+  if (hasPrevious) return <div className="history-avatar-transition" role="group" aria-label="Смена аватара">
+    <AvatarSide previous name={event.previousAvatarName} id={previousId} image={previousImage} author={event.previousAvatarAuthorName} />
+    <span className="history-avatar-arrow" aria-label="на">→</span>
+    <AvatarSide name={event.avatarName} id={id} image={event.avatarUrl} author={event.avatarAuthorName} />
+  </div>;
+  return <div className="history-avatar-change">
+    {event.avatarUrl && <SecureImage className="history-avatar-preview" src={event.avatarUrl} alt={event.avatarName || 'Обновлённое изображение аватара'} maxDimension={256} />}
+    <div><HistoryAvatarSearch name={event.avatarName} avatarId={id} />
+      {!event.avatarName && !id && <p>{event.detail}</p>}
+      {event.avatarAuthorName && <p className="muted small">Автор: {event.avatarAuthorName}</p>}
+    </div>
+  </div>;
+}
+
 export function HistoryRows({ events, limit = 100 }: { events:HistoryEvent[];limit?:number }) {
   const ctx=useApp();
   const [visible,setVisible]=useState(limit);
@@ -34,13 +65,7 @@ export function HistoryRows({ events, limit = 100 }: { events:HistoryEvent[];lim
             <Badge>{event.kind === 'avatar' && event.avatarEvidence === 'image' ? 'Изображение аватара' : historyLabels[event.kind]}</Badge>
             {(event.kind==='world' || event.kind==='instance') && (event.before!==undefined || event.after!==undefined || event.location!==undefined || event.worldId)
               ? <ActivityWorldChange before={event.before} after={event.after ?? event.location} worldId={event.worldId}/>
-              : event.kind === 'avatar' ? <div className="history-avatar-change">
-                {event.avatarUrl && <SecureImage className="history-avatar-preview" src={event.avatarUrl} alt={event.avatarName || 'Обновлённое изображение аватара'} maxDimension={256} />}
-                <div><HistoryAvatarSearch name={event.avatarName} avatarId={event.avatarId || (event.after?.startsWith('avtr_') ? event.after : undefined)} />
-                  {!event.avatarName && !event.avatarId && !event.after?.startsWith('avtr_') && <p>{event.detail}</p>}
-                  {event.avatarAuthorName && <p className="muted small">Автор: {event.avatarAuthorName}</p>}
-                </div>
-              </div> : event.kind === 'bio' ? <p className="history-bio-current">{event.after || 'Био очищено'}</p>
+              : event.kind === 'avatar' ? <AvatarChange event={event} /> : event.kind === 'bio' ? <p className="history-bio-current">{event.after || 'Био очищено'}</p>
                 : <p className="preserve-lines">{event.detail}</p>}
             {event.kind==='bio' && <BioChanges before={event.before} after={event.after} />}
             {event.worldId && event.kind!=='world' && event.kind!=='instance' && <ActivityWorldChange worldId={event.worldId}/>}
@@ -60,7 +85,7 @@ export default function Feed() {
   const [filter,setFilter]=useState<FeedFilter>('all'),[query,setQuery]=useState('');
   const events=useMemo(()=>ctx.history.events.filter((event)=>{
     const kinds:Record<FeedFilter,HistoryKind[]|undefined>={all:undefined,gps:['world','instance'],online:['online'],offline:['offline'],status:['status'],avatar:['avatar'],bio:['bio']};
-    return (!kinds[filter]||kinds[filter]!.includes(event.kind)) && `${event.displayName} ${event.userId} ${event.detail} ${event.avatarName || ''} ${event.avatarAuthorName || ''} ${event.before || ''} ${event.after || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
+    return (!kinds[filter]||kinds[filter]!.includes(event.kind)) && `${event.displayName} ${event.userId} ${event.detail} ${event.avatarName || ''} ${event.avatarAuthorName || ''} ${event.previousAvatarName || ''} ${event.previousAvatarAuthorName || ''} ${event.before || ''} ${event.after || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
   }),[ctx.history.events,filter,query]);
   return <>
     <PageHeader eyebrow="ВАШ КРУГ" title="Лента" subtitle="Наблюдаемые события друзей на этом устройстве"/>

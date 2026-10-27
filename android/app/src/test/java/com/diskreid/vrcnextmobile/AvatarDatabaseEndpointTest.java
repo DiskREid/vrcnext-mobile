@@ -29,4 +29,24 @@ public class AvatarDatabaseEndpointTest {
             assertThrows("Should reject " + id, IllegalArgumentException.class,
                     () -> AvatarDatabaseEndpoint.resolve(id, "Mobile-VRCNext/test"));
     }
+
+    @Test public void usesThePcIcuQueryEndpointAndExactIdsBodyWithoutCredentials() throws Exception {
+        String fileId = "file_22222222-2222-4222-8222-222222222222";
+        Request request = AvatarDatabaseEndpoint.resolve(fileId, "Mobile-VRCNext/test", "icu");
+        assertEquals("https://avtr.icu/resolve", request.url().toString());
+        assertEquals("QUERY", request.method());
+        assertNull(request.url().query());
+        assertNull(request.header("Authorization"));
+        assertNull(request.header("Cookie"));
+        assertEquals("application/json", request.header("Accept"));
+        Buffer body = new Buffer();
+        request.body().writeTo(body);
+        assertEquals("{\"ids\":[\"" + fileId + "\"]}", body.readUtf8());
+    }
+
+    @Test public void rejectsUnknownDatabaseNamesInsteadOfAcceptingAnArbitraryDestination() {
+        for (String source : new String[] { null, "", "https://evil.example", "avtrdb/../auth", "vrchat", "ICU" })
+            assertThrows(IllegalArgumentException.class,
+                    () -> AvatarDatabaseEndpoint.resolve("file_known", "Mobile-VRCNext/test", source));
+    }
 }
