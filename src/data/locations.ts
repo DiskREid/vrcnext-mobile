@@ -77,7 +77,7 @@ export function instanceType(
 export function presenceLabel(user: User): string {
   if (disclosedUserLocation(user)) return 'В VRChat';
   if (user.location === 'private') return 'В приватном мире';
-  if (user.state === 'online') return 'В VRChat';
+  if (user.location === 'traveling' || user.state === 'online') return 'В VRChat';
   if (user.state === 'active') return 'На сайте / в приложении';
   return 'Не в сети';
 }

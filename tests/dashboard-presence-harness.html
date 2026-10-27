@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dashboard presence transport regression fixture only</title></head>
+<body><div id="root"></div><script type="module">
+// Synthetic transport only: render the complete app, including its actual friend loader and filters.
+// This HTML is a test entry and is never bundled into the production APK.
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+import '/src/styles.css';
+const picture='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const selfId='usr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+const websiteId='usr_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+const gameId='usr_cccccccc-3333-4333-8333-cccccccccccc';
+const offlineId='usr_dddddddd-4444-4444-8444-dddddddddddd';
+const travelingId='usr_eeeeeeee-5555-4555-8555-eeeeeeeeeeee';
+const disclosedId='usr_ffffffff-6666-4666-8666-ffffffffffff';
+const worldId='wrld_11111111-1111-4111-8111-111111111111';
+const website={id:websiteId,displayName:'Synthetic Website Friend',location:'offline',status:'busy',isFriend:true,tags:[],currentAvatarThumbnailImageUrl:picture};
+const game={id:gameId,displayName:'Synthetic Game Friend',location:'private',status:'ask me',isFriend:true,tags:[],currentAvatarThumbnailImageUrl:picture};
+const offline={id:offlineId,displayName:'Synthetic Offline Friend',location:'offline',status:'join me',isFriend:true,tags:[],currentAvatarThumbnailImageUrl:picture};
+const traveling={...game,id:travelingId,displayName:'Synthetic Traveling Friend',location:'traveling',status:'join me'};
+const disclosed={...game,id:disclosedId,displayName:'Synthetic Disclosed Friend',location:worldId+':123',status:'active'};
+let websiteState='active', websiteLocation='offline', holdNextFriends=false, releaseFriends;
+const listeners=new Map();
+const snapshot=()=>[{...website},{...game},{...traveling},{...disclosed}];
+window.__dashboardPresenceTest={requests:[],unexpected:[],connected:false,held:false,
+ holdRefresh:()=>{holdNextFriends=true;},releaseRefresh:()=>{releaseFriends?.();},
+ emit:(mode,location)=>{
+  const type=mode==='website'?'friend-active':mode==='game'?(location===''?'friend-online':'friend-location'):'friend-offline';
+  websiteState=mode==='website'?'active':mode==='game'?'online':'offline';
+  websiteLocation=mode==='game'?(location??'private'):'offline';
+  listeners.get('pipeline')?.({type,content:{userId:websiteId,...(type==='friend-location'?{location:websiteLocation}:{})}});
+ }
+};
+const bridge={
+ async sessionState(){return{hasAuth:true};},
+ async request(options){
+ if(options.path.startsWith('/favorites?type=friend'))return{status:200,data:[]};
+  window.__dashboardPresenceTest.requests.push({path:options.path,method:options.method||'GET'});
+  const url=new URL(options.path,'https://synthetic.invalid');
+  if(url.pathname==='/auth/user')return{status:200,data:{id:selfId,displayName:'Synthetic Self',state:'offline',location:'offline',status:'active',activeFriends:[websiteId],onlineFriends:[gameId,travelingId,disclosedId],offlineFriends:[offlineId],friends:[websiteId,gameId,travelingId,disclosedId,offlineId]}};
+  if(url.pathname==='/auth/user/friends'){
+   if(url.searchParams.get('offline')==='false'){
+    // Website users are returned in the online bucket, but LimitedUserFriend has no state.
+    const data=snapshot();
+    if(holdNextFriends){holdNextFriends=false;window.__dashboardPresenceTest.held=true;await new Promise(resolve=>{releaseFriends=resolve;});window.__dashboardPresenceTest.held=false;}
+    return{status:200,data};
+   }
+   // Simulate a friend moving between the sequential bucket requests. Online evidence wins.
+   return{status:200,data:[{...offline},{...website,status:'offline'}]};
+  }
+  if(url.pathname===`/users/${websiteId}`)return{status:200,data:{...website,state:websiteState,location:websiteLocation}};
+  if(url.pathname===`/users/${gameId}`)return{status:200,data:{...game,state:'online'}};
+  if(url.pathname===`/users/${travelingId}`)return{status:200,data:{...traveling,state:'online'}};
+  if(url.pathname===`/users/${disclosedId}`)return{status:200,data:{...disclosed,state:'online'}};
+  if(url.pathname===`/instances/${worldId}:123`)return{status:200,data:{id:worldId+':123',worldId,instanceId:'123',name:'123',type:'public',n_users:7,capacity:80}};
+  if(url.pathname===`/worlds/${worldId}`)return{status:200,data:{id:worldId,name:'Synthetic Disclosed World',authorName:'Synthetic Author',thumbnailImageUrl:picture,occupants:7}};
+  if(url.pathname===`/users/${offlineId}`)return{status:200,data:{...offline,state:'offline'}};
+  if(url.pathname.startsWith('/profile/'))return{status:200,data:{id:url.pathname.slice('/profile/'.length),bio:'Synthetic friend presence regression.'}};
+  if(url.pathname==='/calendar')return{status:200,data:[]};
+  if(url.pathname===`/users/${selfId}/groups`)return{status:200,data:[]};
+  window.__dashboardPresenceTest.unexpected.push(options.path);
+  return{status:500,data:{error:{message:'Unexpected synthetic friend presence route'}}};
+ },
+ async addListener(name,listener){listeners.set(name,listener);return{remove:async()=>{if(listeners.get(name)===listener)listeners.delete(name);}};},
+ async connectPipeline(){window.__dashboardPresenceTest.connected=true;listeners.get('connection')?.({state:'connected'});},
+ async disconnectPipeline(){},async clearSession(){},async loadImage(){return{dataUrl:picture};},
+ async openLink(){},async copyText(){},async exportJson(){return{saved:true};},
+};
+registerPlugin('VrcNative',{web:()=>bridge});
+registerPlugin('App',{web:()=>({getState:async()=>({isActive:true}),addListener:async()=>({remove:async()=>{}}),exitApp:async()=>{}})});
+Capacitor.isNativePlatform=()=>true;
+const {default:App}=await import('/src/App.tsx');
+createRoot(document.getElementById('root')).render(React.createElement(App));
+</script></body></html>

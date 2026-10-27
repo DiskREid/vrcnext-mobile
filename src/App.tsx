@@ -46,7 +46,7 @@ import { useHistory } from './data/history';
 import { useAvatarHistoryResolver } from './data/use-avatar-history-resolver';
 import { useObservation } from './data/observation';
 import { useCalendarSync } from './data/calendar-sync';
-import { presenceLabel } from './data/locations';
+import { disclosedUserLocation, presenceLabel } from './data/locations';
 import { presenceMode } from './data/presence';
 import { reconcilePage } from './hooks/paged-data';
 import { pipelineActivity } from './data/session-activity';
@@ -590,23 +590,20 @@ export default function App() {
 function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
   const ctx = useApp();
   const worldSnapshot = useRef<World[]>([]);
-  const data = { ...ctx.friends, data: ctx.friends.data.filter((f) => f.location !== 'offline' && f.state !== 'offline') };
-  const online = data.data?.filter((f) => f.location && f.location !== 'offline') || [];
+  const data = { ...ctx.friends, data: ctx.friends.data.filter((f) => ['game', 'website'].includes(presenceMode(f))) };
+  const online = data.data.filter((f) => presenceMode(f) === 'game');
+  const friendWorldIds = [...new Set(online.flatMap((f) => {
+    const location = disclosedUserLocation(f);
+    return location ? [location.split(':')[0]] : [];
+  }))].sort();
   const worlds = useLoad(async () => {
     if (ctx.demo) return demoWorlds;
-    const unique = [
-      ...new Set(
-        (data.data || [])
-          .map((f) => f.location?.split(':')[0])
-          .filter((x): x is string => !!x && x.startsWith('wrld_')),
-      ),
-    ];
-    const result = await Promise.allSettled(unique.slice(0, 8).map((id) => api.world(id)));
+    const result = await Promise.allSettled(friendWorldIds.slice(0, 8).map((id) => api.world(id)));
     const incoming = result.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
     if (result.length && !incoming.length) throw new Error('Не удалось загрузить миры друзей. Повторите обновление.');
     worldSnapshot.current = reconcilePage(worldSnapshot.current, incoming);
     return worldSnapshot.current;
-  }, [[...new Set((data.data || []).map((f) => f.location?.split(':')[0]).filter((x) => x?.startsWith('wrld_')))].sort().join(','), ctx.demo, ctx.refresh]);
+  }, [friendWorldIds.join(','), ctx.demo, ctx.refresh]);
   return (
     <>
       <PageHeader
@@ -690,13 +687,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
               <button className="friend-bubble" key={f.id} onClick={() => ctx.openUser(f)}>
                 <AvatarImage src={imageOf(f)} name={f.displayName} size={58} user={f} fallbackSrc={f.currentAvatarThumbnailImageUrl || f.currentAvatarImageUrl} />
                 <strong>{f.displayName}</strong>
-                <span>
-                  {f.location?.startsWith('wrld_')
-                    ? 'В VRChat'
-                    : f.state === 'online'
-                      ? 'На сайте'
-                      : statusName(f.status)}
-                </span>
+                <span>{presenceLabel(f)}</span>
               </button>
             ))}
           </div>
@@ -719,7 +710,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
         ) : worlds.data?.length ? (
           <div className="world-grid">
             {worlds.data.map((w, i) => {
-              const users = (data.data || []).filter((f) => f.location?.startsWith(`${w.id}:`));
+              const users = online.filter((f) => disclosedUserLocation(f)?.startsWith(`${w.id}:`));
               return (
                 <button
                   className="media-card world-card"

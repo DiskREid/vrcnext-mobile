@@ -48,4 +48,13 @@ describe('disclosed friend locations', () => {
       'На сайте / в приложении',
     );
   });
+  it('keeps private, traveling and undisclosed online friends in the game, regardless of preferred status', () => {
+    for (const status of ['active', 'join me', 'ask me', 'busy']) {
+      expect(presenceLabel({ ...friend('1', 'private'), status })).toBe('В приватном мире');
+      expect(presenceLabel({ ...friend('1', 'traveling'), status })).toBe('В VRChat');
+      expect(presenceLabel({ id: '1', displayName: 'Friend', state: 'online', status })).toBe('В VRChat');
+      expect(presenceLabel({ ...friend('1', 'offline'), state: 'active', status })).toBe('На сайте / в приложении');
+      expect(presenceLabel({ ...friend('1', 'offline'), state: 'offline', status })).toBe('Не в сети');
+    }
+  });
 });
