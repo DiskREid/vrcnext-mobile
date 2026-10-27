@@ -1,0 +1,74 @@
+{
+  "version": "0.2.11",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 14,
+  "apk": {
+    "name": "VRCNext-Mobile-0.2.11.apk",
+    "bytes": 5519757,
+    "sha256": "2f20c26f737b0d981b55bd9fa6995ae239745fdbb6620a00854ec1419c752730",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0210": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 342,
+    "playwrightPassed": 132,
+    "fullUiSuite": true,
+    "all132CasesVerifiedAfterRerun": true,
+    "initialUiPassed": 131,
+    "initialRunnerFailures": 1,
+    "initialRunnerFailure": "Trace file removed by another Playwright run sharing the same output directory; isolated rerun passed",
+    "avatarSearchRerunPassed": 8,
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 34,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 30,
+    "testAndDevMarkersAbsent": true,
+    "instrumentationExecuted": false
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "instrumentationExecutedFor0211": false,
+    "note": "Browser UI and native compilation are separate checks. Historical 0.1.1 software emulator WebView renderer failure is not a 0.2.11 physical-device result."
+  },
+  "eventFeed": {
+    "profileScanRemoved": true,
+    "onlyReceivedAvatarEventsResolved": true,
+    "exactFileIdQuery": true,
+    "idleTwoHoursNoProfileReads": true,
+    "placeholderImagesIgnored": true,
+    "bioRequiresActualField": true,
+    "latestFeedUiPassed": 10
+  },
+  "trustRepair": {
+    "emptyTagsAreUnknown": true,
+    "canonicalRankCompared": true,
+    "legacyRowsFilteredOnRead": true,
+    "originalIndexedDbRowsPreserved": true
+  },
+  "screenProtection": {
+    "defaultEnabled": false,
+    "storedNatively": true,
+    "appliedImmediately": true,
+    "deviceScreenshotCaptureVerified": false
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.2.11-source.zip",
+    "sourceCommit": "4228ffedf23c545ec91590854c28068d3f89f77a",
+    "trackedFiles": 243,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "764d2326812c5183fd8261233b5473de38335c805becf72395e6c5c568eba5d6"
+  }
+}

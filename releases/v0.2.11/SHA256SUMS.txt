@@ -1,0 +1,6 @@
+1f44fee2eea8bfbc97d01cff866a713216d4c199b20a3402d9ea601de01145ab  README.md
+764d2326812c5183fd8261233b5473de38335c805becf72395e6c5c568eba5d6  VRCNext-Mobile-0.2.11-source.zip
+2f20c26f737b0d981b55bd9fa6995ae239745fdbb6620a00854ec1419c752730  VRCNext-Mobile-0.2.11.apk
+c54f34c74c2c4a09a8b87bf32616387be272d132270c17888c30a2118f91fe3f  screenshots/landscape-feed-event-avatar-bio-synthetic-fixture.png
+60ac7aec554f96493f93ba162f2cf764cc7e7ac1d8fda738d7409f7b62996abb  screenshots/portrait-feed-event-avatar-bio-synthetic-fixture.png
+74cf32b50478d3fb1505b7001f8e59348ccda8a478d3e1fccb5a58f244123dd8  validation.json
