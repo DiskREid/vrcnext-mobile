@@ -1,0 +1,260 @@
+.holiday-decor {
+  --decor-primary: #f096b8;
+  --decor-secondary: #ffe2ed;
+  --decor-leaf: #89be9e;
+  --decor-gold: #e7c981;
+  --decor-alpha: 0.32;
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+  contain: layout paint style;
+}
+.holiday-decor--womens-day {
+  --decor-primary: #f3a5c5;
+  --decor-secondary: #e4c7fb;
+  --decor-leaf: #a1d3ae;
+}
+.holiday-decor--st-patrick {
+  --decor-primary: #68c5a2;
+  --decor-secondary: #d5f1d5;
+  --decor-leaf: #70b88c;
+  --decor-gold: #e5c86f;
+}
+.holiday-decor--easter {
+  --decor-primary: #c7b0ec;
+  --decor-secondary: #f2c1d5;
+  --decor-leaf: #aed8b2;
+  --decor-gold: #f1df9f;
+}
+.holiday-decor--earth-day {
+  --decor-primary: #7dbdd3;
+  --decor-secondary: #cceaf2;
+  --decor-leaf: #8cc79a;
+}
+.holiday-decor--halloween {
+  --decor-primary: #e8a05f;
+  --decor-secondary: #ae98dc;
+  --decor-leaf: #8b9d80;
+  --decor-gold: #edc47f;
+}
+.holiday-decor--christmas {
+  --decor-primary: #b6def3;
+  --decor-secondary: #edf9ff;
+  --decor-leaf: #88baae;
+  --decor-gold: #f3dfb0;
+}
+.holiday-decor-piece {
+  position: absolute;
+  display: block;
+  line-height: 0;
+  color: var(--decor-primary);
+  opacity: var(--decor-alpha);
+}
+.holiday-decor-piece > svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  overflow: visible;
+}
+.holiday-decor-piece--1,
+.holiday-decor-piece--3,
+.holiday-decor-piece--5 {
+  color: var(--decor-secondary);
+}
+.holiday-decor .holiday-decor-leaf {
+  fill: var(--decor-leaf);
+}
+.holiday-decor .holiday-decor-gold {
+  fill: var(--decor-gold);
+}
+.holiday-decor .holiday-decor-outline {
+  stroke: var(--decor-secondary);
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.holiday-decor .holiday-decor-stripe {
+  stroke: var(--decor-secondary);
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+}
+.holiday-decor .holiday-decor-face {
+  fill: #ffe0a0;
+}
+.holiday-decor .holiday-decor-snow {
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  fill: none;
+}
+.holiday-decor-piece--bat {
+  color: var(--decor-secondary);
+}
+.holiday-decor--ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+}
+.holiday-decor--ambient .holiday-decor-piece {
+  width: 12px;
+  height: 12px;
+  opacity: 0.3;
+}
+.holiday-decor--ambient .holiday-decor-piece--0 {
+  left: 2px;
+  top: 29%;
+}
+.holiday-decor--ambient .holiday-decor-piece--1 {
+  right: 2px;
+  top: 41%;
+}
+.holiday-decor--ambient .holiday-decor-piece--2 {
+  left: 2px;
+  top: 72%;
+}
+.holiday-decor--ambient .holiday-decor-piece--3 {
+  right: 2px;
+  top: 83%;
+}
+.holiday-decor--hero {
+  position: absolute;
+  inset: 0 0 0 52%;
+  z-index: 0;
+  border-radius: inherit;
+}
+.holiday-decor--hero .holiday-decor-piece {
+  width: 25px;
+  height: 25px;
+}
+.holiday-decor--hero .holiday-decor-piece--0 {
+  left: 20%;
+  top: 18%;
+  width: 37px;
+  height: 37px;
+}
+.holiday-decor--hero .holiday-decor-piece--1 {
+  right: 12%;
+  top: 32%;
+  width: 20px;
+  height: 20px;
+}
+.holiday-decor--hero .holiday-decor-piece--2 {
+  left: 45%;
+  bottom: 18%;
+  width: 31px;
+  height: 31px;
+}
+.holiday-decor--hero .holiday-decor-piece--3 {
+  left: 8%;
+  bottom: 23%;
+  width: 18px;
+  height: 18px;
+}
+.holiday-decor--hero .holiday-decor-piece--4 {
+  right: 8%;
+  bottom: 36%;
+  width: 21px;
+  height: 21px;
+}
+.holiday-decor--hero .holiday-decor-piece--5 {
+  right: 21%;
+  top: 8%;
+  width: 13px;
+  height: 13px;
+}
+.holiday-decor-garland {
+  position: absolute;
+  width: 100%;
+  right: 0;
+  top: 0;
+  color: var(--decor-secondary);
+  fill: var(--decor-primary);
+  opacity: var(--decor-alpha);
+}
+.holiday-decor-web {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 95px;
+  height: 95px;
+  stroke: var(--decor-secondary);
+  stroke-width: 0.8;
+  fill: none;
+  opacity: 0.2;
+}
+html[data-theme='liquid-dark'][data-glass-intensity='low'] .holiday-decor,
+html[data-theme='liquid-light'][data-glass-intensity='low'] .holiday-decor {
+  --decor-alpha: 0.22;
+}
+html[data-theme='liquid-dark'][data-glass-intensity='high'] .holiday-decor,
+html[data-theme='liquid-light'][data-glass-intensity='high'] .holiday-decor {
+  --decor-alpha: 0.42;
+}
+html[data-theme='liquid-light'] .holiday-decor--ambient .holiday-decor-piece {
+  opacity: 0.5;
+}
+html[data-theme='liquid-light'] .holiday-decor--hero {
+  --decor-alpha: 0.3;
+}
+html[data-holiday-animations='true'] .holiday-decor-piece {
+  animation: holiday-decor-drift 12s ease-in-out infinite;
+  animation-delay: calc(var(--piece-index) * -1.7s);
+}
+html[data-holiday-animations='true'] .holiday-decor--christmas .holiday-decor-piece--snow {
+  animation: holiday-decor-snowfall 15s linear infinite;
+  animation-delay: calc(var(--piece-index) * -2.1s);
+}
+html[data-app-active='false'] .holiday-decor-piece {
+  animation-play-state: paused;
+}
+html[data-holiday-animations='false'] .holiday-decor-piece,
+html[data-effects='reduced'] .holiday-decor-piece {
+  animation: none;
+}
+html[data-effects='reduced'] .holiday-decor--hero {
+  --decor-alpha: 0.22;
+}
+html[data-effects='reduced'] .holiday-decor-web {
+  opacity: 0.12;
+}
+@keyframes holiday-decor-drift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(5deg);
+  }
+}
+@keyframes holiday-decor-snowfall {
+  0% {
+    transform: translateY(-12px) translateX(0);
+    opacity: 0;
+  }
+  18% {
+    opacity: var(--decor-alpha);
+  }
+  82% {
+    opacity: var(--decor-alpha);
+  }
+  100% {
+    transform: translateY(52px) translateX(8px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .holiday-decor .holiday-decor-piece {
+    animation: none !important;
+  }
+}
+@media (max-width: 600px) {
+  .holiday-decor--hero {
+    inset-inline-start: 58%;
+  }
+  .holiday-decor--hero .holiday-decor-piece--0 {
+    width: 29px;
+    height: 29px;
+  }
+}

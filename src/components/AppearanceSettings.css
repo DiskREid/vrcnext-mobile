@@ -1,0 +1,100 @@
+.appearance-settings {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.appearance-settings .appearance-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.appearance-settings .field {
+  min-width: 0;
+}
+.appearance-settings select {
+  width: 100%;
+  min-width: 0;
+}
+.appearance-settings .appearance-accent {
+  margin-top: 24px;
+}
+.appearance-settings .appearance-accent > p:first-child {
+  margin-bottom: 10px;
+}
+.appearance-settings .color-options {
+  flex-wrap: wrap;
+}
+.appearance-settings .appearance-holidays {
+  border-top: 1px solid var(--border);
+  padding-top: 23px;
+  margin-top: 25px;
+}
+.appearance-holidays > h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+.appearance-settings .appearance-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 48px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.appearance-switch-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.appearance-switch-row > input {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.appearance-switch-row > input:disabled {
+  cursor: not-allowed;
+}
+.appearance-settings .appearance-holiday-controls {
+  margin-top: 16px;
+}
+.appearance-settings .appearance-current-holiday {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--accent-soft, #a398ff12);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 13px;
+  margin: 16px 0 10px;
+  font-size: 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.appearance-current-holiday > span:first-child:not(:last-child) {
+  font-size: 20px;
+  color: var(--accent);
+  line-height: 1;
+}
+.appearance-settings .appearance-performance-note {
+  margin-top: 14px;
+}
+.appearance-settings .appearance-motion-note {
+  margin: 5px 0 0;
+}
+.appearance-settings .appearance-orientation-note {
+  margin: 25px 0 0;
+}
+@media (max-width: 560px) {
+  .appearance-settings .appearance-controls {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+  }
+}

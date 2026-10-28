@@ -5,6 +5,7 @@ const state = (page: import('@playwright/test').Page) => page.evaluate(() =>
 
 test('an avatar name starts AvatarDB search on demand and preserves results on a failed next page', async ({ page }) => {
   await page.goto('/tests/avatar-history-search-harness.html?mode=paging');
+  await expect(page.getByRole('button', { name: 'Найти аватар Reilynn The Werewolf в AvatarDB', exact: true })).toBeVisible();
   expect((await state(page)).searches).toEqual([]);
   await page.getByRole('button', { name: 'Найти аватар Reilynn The Werewolf в AvatarDB', exact: true }).click();
   const search = page.getByRole('dialog', { name: 'Поиск аватара в AvatarDB', exact: true });

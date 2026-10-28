@@ -15,6 +15,7 @@ import it from './locales/it.json';
 import tr from './locales/tr.json';
 import uk from './locales/uk.json';
 import { activityMessages } from './activity-messages';
+import { appearanceMessages } from './appearance-messages';
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'ru', label: 'Русский' },
@@ -40,6 +41,7 @@ export const englishMessages: Record<string, string> = {
   ...personal,
   ...about,
   ...Object.fromEntries(activityMessages.map((item) => [item.source, item.en])),
+  ...Object.fromEntries(appearanceMessages.map((item) => [item.source, item.en])),
 };
 export const localePacks: Partial<Record<Locale, Record<string, string>>> = {
   ja,
@@ -64,7 +66,12 @@ for (const { code } of SUPPORTED_LANGUAGES) {
   if (code === 'ru' || code === 'en') continue;
   Object.assign(
     localePacks[code]!,
-    Object.fromEntries(activityMessages.map((item) => [messageId(item.source), item[code]])),
+    Object.fromEntries(
+      [...activityMessages, ...appearanceMessages].map((item) => [
+        messageId(item.source),
+        item[code],
+      ]),
+    ),
   );
 }
 const english = new Map(

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Appearance synthetic transport fixture only</title></head>
+<body><div id="root"></div><script type="module">
+// These app-owned transport fixtures never enter the production bundle.
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+import '/src/styles.css';
+import { setLanguage } from '/src/i18n/index.ts';
+const image = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const self = {id:'usr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',displayName:'Theme Explorer',state:'offline',location:'offline',status:'active',currentAvatarThumbnailImageUrl:image,friends:['usr_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb']};
+const avatar = {id:'avtr_cccccccc-3333-4333-8333-cccccccccccc',name:'Theme Avatar',authorName:'Theme Explorer',imageUrl:image,thumbnailImageUrl:image,releaseStatus:'private'};
+self.currentAvatar = avatar.id;
+// Deliberately equal to UI translation keys: user content must remain untouched.
+const friend = {id:'usr_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb',displayName:'Theme Friend',state:'active',location:'offline',status:'busy',statusDescription:'На сайте',bio:'Настройки',isFriend:true,tags:[],currentAvatarThumbnailImageUrl:image};
+const badgeFixture = new URLSearchParams(location.search).has('badges') ? [
+ {badgeId:'bdg_fixture_early',badgeName:'Early Supporter',badgeDescription:'Thank you for your support!',badgeImageUrl:image},
+ {badgeId:'bdg_fixture_plus',badgeName:'VRC+ Supporter',badgeDescription:'Awarded after 37 gifts; tier 4.',badgeImageUrl:image},
+ {badgeId:'bdg_fixture_unknown',badgeName:'Настройки',badgeDescription:'Миры',badgeImageUrl:image},
+ {badgeId:'bdg_fixture_hidden',badgeName:'VRChat Team',badgeDescription:'Hidden award',badgeImageUrl:image,hidden:true},
+] : undefined;
+const listeners = new Map();
+const appListeners = new Map();
+window.__appearanceTest = {requests:[],unexpected:[],links:[],copiedText:[],badges:badgeFixture,chooseLanguage:setLanguage,clearedSessions:0,selfId:self.id,friendId:friend.id};
+const bridge = {
+ async sessionState(){return{hasAuth:true};},
+ async request(options){
+  const url = new URL(options.path,'https://synthetic.invalid');
+  window.__appearanceTest.requests.push({path:options.path,method:options.method||'GET'});
+  if(url.pathname==='/auth/user'||url.pathname===`/users/${self.id}`)return{status:200,data:self};
+  if(url.pathname==='/auth/user/friends')return{status:200,data:url.searchParams.get('offline')==='false'?[friend]:[]};
+  if(url.pathname===`/users/${friend.id}`)return{status:200,data:friend};
+  if(url.pathname===`/profile/${friend.id}`)return{status:200,data:{id:friend.id,bio:friend.bio,...(badgeFixture?{badges:badgeFixture}:{})}};
+  if(url.pathname===`/profile/${self.id}`)return{status:200,data:{id:self.id,bio:'Original self biography',languages:['eng'],bioLinks:[]}};
+  if(url.pathname==='/avatars')return{status:200,data:url.searchParams.get('offset')==='0'?[avatar]:[]};
+  if(url.pathname==='/worlds')return{status:200,data:[]};
+  if(url.pathname==='/favorites'||url.pathname==='/calendar'||url.pathname===`/users/${self.id}/groups`)return{status:200,data:[]};
+  window.__appearanceTest.unexpected.push(options.path);
+  return{status:500,data:{error:{message:'Unexpected synthetic language route'}}};
+ },
+ async screenProtection(){return{enabled:false};}, async setScreenProtection({enabled}){return{enabled};},
+ async addListener(name,listener){listeners.set(name,listener);return{remove:async()=>{if(listeners.get(name)===listener)listeners.delete(name);}};},
+ async connectPipeline(){listeners.get('connection')?.({state:'connected'});}, async disconnectPipeline(){},
+ async clearSession(){window.__appearanceTest.clearedSessions++;}, async loadImage(){return{dataUrl:image};},
+ async openLink({url}){window.__appearanceTest.links.push(url);}, async copyText({text}){window.__appearanceTest.copiedText.push(text);}, async exportJson(){return{saved:true};},
+};
+registerPlugin('VrcNative',{web:()=>bridge});
+registerPlugin('App',{web:()=>({getState:async()=>({isActive:true}),addListener:async(name,listener)=>{if(!appListeners.has(name))appListeners.set(name,new Set());appListeners.get(name).add(listener);return{remove:async()=>{appListeners.get(name)?.delete(listener);}};},exitApp:async()=>{}})});
+Capacitor.isNativePlatform=()=>true;
+const {appearanceStore}=await import('/src/data/appearance.ts');
+window.__appearanceTest.setAppearance=appearanceStore.updateSettings;
+window.__appearanceTest.emitAppState=(isActive)=>{for(const listener of appListeners.get('appStateChange')||[])listener({isActive});};
+window.__appearanceTest.appStateListenerCount=()=>appListeners.get('appStateChange')?.size||0;
+const {default:App}=await import('/src/App.tsx');
+createRoot(document.getElementById('root')).render(React.createElement(App));
+</script></body></html>

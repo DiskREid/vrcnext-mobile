@@ -1,3 +1,6 @@
+import { useAppearanceRuntime } from './data/appearance';
+import HolidayDecor from './components/HolidayDecor';
+import './appearance.css';
 import type { UiMessage } from './i18n';
 import { t, useI18n, dateLocale } from './i18n';
 import SecureImage, { clearImageCache } from './components/SecureImage';
@@ -119,6 +122,7 @@ const tabs: { id: Screen; label: string; icon: ComponentType<{ size?: number }> 
 ];
 export default function App() {
   useI18n();
+  useAppearanceRuntime();
   const [user, setUser] = useState<User | null>(null),
     [demo, setDemo] = useState(false),
     [screen, setScreen] = useState<Screen>('home'),
@@ -287,8 +291,6 @@ export default function App() {
     });
   }, [screen]);
   useEffect(() => {
-    const c = localStorage.getItem('accent');
-    if (c) document.documentElement.style.setProperty('--accent', c);
     const yes = () => setOnline(true),
       no = () => setOnline(false);
     window.addEventListener('online', yes);
@@ -468,6 +470,7 @@ export default function App() {
         activity,
       }}
     >
+      <HolidayDecor />
       <div className="app-shell">
         <aside className="sidebar">
           <button
@@ -779,6 +782,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
       />
       <section className="hero">
         <div className="hero-shade" />
+        <HolidayDecor area="hero" />
         <div className="hero-content">
           <span className="hero-kicker">
             <span className="live-dot" />

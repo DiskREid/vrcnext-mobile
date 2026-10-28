@@ -1,16 +1,8 @@
+import AppearanceSettings from '../components/AppearanceSettings';
 import { uiMessage } from '../i18n';
 import DiagnosticsPanel from '../components/DiagnosticsPanel';
 import { useEffect, useRef, useState } from 'react';
-import {
-  LockKeyhole,
-  LogOut,
-  Info,
-  Palette,
-  Clock,
-  ArrowUpRight,
-  Languages,
-  Check,
-} from 'lucide-react';
+import { LockKeyhole, LogOut, Info, Clock, ArrowUpRight, Languages } from 'lucide-react';
 import { api } from '../api';
 import { isNative, native } from '../api/native';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
@@ -210,9 +202,8 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
 }
 export function SettingsPage({ onAbout }: { onAbout?: () => void } = {}) {
   const { language, setLanguage } = useI18n();
-  const { logout } = useApp(),
-    [accent, setAccent] = useState(localStorage.getItem('accent') || '#a398ff'),
-    [confirm, setConfirm] = useState(false);
+  const { logout } = useApp();
+  const [confirm, setConfirm] = useState(false);
   const [screenProtection, setScreenProtection] = useState<boolean | null>(isNative ? null : false);
   const [protectionBusy, setProtectionBusy] = useState(false);
   const [protectionError, setProtectionError] = useState('');
@@ -246,11 +237,6 @@ export function SettingsPage({ onAbout }: { onAbout?: () => void } = {}) {
       setProtectionBusy(false);
     }
   };
-  const setColor = (c: string) => {
-    setAccent(c);
-    document.documentElement.style.setProperty('--accent', c);
-    localStorage.setItem('accent', c);
-  };
   return (
     <>
       <PageHeader eyebrow={t('ПОД ВАС')} title={t('Настройки')} />
@@ -276,29 +262,7 @@ export function SettingsPage({ onAbout }: { onAbout?: () => void } = {}) {
             {t('Применяется сразу. Друзья, история и сессия сохраняются.')}
           </p>
         </section>
-        <section className="card settings-section">
-          <Palette />
-          <h2>{t('Внешний вид')}</h2>
-          <p className="muted">{t('Цвет акцента')}</p>
-          <div className="color-options">
-            {['#a398ff', '#82c9b3', '#e6ae85', '#e4a3c0', '#83bbef'].map((c) => (
-              <button
-                aria-label={t('Цвет {color}', { color: c })}
-                aria-pressed={c === accent}
-                key={c}
-                style={{ background: c }}
-                onClick={() => setColor(c)}
-              >
-                {c === accent && <Check size={20} />}
-              </button>
-            ))}
-          </div>
-          <p className="muted small">
-            {t(
-              'Ориентация следует повороту устройства. Навигация и карточки автоматически подстраиваются под экран.',
-            )}
-          </p>
-        </section>
+        <AppearanceSettings />
         <section className="card settings-section">
           <LockKeyhole />
           <h2>{t('Конфиденциальность')}</h2>

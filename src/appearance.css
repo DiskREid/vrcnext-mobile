@@ -1,0 +1,764 @@
+/* Appearance is a token layer over the existing layout. Cards never own live blur. */
+html[data-theme] {
+  --glass-blur: 10px;
+  --glass-alpha: 0.83;
+  --glass-chrome-alpha: 0.91;
+  --glass-reflection: 0.08;
+  --glass-shadow: 22px;
+  --holiday-rgb: 163, 152, 255;
+  --accent-soft: #a398ff20;
+  --accent-readable: var(--accent);
+}
+html[data-glass-intensity='low'] {
+  --glass-blur: 4px;
+  --glass-alpha: 0.94;
+  --glass-chrome-alpha: 0.97;
+  --glass-reflection: 0.025;
+  --glass-shadow: 12px;
+}
+html[data-glass-intensity='high'] {
+  --glass-blur: 16px;
+  --glass-alpha: 0.68;
+  --glass-chrome-alpha: 0.8;
+  --glass-reflection: 0.14;
+  --glass-shadow: 30px;
+}
+html[data-holiday='valentine'] {
+  --holiday-rgb: 232, 103, 149;
+}
+html[data-holiday='womens-day'] {
+  --holiday-rgb: 226, 132, 179;
+}
+html[data-holiday='st-patrick'] {
+  --holiday-rgb: 56, 183, 132;
+}
+html[data-holiday='easter'] {
+  --holiday-rgb: 180, 152, 228;
+}
+html[data-holiday='earth-day'] {
+  --holiday-rgb: 72, 165, 163;
+}
+html[data-holiday='halloween'] {
+  --holiday-rgb: 241, 148, 65;
+}
+html[data-holiday='christmas'] {
+  --holiday-rgb: 142, 192, 239;
+}
+
+/* A holiday can change accents without replacing the persistent base theme. */
+html[data-holiday]:not([data-holiday='none']) .workspace {
+  background:
+    radial-gradient(ellipse at 95% 0, rgba(var(--holiday-rgb), 0.1), transparent 54%), var(--bg);
+}
+html[data-theme] .button.primary {
+  color: var(--accent-ink, #211c35);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  html[data-theme] {
+    --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  }
+}
+
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+  --glass-surface-rgb: 24, 37, 62;
+  --glass-chrome-rgb: 17, 29, 51;
+  --bg: #10182a;
+  --surface: rgba(var(--glass-surface-rgb), var(--glass-alpha));
+  --surface-hover: rgba(42, 60, 89, 0.94);
+  --border: rgba(190, 212, 250, 0.16);
+  --text: #edf4ff;
+  --muted: #acbad1;
+  --green: #91d8c0;
+  --peach: #ebbd9e;
+  --glass-inset: rgba(9, 21, 42, 0.66);
+  --glass-edge: rgba(215, 230, 255, 0.2);
+  --glass-line: rgba(186, 207, 244, 0.14);
+  --glass-secondary: #c5d3e9;
+  --glass-shadow-color: 3, 9, 24;
+  --glass-alert: #f2afbf;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: dark;
+}
+html[data-theme='liquid-light'] {
+  --glass-surface-rgb: 255, 255, 255;
+  --glass-chrome-rgb: 245, 249, 255;
+  --bg: #eaf0f8;
+  --surface-hover: rgba(237, 245, 255, 0.97);
+  --border: rgba(104, 130, 166, 0.25);
+  --text: #192b44;
+  --muted: #50627b;
+  --green: #216d53;
+  --peach: #946238;
+  --accent-readable: #4d4396;
+  --glass-inset: rgba(237, 243, 251, 0.84);
+  --glass-edge: rgba(255, 255, 255, 0.95);
+  --glass-line: rgba(89, 117, 156, 0.19);
+  --glass-secondary: #3f536d;
+  --glass-shadow-color: 47, 70, 105;
+  --glass-alert: #a52d4d;
+  color-scheme: light;
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  html[data-theme='liquid-light'] {
+    --accent-readable: color-mix(in srgb, var(--accent) 42%, #14243b);
+  }
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) body {
+  background:
+    radial-gradient(ellipse at 0 0, rgba(109, 144, 232, 0.14), transparent 48%),
+    radial-gradient(ellipse at 100% 15%, rgba(var(--holiday-rgb), 0.12), transparent 48%), var(--bg);
+  color: var(--text);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .workspace {
+  background:
+    radial-gradient(ellipse at 100% 0, rgba(var(--holiday-rgb), 0.09), transparent 52%), transparent;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) :is(.main-content, .auth-page) {
+  background: transparent;
+  color: var(--text);
+  scrollbar-color: #667d9f transparent;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .sidebar {
+  background: linear-gradient(
+    160deg,
+    rgba(var(--glass-chrome-rgb), 0.98),
+    rgba(var(--glass-chrome-rgb), 0.9)
+  );
+  border-color: var(--glass-line);
+}
+
+/* Only the two small navigation surfaces and ordinary dialog panels blur content. */
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.topbar, .bottom-nav, .modal:not(.fullscreen-network):not(.fullscreen-image-viewer)) {
+  background: rgba(var(--glass-chrome-rgb), var(--glass-chrome-alpha));
+  border-color: var(--glass-edge);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, var(--glass-reflection)),
+    0 8px var(--glass-shadow) rgba(var(--glass-shadow-color), 0.14);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .modal-backdrop {
+  background: rgba(3, 10, 26, 0.58);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-theme='liquid-light'] .modal-backdrop {
+  background: rgba(37, 54, 79, 0.3);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .modal-heading {
+  background: rgba(var(--glass-chrome-rgb), 0.98);
+  border-color: var(--glass-line);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .card,
+    .media-card,
+    .dashboard-stats > button,
+    .user-content-card,
+    .network-person-row,
+    .history-avatar-result
+  ) {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, var(--glass-reflection)), transparent 65%),
+    var(--surface);
+  border-color: var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, var(--glass-reflection)),
+    0 5px var(--glass-shadow) rgba(var(--glass-shadow-color), 0.08);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .card,
+    .media-card,
+    .dashboard-stats > button,
+    .network-person-row,
+    .history-avatar-result,
+    .button
+  ) {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) :is(.card, .media-card) {
+  color: var(--text);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.inset-panel, .confirm-inline, .calendar-reminder-banner, .history-avatar-search-error) {
+  background: var(--glass-inset);
+  border-color: var(--glass-line);
+  color: var(--glass-secondary);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .search,
+    .segmented,
+    .account-button,
+    .profile-json,
+    .license-text,
+    .history-avatar-side,
+    .history-body details,
+    .network-zoom,
+    .appearance-preview
+  ) {
+  background: var(--glass-inset);
+  border-color: var(--glass-line);
+  color: var(--text);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.field input, .field textarea, .field select) {
+  background: var(--glass-inset);
+  border-color: var(--glass-line);
+  color: var(--text);
+  color-scheme: inherit;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.field, .search, .icon-button, .segmented > button) {
+  color: var(--glass-secondary);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.field input::placeholder, .field textarea::placeholder, .search > input::placeholder) {
+  color: var(--muted);
+  opacity: 1;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) select option {
+  color: var(--text);
+  background: var(--bg);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.button.secondary, .button.light) {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--glass-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, var(--glass-reflection));
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.side-nav > button, .bottom-nav > button) {
+  color: var(--muted);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.side-nav > button.active, .bottom-nav > button.active, .segmented > button.active) {
+  color: var(--accent-readable);
+  border-color: var(--glass-line);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .side-nav > button.active,
+    .bottom-nav > button.active > span,
+    .segmented > button.active,
+    .messenger-friend.selected
+  ) {
+  background: var(--accent-soft);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .friend-card.is-favorite,
+    .notification-card.is-unread,
+    .boop-choice.selected,
+    .network-person-row.selected
+  ) {
+  border-color: var(--accent);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .brand,
+    .breadcrumb strong,
+    .friend-card h3,
+    .more-card h3,
+    .empty h3,
+    .modal-heading h2,
+    .person-link,
+    .calendar-month-row h2
+  ) {
+  color: var(--text);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .brand span,
+    .nav-caption,
+    .connection,
+    .account-button > div > span,
+    .breadcrumb,
+    .eyebrow,
+    .date-label,
+    .friend-bubble > span:last-child,
+    .friend-card-text p,
+    .friend-location,
+    .friend-rank,
+    .empty,
+    .empty p,
+    .input-hint,
+    .stat-row span,
+    .more-card p,
+    .list-row p,
+    .notification-meta time,
+    .timeline-entry time,
+    .page-footer,
+    .page-footer > span,
+    .world-friend-row,
+    .dashboard-stats > button > div > span,
+    .dashboard-stats > button > svg,
+    .discover-banner p,
+    .settings-section p,
+    .status-line,
+    .notification-body p,
+    .auth-description,
+    .privacy-note,
+    .auth-footer
+  ) {
+  color: var(--muted);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .status-description {
+  color: var(--glass-secondary);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.count-label, .badge, .demo-badge) {
+  background: var(--accent-soft);
+  color: var(--glass-secondary);
+  border-color: var(--glass-line);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.demo-banner, .auth-panel .pill) {
+  background: var(--accent-soft);
+  color: var(--glass-secondary);
+  border-color: var(--glass-line);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .list-row,
+    .stat-row,
+    .world-instance,
+    .instance-row,
+    .favorite-card-actions,
+    .appearance-actions,
+    .messenger-recipient,
+    .about-legal-note,
+    .about-license
+  ) {
+  border-color: var(--glass-line);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) :is(.toast, .confirm-panel) {
+  background: rgba(var(--glass-chrome-rgb), 0.98);
+  color: var(--text);
+  border-color: var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, var(--glass-reflection)),
+    0 8px var(--glass-shadow) rgba(var(--glass-shadow-color), 0.15);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.hero-kicker, .about-pill-row > span) {
+  border-color: var(--glass-edge);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) :is(.world-occupants, .cover-cta) {
+  /* Photo overlays remain dark and readable; no blur per image in a long list. */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.world-population, .world-occupants, .cover-cta, .cover-label) {
+  color: #f2f6ff;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .gallery-grid img,
+    .inventory-cover,
+    .inventory-cover img,
+    .collection-image-view,
+    .favorite-avatar-preview
+  ) {
+  background: var(--glass-inset);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .calendar-day.selected {
+  background: var(--accent);
+  color: var(--accent-ink, #19213b);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .calendar-day.today {
+  border-color: var(--accent);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .calendar-day i {
+  background: var(--accent);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .calendar-day.selected i {
+  background: var(--accent-ink, #19213b);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.event-date, .current-avatar, .upload-picker) {
+  color: var(--accent-readable);
+  background: var(--accent-soft);
+  border-color: var(--glass-line);
+}
+
+/* Light surfaces need explicit replacements for the old dark palette's literals. */
+html[data-theme='liquid-light']
+  :is(
+    a,
+    .text-button,
+    .link-row,
+    .settings-section summary,
+    .about-section-icon,
+    .user-platform-icon,
+    .friend-favorite-toggle.selected,
+    .friend-favorite-badge,
+    .world-instance-friend-text > strong,
+    .location-world > svg,
+    .social-moderation-history summary,
+    .history-body summary
+  ) {
+  color: var(--accent-readable);
+}
+html[data-theme='liquid-light']
+  :is(.icon-button:hover, .friend-bubble:hover, .calendar-day:not(.selected):hover) {
+  background: var(--accent-soft);
+}
+html[data-theme='liquid-light'] :is(.friend-card:hover, .network-person-row:hover) {
+  background: var(--surface-hover);
+}
+html[data-theme='liquid-light'] :is(.stat-icon.purple, .notification-icon) {
+  color: #5a4b9b;
+  background: #e5dff6;
+}
+html[data-theme='liquid-light'] :is(.stat-icon.green, .badge.green, .badge.quest) {
+  color: #22644e;
+  background: #d9eee5;
+}
+html[data-theme='liquid-light'] .stat-icon.peach {
+  color: #875429;
+  background: #f4e4d4;
+}
+html[data-theme='liquid-light'] .stat-icon.blue {
+  color: #305f95;
+  background: #dceafa;
+}
+html[data-theme='liquid-light'] .badge.rank {
+  color: #62429c;
+  background: #e8dff6;
+}
+html[data-theme='liquid-light'] .user-platform-android {
+  color: #24674d;
+}
+html[data-theme='liquid-light'] .user-platform-ios {
+  color: #365c91;
+}
+html[data-theme='liquid-light'] .user-platform-unknown {
+  color: var(--muted);
+}
+html[data-theme='liquid-light'] .button.danger {
+  background: #fff0f3;
+  color: #a02e4a;
+  border-color: #d99bac;
+}
+html[data-theme='liquid-light'] :is(.form-error, .error-state) {
+  color: var(--glass-alert);
+  background: #fff0f3;
+  border-color: #dfb0bf;
+}
+html[data-theme='liquid-light']
+  :is(.inline-error, .favorite-card-error, .location-error, .chart-world-error) {
+  color: var(--glass-alert);
+}
+html[data-theme='liquid-light'] .offline-banner {
+  color: #825216;
+  background: #fff1d8;
+}
+html[data-theme='liquid-light'] :is(.message-receipt, .network-notice) {
+  color: #246b4b;
+}
+html[data-theme='liquid-light'] .loading {
+  color: #615288;
+}
+html[data-theme='liquid-light'] .color-options > button[aria-pressed='true'] {
+  outline-color: #354863;
+}
+html[data-theme='liquid-light'] .main-content {
+  scrollbar-color: #9cacc2 transparent;
+}
+html[data-theme='liquid-light']
+  :is(.chart-date-controls input, .game-log-filters input[type='date']) {
+  color-scheme: light;
+}
+html[data-theme='liquid-light'] .profile-json {
+  color: #273a52;
+}
+html[data-theme='liquid-light'] .json-children {
+  border-color: #c4d0e1;
+}
+html[data-theme='liquid-light'] .json-key {
+  color: #3959a1;
+}
+html[data-theme='liquid-light'] .json-string {
+  color: #28694b;
+}
+html[data-theme='liquid-light'] .json-number {
+  color: #86521d;
+}
+html[data-theme='liquid-light'] .json-boolean {
+  color: #713f9e;
+}
+html[data-theme='liquid-light'] :is(.json-null, .json-punctuation) {
+  color: #596b82;
+}
+html[data-theme='liquid-light'] :is(.bio-diff-removed, .bio-diff-text del) {
+  color: #9e2341;
+}
+html[data-theme='liquid-light'] .bio-diff-text del {
+  background: #f8d9e0;
+}
+html[data-theme='liquid-light'] :is(.bio-diff-added, .bio-diff-text ins) {
+  color: #21673b;
+}
+html[data-theme='liquid-light'] .bio-diff-text ins {
+  background: #d5efdb;
+}
+html[data-theme='liquid-light'] .instance-grid-line {
+  stroke: #526b8e25;
+}
+html[data-theme='liquid-light'] .network-frame {
+  background: radial-gradient(ellipse at 50% 50%, #dbe6fb80, transparent 72%), var(--surface);
+}
+html[data-theme='liquid-light'] .network-label {
+  fill: var(--text);
+  stroke: #f4f8ff;
+}
+html[data-theme='liquid-light'] .network-node-disc {
+  stroke: #bccbe0;
+}
+html[data-theme='liquid-light']
+  :is(.network-node.selected, .network-node:hover, .network-node:focus)
+  .network-node-disc {
+  stroke: #314a73;
+}
+html[data-theme='liquid-light'] .network-edges path {
+  opacity: 0.8;
+}
+html[data-theme='liquid-light'] .network-edges .mutual-edge {
+  opacity: 0.95;
+}
+html[data-theme='liquid-light'] .network-edges .selected-edge {
+  opacity: 1;
+}
+html[data-theme='liquid-light'] .network-edges .dimmed {
+  opacity: 0.12;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#b3a4ff'] {
+  stroke: #7259bf;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#88d6bc'] {
+  stroke: #2e8b6c;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#f0b28e'] {
+  stroke: #b1693e;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#e4a8d2'] {
+  stroke: #a84f8f;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#85bdf3'] {
+  stroke: #3d7cb6;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#e4ce85'] {
+  stroke: #8f7925;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#8bd4dc'] {
+  stroke: #337d85;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#d5a8f1'] {
+  stroke: #9151b9;
+}
+html[data-theme='liquid-light'] .network-edges [stroke='#70809b'] {
+  stroke: #5b7090;
+}
+
+/* Preserve artwork, but make the surrounding decorative hero belong to the light base. */
+html[data-theme='liquid-light'] .hero {
+  background-color: #dce6f6;
+  border-color: var(--glass-edge);
+}
+html[data-theme='liquid-light'] .hero-shade {
+  background: linear-gradient(90deg, #f3f7fff5, #eff4ffdf 48%, #e8effb30 100%);
+}
+html[data-theme='liquid-light'] .hero h2 {
+  color: #1e3150;
+}
+html[data-theme='liquid-light'] .hero p {
+  color: #455b78;
+}
+html[data-theme='liquid-light'] .hero-kicker {
+  color: #4c5b7c;
+  background: #ffffff99;
+}
+html[data-theme='liquid-light'] .hero-world {
+  color: #304361;
+  text-shadow: none;
+}
+html[data-theme='liquid-light'] .hero .button.light {
+  background: #ffffffd9;
+  color: #263b5a;
+  border-color: #8d9fbc45;
+}
+html[data-theme='liquid-light'] .more-profile,
+html[data-theme='liquid-light'] .discover-banner {
+  background: linear-gradient(125deg, #f5f4ffba, #e2edfbbb), var(--surface);
+  border-color: var(--glass-edge);
+}
+html[data-theme='liquid-light'] .discover-banner > svg {
+  color: var(--accent-readable);
+}
+html[data-theme='liquid-light'] .auth-art {
+  background:
+    linear-gradient(90deg, #eef4ffe6, #ebf1fa70),
+    url('/world-orbit.svg') 68% center / cover;
+}
+html[data-theme='liquid-light'] .auth-art > span {
+  color: #243954;
+}
+html[data-theme='liquid-light'] .auth-divider {
+  border-color: var(--glass-line);
+}
+html[data-theme='liquid-light'] .auth-divider > span {
+  color: var(--muted);
+  background: var(--bg);
+}
+html[data-theme='liquid-light'] .orbit {
+  border-color: #647b9f22;
+}
+html[data-theme='liquid-light'] .about-hero {
+  background: radial-gradient(ellipse at 95% 0, #becbf64d, transparent 50%), var(--surface);
+}
+html[data-theme='liquid-light']
+  :is(
+    .about-hero p,
+    .about-kicker,
+    .about-pill-row > span,
+    .about-legal-note,
+    .about-legal-note p,
+    .about-support p,
+    .about-creator p,
+    .about-credits p
+  ) {
+  color: var(--glass-secondary);
+}
+html[data-theme='liquid-light'] .about-pill-row > span {
+  background: #ffffff66;
+  border-color: var(--glass-line);
+}
+html[data-theme='liquid-light'] .about-support {
+  background: linear-gradient(145deg, #fff0f7b3, #f9fcff5c), var(--surface);
+  border-color: var(--glass-edge);
+}
+html[data-theme='liquid-light'] .about-support .about-section-icon {
+  color: #97516f;
+  background: #f4dce9;
+  border-color: #dbb5c8;
+}
+html[data-theme='liquid-light']
+  :is(.about-hero-orbit, .about-hero-orbit::before, .about-hero-orbit::after) {
+  border-color: #637baa22;
+}
+html[data-theme='liquid-light'] .about-hero-orbit span {
+  background: radial-gradient(circle at 30% 25%, #b4c7ee70, #9eb3e220 60%);
+  border-color: #637baa25;
+}
+html[data-theme='liquid-light'] .about-hero-orbit svg {
+  color: #637baa50;
+}
+
+/* Fullscreen graphs and photographs avoid viewport-size blur/compositing work. */
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .modal.fullscreen-network {
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  .fullscreen-network
+  .modal-heading {
+  background: var(--bg);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .modal.fullscreen-image-viewer {
+  background: #080b12;
+  color: #f1f5ff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  .fullscreen-image-viewer
+  .modal-heading {
+  background: transparent;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  .fullscreen-image-viewer
+  :is(.modal-heading h2, .icon-button, .image-viewer-tools > span, .image-viewer-status) {
+  color: #d6e3f6;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  .fullscreen-image-viewer
+  .button.secondary {
+  background: #253044;
+  color: #eef4ff;
+  border-color: #607089;
+}
+
+/* No unsupported-device blur fallback relies on transparent text or bright images behind it. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+    --glass-alpha: 0.95;
+    --glass-chrome-alpha: 0.98;
+  }
+}
+html[data-effects='reduced']:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+  --glass-alpha: 0.95;
+  --glass-chrome-alpha: 0.98;
+  --glass-reflection: 0.025;
+  --glass-shadow: 10px;
+}
+html[data-effects='reduced']
+  :is(.topbar, .bottom-nav, .modal, .modal-backdrop, .world-occupants, .cover-cta) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme]
+    :is(
+      .card,
+      .media-card,
+      .dashboard-stats > button,
+      .network-person-row,
+      .history-avatar-result,
+      .button
+    ) {
+    transition: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+    --glass-alpha: 0.98;
+    --glass-chrome-alpha: 1;
+  }
+  html[data-theme] :is(.topbar, .bottom-nav, .modal) {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Keep intensity useful even when the device cannot afford live blur. */
+html[data-effects='reduced'][data-glass-intensity='low'] {
+  --glass-alpha: 0.98;
+  --glass-chrome-alpha: 0.99;
+}
+html[data-effects='reduced'][data-glass-intensity='high'] {
+  --glass-alpha: 0.9;
+  --glass-chrome-alpha: 0.96;
+}
+html[data-theme='liquid-light'] .inventory-image-badges .badge {
+  color: #f2f6ff;
+  background: #18263be8;
+  border-color: #ffffff30;
+}
+html[data-theme='liquid-light'] .current-avatar {
+  /* This label overlays arbitrary artwork, so its contrast needs a stable surface. */
+  color: #f2f6ff;
+  background: #18263bf5;
+  border-color: #ffffff30;
+}
