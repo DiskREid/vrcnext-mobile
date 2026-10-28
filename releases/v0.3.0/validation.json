@@ -1,0 +1,143 @@
+{
+  "version": "0.3.0",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 17,
+  "apk": {
+    "name": "VRCNext-Mobile-0.3.0.apk",
+    "bytes": 6214810,
+    "sha256": "e7d0f1c51e43bca3bf179f0f08179eac68c237e7e493b7f1c141463654dc8fd5",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0213": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 374,
+    "vitestFiles": 32,
+    "playwrightUniqueCasesVerified": 154,
+    "fullUiSuiteCompleted": true,
+    "fullUiSingleRunClean": false,
+    "initialFullUiPassed": 152,
+    "initialFullUiFailed": 2,
+    "finalRegressionsPassed": 8,
+    "latestLanguageUiPassed": 8,
+    "uiRerunReason": "Replaced cached exact label selector with a role selector; scrolled to lazy destination world title in short landscape viewport. Both failed cases passed after these test updates.",
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 31,
+    "testAndDevMarkersAbsent": true
+  },
+  "languages": {
+    "catalogMessages": 1142,
+    "locales": [
+      {
+        "code": "ru",
+        "label": "Русский"
+      },
+      {
+        "code": "en",
+        "label": "English"
+      },
+      {
+        "code": "ja",
+        "label": "日本語"
+      },
+      {
+        "code": "de",
+        "label": "Deutsch"
+      },
+      {
+        "code": "fr",
+        "label": "Français"
+      },
+      {
+        "code": "es",
+        "label": "Español"
+      },
+      {
+        "code": "pt",
+        "label": "Português"
+      },
+      {
+        "code": "pl",
+        "label": "Polski"
+      },
+      {
+        "code": "it",
+        "label": "Italiano"
+      },
+      {
+        "code": "tr",
+        "label": "Türkçe"
+      },
+      {
+        "code": "uk",
+        "label": "Українська"
+      }
+    ],
+    "packCounts": {
+      "ja": 1142,
+      "de": 1142,
+      "fr": 1142,
+      "es": 1142,
+      "pt": 1142,
+      "pl": 1142,
+      "it": 1142,
+      "tr": 1142,
+      "uk": 1142
+    },
+    "homeLabels": {
+      "ru": "Главная",
+      "en": "Home",
+      "ja": "ホーム",
+      "de": "Start",
+      "fr": "Accueil",
+      "es": "Inicio",
+      "pt": "Início",
+      "pl": "Strona główna",
+      "it": "Home",
+      "tr": "Ana Sayfa",
+      "uk": "Головна"
+    },
+    "instantSwitch": true,
+    "preferenceSavedOnDevice": true,
+    "firstLaunchFollowsSupportedSystemLanguage": true,
+    "allPacksCompleteAndPlaceholdersVerified": true,
+    "runtimeTranslationServiceUsed": false,
+    "originalUserContentPreserved": true,
+    "unsavedProfileEditsRetained": true,
+    "professionalNativeSpeakerReviewCompleted": false
+  },
+  "project": {
+    "creator": "DiskREid",
+    "boostyUrl": "https://boosty.to/mr.diskreid",
+    "opensOnlyAfterTap": true,
+    "nativeLinkDoesNotRequireSessionOrMutation": true,
+    "originalLicensePreserved": true
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "instrumentationExecuted": false,
+    "avatarLoggingConfirmedWorking": false,
+    "avatarLoggingFixClaimedInThisVersion": false
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.3.0-source.zip",
+    "sourceCommit": "f6c1ce271900017dda3745abf0ca47b4d55107c5",
+    "trackedFiles": 271,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "e7923619d4c1169ab972edf99bdc3126efb84378f1aa1719e2797fddbe6813ff"
+  }
+}
