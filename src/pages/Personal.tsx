@@ -2,7 +2,7 @@ import AppearanceSettings from '../components/AppearanceSettings';
 import { uiMessage } from '../i18n';
 import DiagnosticsPanel from '../components/DiagnosticsPanel';
 import { useEffect, useRef, useState } from 'react';
-import { LockKeyhole, LogOut, Info, Clock, ArrowUpRight, Languages } from 'lucide-react';
+import { LockKeyhole, LogOut, Clock, Languages } from 'lucide-react';
 import { api } from '../api';
 import { isNative, native } from '../api/native';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
@@ -200,7 +200,7 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
     </>
   );
 }
-export function SettingsPage({ onAbout }: { onAbout?: () => void } = {}) {
+export function SettingsPage() {
   const { language, setLanguage } = useI18n();
   const { logout } = useApp();
   const [confirm, setConfirm] = useState(false);
@@ -330,22 +330,6 @@ export function SettingsPage({ onAbout }: { onAbout?: () => void } = {}) {
             </div>
           )}
         </section>
-        {onAbout && (
-          <section className="card settings-section">
-            <Info />
-            <h2>{t('О проекте')}</h2>
-            <p className="muted">
-              {t('VRCNext Mobile — ваши друзья, миры и встречи VRChat с телефона.')}
-            </p>
-            <p className="muted small">
-              {t('История проекта, автор, исходный код и поддержка на Boosty.')}
-            </p>
-            <button className="button secondary" onClick={onAbout}>
-              {t('Открыть страницу проекта')}
-              <ArrowUpRight size={17} />
-            </button>
-          </section>
-        )}
       </div>
     </>
   );

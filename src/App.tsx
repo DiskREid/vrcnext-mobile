@@ -1,5 +1,6 @@
 import { useAppearanceRuntime } from './data/appearance';
 import HolidayDecor from './components/HolidayDecor';
+import GlassRefraction from './components/GlassRefraction';
 import './appearance.css';
 import './hero-artwork.css';
 import type { UiMessage } from './i18n';
@@ -471,6 +472,7 @@ export default function App() {
         activity,
       }}
     >
+      <GlassRefraction />
       <div className="app-shell">
         <aside className="sidebar">
           <button
@@ -681,7 +683,7 @@ export default function App() {
                     ) : page === 'about' ? (
                       <AboutPage />
                     ) : (
-                      <SettingsPage onAbout={() => navigate('about')} />
+                      <SettingsPage />
                     )}
                   </Suspense>
                 </PageScope>

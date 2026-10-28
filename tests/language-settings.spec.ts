@@ -103,17 +103,27 @@ test('all eleven languages switch immediately, retain the account and persist af
   expect(externalRequests).toEqual([]);
 });
 
-test('project page opens Boosty only on tap and preserves creator credits, original license and user text', async ({
+test('project page is available from More without a Settings duplicate, opens Boosty only on tap and preserves credits and user text', async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await openSettings(page);
   await activeScreen(page, 'settings').locator('select').first().selectOption('en');
-  await activeScreen(page, 'settings')
-    .locator('button')
-    .filter({ hasText: /project page|about the project|about project/i })
-    .click();
+  await expect(activeScreen(page, 'settings').getByRole('heading', { name: /about/i })).toHaveCount(
+    0,
+  );
+  await expect(
+    activeScreen(page, 'settings').getByRole('button', {
+      name: /project page|about the project|about project/i,
+    }),
+  ).toHaveCount(0);
+  await nav(page).locator('button').nth(4).click();
+  const aboutLink = activeScreen(page, 'more')
+    .locator('.more-card')
+    .filter({ has: page.getByRole('heading', { name: /about/i }) });
+  await expect(aboutLink).toHaveCount(1);
+  await aboutLink.click();
   const about = activeScreen(page, 'about');
   await expect(about).toBeVisible();
   await expect(about).toContainText('DiskREid');
