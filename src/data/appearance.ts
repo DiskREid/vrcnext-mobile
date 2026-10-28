@@ -94,7 +94,8 @@ export function detectAppearanceEffects(): EffectsLevel {
   const transparency =
     typeof matchMedia !== 'undefined' &&
     matchMedia('(prefers-reduced-transparency: reduce)').matches;
-  return (memory && memory <= 4) || (cores && cores <= 4) || !blur || transparency
+  // WebView reports memory in coarse buckets; 4 GB alone does not imply a weak GPU.
+  return (memory && memory <= 2) || (cores && cores <= 4) || !blur || transparency
     ? 'reduced'
     : 'full';
 }

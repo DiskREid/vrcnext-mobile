@@ -1,6 +1,7 @@
 import { useAppearanceRuntime } from './data/appearance';
 import HolidayDecor from './components/HolidayDecor';
 import './appearance.css';
+import './hero-artwork.css';
 import type { UiMessage } from './i18n';
 import { t, useI18n, dateLocale } from './i18n';
 import SecureImage, { clearImageCache } from './components/SecureImage';
@@ -470,7 +471,6 @@ export default function App() {
         activity,
       }}
     >
-      <HolidayDecor />
       <div className="app-shell">
         <aside className="sidebar">
           <button
@@ -530,6 +530,7 @@ export default function App() {
           </div>
         </aside>
         <div className="workspace">
+          <HolidayDecor />
           <header className="topbar">
             <div className="topbar-left">
               {!topLevel ? (

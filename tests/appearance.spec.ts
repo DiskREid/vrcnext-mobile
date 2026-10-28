@@ -31,7 +31,7 @@ async function device(page: Page, weak = false) {
     ({ weak }) => {
       Object.defineProperty(navigator, 'deviceMemory', {
         configurable: true,
-        get: () => (weak ? 2 : 8),
+        get: () => (weak ? 2 : 4),
       });
       Object.defineProperty(navigator, 'hardwareConcurrency', {
         configurable: true,
@@ -97,6 +97,24 @@ async function screenshotHome(page: Page, info: TestInfo, name: string) {
   });
   await settings(page);
 }
+async function heroArtwork(page: Page, name: string) {
+  const image = await page
+    .locator('.hero')
+    .evaluate((element) => getComputedStyle(element).backgroundImage);
+  const asset = image.match(/url\(["']?([^"')]+)["']?\)/)?.[1];
+  expect(asset, `Hero artwork for ${name}`).toBeTruthy();
+  expect(new URL(asset!).pathname).toBe(`/appearance/hero-${name}.svg`);
+  const decoded = await page.evaluate(async (url) => {
+    const picture = new Image();
+    picture.src = url;
+    await picture.decode();
+    return { width: picture.naturalWidth, height: picture.naturalHeight };
+  }, asset!);
+  expect(decoded.width).toBeGreaterThan(0);
+  expect(decoded.height).toBeGreaterThan(0);
+  expect(decoded.width / decoded.height).toBeGreaterThan(1.4);
+  return asset!;
+}
 function contrast(foreground: string, background: string) {
   const luminance = (value: string) => {
     const parts = value
@@ -131,58 +149,8 @@ async function settledStyle(locator: Locator) {
   });
   return style(locator);
 }
-
-test('all base themes combine with all seven holidays without network refreshes, excessive blur or decoration hitboxes', async ({
-  page,
-}, info) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await device(page);
-  await page.clock.setFixedTime(new Date('2026-06-20T12:00:00+02:00'));
-  await open(page);
-  await settings(page);
-  const panel = controls(page),
-    html = page.locator('html');
-  await panel.getByRole('switch', { name: 'Праздничное оформление', exact: true }).uncheck();
-  await screenshotHome(page, info, 'standard-dark');
-  const before = (await fixture(page)).requests.length;
-  await manual(page, 'halloween');
-  const palettes = new Set<string>();
-  for (const theme of ['standard-dark', 'liquid-dark', 'liquid-light']) {
-    await panel.getByRole('combobox', { name: 'Тема интерфейса', exact: true }).selectOption(theme);
-    await expect(html).toHaveAttribute('data-theme', theme);
-    const intensity = panel.getByRole('combobox', {
-      name: 'Интенсивность стекла',
-      exact: true,
-    });
-    if (theme === 'standard-dark') await expect(intensity).toBeDisabled();
-    else await expect(intensity).toBeEnabled();
-    for (const holiday of holidays) {
-      await panel.getByRole('combobox', { name: 'Праздник', exact: true }).selectOption(holiday);
-      await expect(html).toHaveAttribute('data-holiday', holiday);
-      await expect(page.locator('.holiday-decor--ambient')).toHaveCount(1);
-      const colors = await html.evaluate((element) => {
-        const css = getComputedStyle(element);
-        return {
-          color: css.color,
-          background: css.backgroundColor,
-          accent: css.getPropertyValue('--accent').trim(),
-        };
-      });
-      expect(contrast(colors.color, colors.background)).toBeGreaterThanOrEqual(4.5);
-      if (theme === 'standard-dark') palettes.add(colors.accent);
-      expect((await style(page.locator('.holiday-decor--ambient'))).events).toBe('none');
-      expect((await style(panel)).blur).toBe('none');
-      await noOverflow(page);
-      if ((theme === 'standard-dark' || theme === 'liquid-dark') && holiday === 'halloween')
-        await screenshotHome(page, info, `${theme}-halloween`);
-      if (theme === 'liquid-light' && holiday === 'christmas')
-        await screenshotHome(page, info, 'liquid-light-christmas');
-    }
-  }
-  expect(palettes.size).toBe(7);
-  await expect(html).toHaveAttribute('data-effects', 'full');
-  const blurred = await page.evaluate(() =>
+async function visibleBlurredSurfaces(page: Page) {
+  return page.evaluate(() =>
     [...document.querySelectorAll('*')]
       .filter((element) => {
         const rect = element.getBoundingClientRect(),
@@ -196,6 +164,77 @@ test('all base themes combine with all seven holidays without network refreshes,
       })
       .map((element) => element.className),
   );
+}
+
+test('all base themes combine with all seven holidays without network refreshes, excessive blur or decoration hitboxes', async ({
+  page,
+}, info) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await device(page);
+  await page.clock.setFixedTime(new Date('2026-06-20T12:00:00+02:00'));
+  await open(page);
+  await settings(page);
+  const panel = controls(page),
+    html = page.locator('html');
+  await panel.getByRole('switch', { name: 'Праздничное оформление', exact: true }).uncheck();
+  await screenshotHome(page, info, 'standard-dark');
+  const before = (await fixture(page)).requests.length;
+  const palettes = new Set<string>(),
+    artwork = new Set<string>(),
+    backgrounds = new Set<string>();
+  for (const theme of ['standard-dark', 'liquid-dark', 'liquid-light']) {
+    await panel.getByRole('switch', { name: 'Праздничное оформление', exact: true }).uncheck();
+    await panel.getByRole('combobox', { name: 'Тема интерфейса', exact: true }).selectOption(theme);
+    await expect(html).toHaveAttribute('data-theme', theme);
+    artwork.add(await heroArtwork(page, theme));
+    await screenshotHome(page, info, `${theme}-base`);
+    await manual(page, 'halloween');
+    const intensity = panel.getByRole('combobox', {
+      name: 'Интенсивность стекла',
+      exact: true,
+    });
+    if (theme === 'standard-dark') await expect(intensity).toBeDisabled();
+    else await expect(intensity).toBeEnabled();
+    for (const holiday of holidays) {
+      await panel.getByRole('combobox', { name: 'Праздник', exact: true }).selectOption(holiday);
+      await expect(html).toHaveAttribute('data-holiday', holiday);
+      artwork.add(await heroArtwork(page, holiday));
+      await expect(page.locator('.holiday-decor--ambient')).toHaveCount(1);
+      const colors = await html.evaluate((element) => {
+        const css = getComputedStyle(element);
+        return {
+          color: css.color,
+          background: css.backgroundColor,
+          accent: css.getPropertyValue('--accent').trim(),
+        };
+      });
+      expect(contrast(colors.color, colors.background)).toBeGreaterThanOrEqual(4.5);
+      if (theme === 'standard-dark') palettes.add(colors.accent);
+      const backdrop = await page
+        .locator('.workspace')
+        .evaluate((element) => getComputedStyle(element).backgroundImage);
+      expect(backdrop).toContain('gradient');
+      backgrounds.add(backdrop);
+      const content = await style(page.locator('.main-content'));
+      expect(content.image).toBe('none');
+      expect(content.background).toBe('rgba(0, 0, 0, 0)');
+      expect((await style(page.locator('.holiday-decor--ambient'))).events).toBe('none');
+      expect((await style(panel)).blur).toBe('none');
+      await noOverflow(page);
+      if ((theme === 'standard-dark' || theme === 'liquid-dark') && holiday === 'halloween')
+        await screenshotHome(page, info, `${theme}-halloween`);
+      if (theme === 'liquid-dark') await screenshotHome(page, info, `holiday-${holiday}`);
+      if (theme === 'liquid-light' && holiday === 'christmas')
+        await screenshotHome(page, info, 'liquid-light-christmas');
+    }
+  }
+  expect(palettes.size).toBe(7);
+  expect(artwork.size).toBe(10);
+  expect(backgrounds.size).toBeGreaterThanOrEqual(7);
+  await expect(html).toHaveAttribute('data-effects', 'full');
+  const blurred = await visibleBlurredSurfaces(page);
   expect(blurred.length).toBeLessThanOrEqual(2);
   const homeButton = nav(page).locator('button').first();
   expect(
@@ -208,6 +247,14 @@ test('all base themes combine with all seven holidays without network refreshes,
       );
     }),
   ).toBe(true);
+  await homeButton.click();
+  const stats = active(page, 'home').locator('.dashboard-stats > button:nth-child(-n + 2)');
+  await expect(stats).toHaveCount(2);
+  for (const card of await stats.all()) expect((await style(card)).blur).toContain('blur(');
+  expect((await style(active(page, 'home').locator('.dashboard-stats > button').nth(2))).blur).toBe(
+    'none',
+  );
+  expect((await visibleBlurredSurfaces(page)).length).toBeLessThanOrEqual(4);
   expect((await fixture(page)).requests.length).toBe(before);
   expect((await fixture(page)).unexpected).toEqual([]);
   expect(errors).toEqual([]);
@@ -376,6 +423,12 @@ test('weak WebViews and reduced-motion preferences keep static decorations with 
   expect((await style(page.locator('.holiday-decor-piece').first())).animation).toBe('none');
   await panel.getByRole('switch', { name: 'Праздничные анимации', exact: true }).uncheck();
   await expect(page.locator('.holiday-decor--ambient')).toHaveCount(1);
+  await nav(page).locator('button').first().click();
+  const stats = active(page, 'home').locator('.dashboard-stats > button');
+  await expect(stats).toHaveCount(3);
+  for (const card of await stats.all()) expect((await style(card)).blur).toBe('none');
+  expect(await visibleBlurredSurfaces(page)).toEqual([]);
+  await settings(page);
   await noOverflow(page);
   expect((await fixture(page)).unexpected).toEqual([]);
 });
@@ -490,5 +543,62 @@ test('light glass keeps selected calendar days and current-avatar artwork labels
   expect(contrast(artworkLabel.color, artworkLabel.background)).toBeGreaterThanOrEqual(4.5);
   const alpha = artworkLabel.background.match(/[\d.]+/g)!;
   expect(alpha.length === 3 || Number(alpha[3]) >= 0.95).toBe(true);
+  expect((await fixture(page)).unexpected).toEqual([]);
+});
+
+test('holiday ornaments vary in size behind the content and keep their layout while other appearance settings change', async ({
+  page,
+}) => {
+  await device(page);
+  await open(page);
+  await settings(page);
+  await manual(page, 'valentine');
+  const panel = controls(page),
+    ambient = page.locator('.workspace > .holiday-decor--ambient'),
+    pieces = ambient.locator('.holiday-decor-piece');
+  await panel
+    .getByRole('combobox', { name: 'Тема интерфейса', exact: true })
+    .selectOption('liquid-dark');
+  await expect(pieces).toHaveCount(8);
+  const placements = () =>
+    pieces.evaluateAll((elements) =>
+      elements.map((element) => (element as HTMLElement).style.cssText),
+    );
+  const initial = await placements();
+  const dimensions = await pieces.evaluateAll((elements) =>
+    elements.map((element) => {
+      const css = getComputedStyle(element);
+      return { width: parseFloat(css.width), height: parseFloat(css.height) };
+    }),
+  );
+  expect(new Set(dimensions.map((piece) => piece.width)).size).toBeGreaterThanOrEqual(3);
+  expect(Math.min(...dimensions.map((piece) => piece.width))).toBeLessThanOrEqual(32);
+  expect(Math.max(...dimensions.map((piece) => piece.width))).toBeGreaterThanOrEqual(38);
+  for (const piece of dimensions) {
+    expect(piece.width).toBeGreaterThanOrEqual(16);
+    expect(piece.width).toBeLessThanOrEqual(62);
+    expect(piece.height).toBe(piece.width);
+  }
+  const layer = await ambient.evaluate((element) => ({
+    decor: Number(getComputedStyle(element).zIndex),
+    content: Number(getComputedStyle(document.querySelector('.main-content')!).zIndex),
+    pointer: getComputedStyle(element).pointerEvents,
+  }));
+  expect(layer.content).toBeGreaterThan(layer.decor);
+  expect(layer.pointer).toBe('none');
+  await expect(ambient).toHaveAttribute('aria-hidden', 'true');
+  const before = (await fixture(page)).requests.length;
+  await panel
+    .getByRole('combobox', { name: 'Интенсивность стекла', exact: true })
+    .selectOption('high');
+  await panel.getByRole('switch', { name: 'Праздничные анимации', exact: true }).uncheck();
+  await panel.getByRole('button', { name: 'Цвет #83bbef', exact: true }).click();
+  expect(await placements()).toEqual(initial);
+  expect((await style(pieces.first())).animation).toBe('none');
+  await panel.getByRole('combobox', { name: 'Праздник', exact: true }).selectOption('christmas');
+  expect(await placements()).not.toEqual(initial);
+  await panel.getByRole('combobox', { name: 'Праздник', exact: true }).selectOption('valentine');
+  expect(await placements()).toEqual(initial);
+  expect((await fixture(page)).requests.length).toBe(before);
   expect((await fixture(page)).unexpected).toEqual([]);
 });

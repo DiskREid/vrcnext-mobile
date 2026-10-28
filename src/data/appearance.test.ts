@@ -4,7 +4,41 @@ import {
   DEFAULT_APPEARANCE_SETTINGS,
   appearanceAccent,
   createAppearanceStore,
+  detectAppearanceEffects,
 } from './appearance';
+
+it('keeps supported glass on an eight-core 4 GB WebView while respecting low resources and transparency preferences', () => {
+  let memory = 4,
+    cores = 8,
+    blur = true,
+    transparency = false;
+  vi.stubGlobal('navigator', {
+    get deviceMemory() {
+      return memory;
+    },
+    get hardwareConcurrency() {
+      return cores;
+    },
+  });
+  vi.stubGlobal('CSS', { supports: () => blur });
+  vi.stubGlobal('matchMedia', () => ({ matches: transparency }));
+  try {
+    expect(detectAppearanceEffects()).toBe('full');
+    memory = 2;
+    expect(detectAppearanceEffects()).toBe('reduced');
+    memory = 4;
+    cores = 4;
+    expect(detectAppearanceEffects()).toBe('reduced');
+    cores = 8;
+    blur = false;
+    expect(detectAppearanceEffects()).toBe('reduced');
+    blur = true;
+    transparency = true;
+    expect(detectAppearanceEffects()).toBe('reduced');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial));

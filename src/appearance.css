@@ -1,54 +1,101 @@
-/* Appearance is a token layer over the existing layout. Cards never own live blur. */
+/* Appearance is a token layer over the existing layout. List cards never own live blur. */
 html[data-theme] {
-  --glass-blur: 10px;
-  --glass-alpha: 0.83;
-  --glass-chrome-alpha: 0.91;
-  --glass-reflection: 0.08;
+  --glass-blur: 16px;
+  --glass-alpha: 0.59;
+  --glass-chrome-alpha: 0.72;
+  --glass-reflection: 0.16;
   --glass-shadow: 22px;
   --holiday-rgb: 163, 152, 255;
+  --holiday-secondary-rgb: 77, 168, 232;
+  --holiday-tertiary-rgb: 151, 98, 218;
+  --holiday-dark: #10182a;
+  --holiday-light: #edf3fc;
+  --canvas-color: var(--bg);
   --accent-soft: #a398ff20;
   --accent-readable: var(--accent);
 }
 html[data-glass-intensity='low'] {
-  --glass-blur: 4px;
-  --glass-alpha: 0.94;
-  --glass-chrome-alpha: 0.97;
-  --glass-reflection: 0.025;
+  --glass-blur: 8px;
+  --glass-alpha: 0.81;
+  --glass-chrome-alpha: 0.9;
+  --glass-reflection: 0.08;
   --glass-shadow: 12px;
 }
 html[data-glass-intensity='high'] {
-  --glass-blur: 16px;
-  --glass-alpha: 0.68;
-  --glass-chrome-alpha: 0.8;
-  --glass-reflection: 0.14;
+  --glass-blur: 22px;
+  --glass-alpha: 0.43;
+  --glass-chrome-alpha: 0.58;
+  --glass-reflection: 0.23;
   --glass-shadow: 30px;
 }
 html[data-holiday='valentine'] {
-  --holiday-rgb: 232, 103, 149;
+  --holiday-rgb: 247, 85, 147;
+  --holiday-secondary-rgb: 155, 68, 218;
+  --holiday-tertiary-rgb: 255, 157, 119;
+  --holiday-dark: #1e1229;
+  --holiday-light: #fff0f6;
 }
 html[data-holiday='womens-day'] {
-  --holiday-rgb: 226, 132, 179;
+  --holiday-rgb: 245, 124, 184;
+  --holiday-secondary-rgb: 151, 105, 234;
+  --holiday-tertiary-rgb: 109, 214, 170;
+  --holiday-dark: #1b152c;
+  --holiday-light: #fff3fc;
 }
 html[data-holiday='st-patrick'] {
-  --holiday-rgb: 56, 183, 132;
+  --holiday-rgb: 25, 191, 131;
+  --holiday-secondary-rgb: 25, 120, 173;
+  --holiday-tertiary-rgb: 232, 184, 67;
+  --holiday-dark: #0b241f;
+  --holiday-light: #edf9f1;
 }
 html[data-holiday='easter'] {
-  --holiday-rgb: 180, 152, 228;
+  --holiday-rgb: 182, 132, 249;
+  --holiday-secondary-rgb: 241, 131, 183;
+  --holiday-tertiary-rgb: 100, 207, 193;
+  --holiday-dark: #1b1932;
+  --holiday-light: #f8f1ff;
 }
 html[data-holiday='earth-day'] {
-  --holiday-rgb: 72, 165, 163;
+  --holiday-rgb: 37, 172, 145;
+  --holiday-secondary-rgb: 39, 140, 230;
+  --holiday-tertiary-rgb: 125, 181, 68;
+  --holiday-dark: #0d222b;
+  --holiday-light: #edf9f8;
 }
 html[data-holiday='halloween'] {
-  --holiday-rgb: 241, 148, 65;
+  --holiday-rgb: 244, 124, 39;
+  --holiday-secondary-rgb: 149, 59, 231;
+  --holiday-tertiary-rgb: 222, 61, 116;
+  --holiday-dark: #1c122b;
+  --holiday-light: #fff2eb;
 }
 html[data-holiday='christmas'] {
-  --holiday-rgb: 142, 192, 239;
+  --holiday-rgb: 74, 162, 255;
+  --holiday-secondary-rgb: 121, 103, 232;
+  --holiday-tertiary-rgb: 65, 213, 195;
+  --holiday-dark: #101f36;
+  --holiday-light: #edf5ff;
 }
 
 /* A holiday can change accents without replacing the persistent base theme. */
-html[data-holiday]:not([data-holiday='none']) .workspace {
+html[data-holiday]:not([data-holiday='none']) {
+  --canvas-color: var(--holiday-dark);
+}
+html[data-theme='liquid-light'][data-holiday]:not([data-holiday='none']) {
+  --canvas-color: var(--holiday-light);
+}
+html[data-holiday]:not([data-holiday='none']) .app-shell {
+  background: var(--canvas-color);
+}
+html[data-holiday]:not([data-holiday='none']) .main-content {
+  background: transparent;
+}
+html[data-theme='standard-dark'][data-holiday]:not([data-holiday='none'])
+  :is(.card, .media-card, .dashboard-stats > button) {
   background:
-    radial-gradient(ellipse at 95% 0, rgba(var(--holiday-rgb), 0.1), transparent 54%), var(--bg);
+    linear-gradient(140deg, rgba(var(--holiday-rgb), 0.07), transparent 66%), rgba(22, 24, 40, 0.86);
+  border-color: rgba(var(--holiday-rgb), 0.24);
 }
 html[data-theme] .button.primary {
   color: var(--accent-ink, #211c35);
@@ -67,13 +114,13 @@ html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
   --surface-hover: rgba(42, 60, 89, 0.94);
   --border: rgba(190, 212, 250, 0.16);
   --text: #edf4ff;
-  --muted: #acbad1;
+  --muted: #dde5f3;
   --green: #91d8c0;
   --peach: #ebbd9e;
   --glass-inset: rgba(9, 21, 42, 0.66);
-  --glass-edge: rgba(215, 230, 255, 0.2);
+  --glass-edge: rgba(215, 230, 255, 0.32);
   --glass-line: rgba(186, 207, 244, 0.14);
-  --glass-secondary: #c5d3e9;
+  --glass-secondary: #e3ebf8;
   --glass-shadow-color: 3, 9, 24;
   --glass-alert: #f2afbf;
   color: var(--text);
@@ -106,13 +153,26 @@ html[data-theme='liquid-light'] {
 }
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) body {
   background:
-    radial-gradient(ellipse at 0 0, rgba(109, 144, 232, 0.14), transparent 48%),
-    radial-gradient(ellipse at 100% 15%, rgba(var(--holiday-rgb), 0.12), transparent 48%), var(--bg);
+    radial-gradient(ellipse at 0 0, rgba(102, 145, 242, 0.3), transparent 58%),
+    radial-gradient(ellipse at 100% 15%, rgba(var(--holiday-rgb), 0.24), transparent 58%),
+    var(--canvas-color);
   color: var(--text);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .app-shell {
+  background: transparent;
 }
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .workspace {
   background:
-    radial-gradient(ellipse at 100% 0, rgba(var(--holiday-rgb), 0.09), transparent 52%), transparent;
+    radial-gradient(ellipse at 105% -5%, rgba(var(--holiday-rgb), 0.26), transparent 56%),
+    radial-gradient(ellipse at -15% 70%, rgba(var(--holiday-secondary-rgb), 0.2), transparent 60%),
+    var(--canvas-color);
+}
+html[data-holiday]:not([data-holiday='none']) .workspace {
+  background:
+    radial-gradient(ellipse at 100% 8%, rgba(var(--holiday-rgb), 0.37), transparent 55%),
+    radial-gradient(ellipse at -15% 55%, rgba(var(--holiday-secondary-rgb), 0.27), transparent 58%),
+    radial-gradient(ellipse at 85% 100%, rgba(var(--holiday-tertiary-rgb), 0.18), transparent 51%),
+    var(--canvas-color);
 }
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) :is(.main-content, .auth-page) {
   background: transparent;
@@ -131,18 +191,29 @@ html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .sidebar {
 /* Only the two small navigation surfaces and ordinary dialog panels blur content. */
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
   :is(.topbar, .bottom-nav, .modal:not(.fullscreen-network):not(.fullscreen-image-viewer)) {
-  background: rgba(var(--glass-chrome-rgb), var(--glass-chrome-alpha));
+  background:
+    linear-gradient(110deg, rgba(255, 255, 255, var(--glass-reflection)), transparent 38%),
+    rgba(var(--glass-chrome-rgb), var(--glass-chrome-alpha));
   border-color: var(--glass-edge);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
   backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, var(--glass-reflection)),
-    0 8px var(--glass-shadow) rgba(var(--glass-shadow-color), 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 8px var(--glass-shadow) rgba(var(--glass-shadow-color), 0.16);
 }
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .modal-backdrop {
   background: rgba(3, 10, 26, 0.58);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+/* Just two small dashboard tiles frost the decorative layer behind them.
+   Long lists and graphs still use static translucent surfaces without blur. */
+html[data-effects='full']:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  .dashboard-stats
+  > button:nth-child(-n + 2) {
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.45)) saturate(1.15);
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.45)) saturate(1.15);
 }
 html[data-theme='liquid-light'] .modal-backdrop {
   background: rgba(37, 54, 79, 0.3);
@@ -161,12 +232,26 @@ html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
     .history-avatar-result
   ) {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, var(--glass-reflection)), transparent 65%),
+    radial-gradient(ellipse at 0 0, rgba(255, 255, 255, var(--glass-reflection)), transparent 64%),
+    linear-gradient(
+      120deg,
+      rgba(255, 255, 255, 0.06),
+      transparent 26%,
+      rgba(255, 255, 255, 0.025) 62%,
+      transparent 80%
+    ),
+    radial-gradient(
+      ellipse at 100% 100%,
+      rgba(var(--holiday-secondary-rgb), 0.07),
+      transparent 70%
+    ),
     var(--surface);
   border-color: var(--glass-edge);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, var(--glass-reflection)),
-    0 5px var(--glass-shadow) rgba(var(--glass-shadow-color), 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.025),
+    0 8px var(--glass-shadow) rgba(var(--glass-shadow-color), 0.16);
 }
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
   :is(
@@ -703,15 +788,16 @@ html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
 /* No unsupported-device blur fallback relies on transparent text or bright images behind it. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
-    --glass-alpha: 0.95;
-    --glass-chrome-alpha: 0.98;
+    --glass-alpha: 0.76;
+    --glass-chrome-alpha: 0.88;
   }
 }
 html[data-effects='reduced']:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
-  --glass-alpha: 0.95;
-  --glass-chrome-alpha: 0.98;
-  --glass-reflection: 0.025;
-  --glass-shadow: 10px;
+  /* Static reflected light and a translucent body still read as glass without GPU blur. */
+  --glass-alpha: 0.76;
+  --glass-chrome-alpha: 0.88;
+  --glass-reflection: 0.13;
+  --glass-shadow: 16px;
 }
 html[data-effects='reduced']
   :is(.topbar, .bottom-nav, .modal, .modal-backdrop, .world-occupants, .cover-cta) {
@@ -744,12 +830,20 @@ html[data-effects='reduced']
 
 /* Keep intensity useful even when the device cannot afford live blur. */
 html[data-effects='reduced'][data-glass-intensity='low'] {
-  --glass-alpha: 0.98;
-  --glass-chrome-alpha: 0.99;
+  --glass-alpha: 0.88;
+  --glass-chrome-alpha: 0.95;
+  --glass-reflection: 0.08;
 }
 html[data-effects='reduced'][data-glass-intensity='high'] {
-  --glass-alpha: 0.9;
-  --glass-chrome-alpha: 0.96;
+  --glass-alpha: 0.64;
+  --glass-chrome-alpha: 0.8;
+  --glass-reflection: 0.18;
+}
+@media (prefers-reduced-transparency: reduce) {
+  html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+    --glass-alpha: 0.98;
+    --glass-chrome-alpha: 1;
+  }
 }
 html[data-theme='liquid-light'] .inventory-image-badges .badge {
   color: #f2f6ff;

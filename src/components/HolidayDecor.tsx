@@ -1,7 +1,8 @@
-import { memo } from 'react';
+import { memo, useId, useMemo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useAppearance } from '../data/appearance';
 import type { HolidayId } from '../data/holiday-calendar';
+import { holidayDecorLayout } from '../data/holiday-decor-layout';
 import './HolidayDecor.css';
 
 type Ornament =
@@ -27,8 +28,11 @@ const ornaments: Record<HolidayId, readonly Ornament[]> = {
   halloween: ['pumpkin', 'bat', 'pumpkin', 'bat', 'star', 'bat'],
   christmas: ['snow', 'star', 'snow', 'bauble', 'snow', 'snow'],
 };
+// One seed per page lifetime; switching a setting never reshuffles the background.
+const sessionSeed = Math.floor(Math.random() * 4294967296);
 
 function OrnamentImage({ kind }: { kind: Ornament }) {
+  const toneId = `holiday-tone-${useId().replace(/:/g, '')}`;
   let shape: ReactNode;
   switch (kind) {
     case 'heart':
@@ -147,7 +151,24 @@ function OrnamentImage({ kind }: { kind: Ornament }) {
   }
   return (
     <svg viewBox="0 0 32 32" focusable="false" aria-hidden="true">
-      {shape}
+      <defs>
+        <linearGradient id={toneId} x1="5" y1="0" x2="27" y2="32" gradientUnits="userSpaceOnUse">
+          <stop stopColor="var(--decor-secondary)" />
+          <stop offset=".36" stopColor="var(--decor-primary)" />
+          <stop offset="1" stopColor="var(--decor-deep)" />
+        </linearGradient>
+      </defs>
+      <g
+        fill={`url(#${toneId})`}
+        stroke="var(--decor-rim)"
+        strokeWidth=".35"
+        strokeLinejoin="round"
+      >
+        {shape}
+      </g>
+      {kind !== 'snow' && kind !== 'bat' && (
+        <path className="holiday-decor-glint" d="M7 13c1-5 4-7 8-7" />
+      )}
     </svg>
   );
 }
@@ -185,21 +206,37 @@ function SpiderWeb() {
 /** Decorative SVGs stay outside hit testing; their only motion is bounded CSS transform/opacity. */
 function HolidayDecor({ area = 'ambient' }: { area?: 'ambient' | 'hero' }) {
   const { activeHoliday, effects } = useAppearance();
+  const placements = useMemo(
+    () => (activeHoliday ? holidayDecorLayout(activeHoliday, area, sessionSeed) : []),
+    [activeHoliday, area],
+  );
   if (!activeHoliday) return null;
   const count =
-    area === 'ambient' ? (effects === 'reduced' ? 2 : 4) : effects === 'reduced' ? 3 : 6;
+    area === 'ambient' ? (effects === 'reduced' ? 2 : 8) : effects === 'reduced' ? 3 : 4;
   return (
     <div
       className={`holiday-decor holiday-decor--${area} holiday-decor--${activeHoliday}`}
       aria-hidden="true"
     >
-      {ornaments[activeHoliday].slice(0, count).map((kind, index) => (
+      {placements.slice(0, count).map((piece, index) => (
         <span
-          className={`holiday-decor-piece holiday-decor-piece--${index} holiday-decor-piece--${kind}`}
+          className={`holiday-decor-piece holiday-decor-piece--${index} holiday-decor-piece--${ornaments[activeHoliday][index % ornaments[activeHoliday].length]}`}
           key={index}
-          style={{ '--piece-index': index } as CSSProperties}
+          style={
+            {
+              '--piece-index': index,
+              '--piece-x': `${piece.x}%`,
+              '--piece-y': `${piece.y}%`,
+              '--piece-size': `${piece.size}px`,
+              '--piece-rotation': `${piece.rotation}deg`,
+              '--piece-alpha': piece.opacity,
+              '--piece-duration': `${piece.duration}s`,
+              '--piece-delay': `${piece.delay}s`,
+              '--piece-drift': `${piece.drift}px`,
+            } as CSSProperties
+          }
         >
-          <OrnamentImage kind={kind} />
+          <OrnamentImage kind={ornaments[activeHoliday][index % ornaments[activeHoliday].length]} />
         </span>
       ))}
       {area === 'hero' && activeHoliday === 'christmas' && <Garland />}

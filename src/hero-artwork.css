@@ -1,0 +1,65 @@
+/* One local scene per base or holiday; CSS switches art without refreshing account data. */
+html[data-theme='standard-dark'] {
+  --hero-art: url('/appearance/hero-standard-dark.svg');
+}
+html[data-theme='liquid-dark'] {
+  --hero-art: url('/appearance/hero-liquid-dark.svg');
+}
+html[data-theme='liquid-light'] {
+  --hero-art: url('/appearance/hero-liquid-light.svg');
+}
+html[data-holiday='valentine'] {
+  --hero-art: url('/appearance/hero-valentine.svg');
+}
+html[data-holiday='womens-day'] {
+  --hero-art: url('/appearance/hero-womens-day.svg');
+}
+html[data-holiday='st-patrick'] {
+  --hero-art: url('/appearance/hero-st-patrick.svg');
+}
+html[data-holiday='easter'] {
+  --hero-art: url('/appearance/hero-easter.svg');
+}
+html[data-holiday='earth-day'] {
+  --hero-art: url('/appearance/hero-earth-day.svg');
+}
+html[data-holiday='halloween'] {
+  --hero-art: url('/appearance/hero-halloween.svg');
+}
+html[data-holiday='christmas'] {
+  --hero-art: url('/appearance/hero-christmas.svg');
+}
+html[data-theme] .hero {
+  background-image: var(--hero-art);
+  background-position: 74% center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  isolation: isolate;
+}
+html[data-theme] .hero-shade {
+  background: linear-gradient(90deg, #071122eb 0%, #10142cbf 38%, #10142c50 70%, #10142c04 100%);
+}
+html[data-theme='liquid-light'] .hero-shade {
+  background: linear-gradient(90deg, #f5faffee 0%, #f0f7ffcb 38%, #e9f1ff66 70%, #e9f1ff0d 100%);
+}
+html[data-theme] .hero .hero-content {
+  position: relative;
+  z-index: 1;
+}
+html[data-theme]:not([data-theme='liquid-light']) .hero h2 {
+  text-shadow: 0 2px 14px #040a1d50;
+}
+html[data-theme] .hero-world {
+  z-index: 1;
+}
+@media (max-width: 560px) {
+  html[data-theme] .hero {
+    background-position: 77% center;
+  }
+  html[data-theme] .hero-shade {
+    background: linear-gradient(90deg, #071122db, #10142c9c 55%, #10142c24);
+  }
+  html[data-theme='liquid-light'] .hero-shade {
+    background: linear-gradient(90deg, #f5faffeb, #f0f7ffb3 55%, #e9f1ff33);
+  }
+}

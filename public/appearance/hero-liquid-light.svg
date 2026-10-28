@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="112" y1="0" x2="1086" y2="677" gradientUnits="userSpaceOnUse"><stop stop-color="#e4effc"/><stop offset=".38" stop-color="#b3d5f2"/><stop offset=".72" stop-color="#c5d5ef"/><stop offset="1" stop-color="#9dc5df"/></linearGradient>
+    <radialGradient id="sunGlow" cx="0" cy="0" r="1" gradientTransform="translate(949 154) rotate(90) scale(296 425)" gradientUnits="userSpaceOnUse"><stop stop-color="#fff5db" stop-opacity=".8"/><stop offset="1" stop-color="#fff5db" stop-opacity="0"/></radialGradient>
+    <linearGradient id="water" x1="982" y1="435" x2="940" y2="720" gradientUnits="userSpaceOnUse"><stop stop-color="#99bdd9"/><stop offset="1" stop-color="#d0ebef"/></linearGradient>
+    <linearGradient id="glass" x1="775" y1="244" x2="1024" y2="495" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity=".94"/><stop offset=".32" stop-color="#d8ecff" stop-opacity=".4"/><stop offset=".6" stop-color="#8bb4d4" stop-opacity=".6"/><stop offset="1" stop-color="#f3fdff" stop-opacity=".78"/></linearGradient>
+    <linearGradient id="roof" x1="746" y1="315" x2="1060" y2="380" gradientUnits="userSpaceOnUse"><stop stop-color="#eefaff"/><stop offset=".45" stop-color="#c7d5ef"/><stop offset="1" stop-color="#91b5d1"/></linearGradient>
+    <linearGradient id="stone" x1="701" y1="482" x2="1109" y2="601" gradientUnits="userSpaceOnUse"><stop stop-color="#f7f3f4"/><stop offset=".5" stop-color="#ccd8e7"/><stop offset="1" stop-color="#9bc0d4"/></linearGradient>
+    <linearGradient id="reflection" x1="910" y1="535" x2="910" y2="720" gradientUnits="userSpaceOnUse"><stop stop-color="#f4faff" stop-opacity=".55"/><stop offset="1" stop-color="#e5f4ff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="crystal" x1="1070" y1="379" x2="1125" y2="512" gradientUnits="userSpaceOnUse"><stop stop-color="#fff9ff"/><stop offset=".45" stop-color="#c6b9e8"/><stop offset="1" stop-color="#88b4d1"/></linearGradient>
+    <g id="cloud"><path d="M0 25C7 7 33 5 45 19 45-8 94-4 98 20c21-8 42 3 42 17H0Z" fill="#f5fbff" fill-opacity=".52"/></g>
+    <g id="plant"><path d="M0 0c-1-25-24-43-29-38 0 21 8 35 29 38M0 0c1-25 24-43 29-38 0 21-8 35-29 38M0-12c-2-25-15-38-19-35-1 14 2 28 19 35M0-12c2-25 15-38 19-35 1 14-2 28-19 35" fill="#79b4b0"/><path d="M0-43V10" stroke="#c3e5d5" stroke-width="2"/></g>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1200v720H0z"/><path fill="url(#sunGlow)" d="M0 0h1200v720H0z"/>
+  <circle cx="965" cy="159" r="77" fill="#fff2dc" fill-opacity=".75"/><circle cx="965" cy="159" r="98" stroke="#fff9ee" stroke-opacity=".2" stroke-width="2"/>
+  <use href="#cloud" x="575" y="174"/><use href="#cloud" x="1030" y="250"/><use href="#cloud" transform="translate(824 100) scale(.55)"/>
+  <path d="m438 454 165-150 139 115 119-118 166 148 173-151v422H438Z" fill="#7fa8cb" fill-opacity=".23"/><path d="m439 466 186-106 123 69 159-84 163 113 130-57v319H439Z" fill="#91b7cc" fill-opacity=".35"/>
+  <path d="M0 495c170-42 275-16 445-24 276-14 498-40 755-9v258H0Z" fill="url(#water)"/>
+  <path d="M430 486c264-21 488-37 770-10" stroke="#effaff" stroke-opacity=".5" stroke-width="2"/>
+  <path d="m673 508 224-70 265 81-242 102Z" fill="url(#stone)"/><path d="m673 508 247 113 242-102-28 35-214 94-217-101Z" fill="#8eafc1"/><path d="m673 508 247 113 242-102" stroke="#f6fbff" stroke-opacity=".85" stroke-width="2"/>
+  <path d="m751 488 147-44 175 53-159 61Z" fill="#effaff" fill-opacity=".45"/>
+  <path d="m771 319 124-76 142 85-135 77Z" fill="url(#roof)" stroke="#f2faff" stroke-width="2"/>
+  <path d="m791 320 104-64 121 72-113 64Z" fill="#e9faff" fill-opacity=".37"/><path d="m895 243 8 162M771 319l132 86 134-77" stroke="#effaff" stroke-width="2" stroke-opacity=".8"/>
+  <path d="M785 328v157l115 57 122-52V336l-119 69Z" fill="url(#glass)" stroke="#edfaff" stroke-width="1.5"/>
+  <path d="m806 346 1 144m36-119v134m60-101v138m66-176v146m35-165v150" stroke="#edfaff" stroke-opacity=".7" stroke-width="3"/>
+  <path d="m796 426 103 53 112-53M796 438l103 51 112-51" stroke="#709ebc" stroke-opacity=".2"/><path d="m817 359 51 34-25 115-28-14Z" fill="#fff" fill-opacity=".22"/><path d="m974 364 28-17-28 162-29 12Z" fill="#fff" fill-opacity=".28"/>
+  <path d="m859 517 40-14 45 17-43 19Z" fill="#fff" fill-opacity=".55"/>
+  <path d="m856 550 50-19 69 24-54 23ZM831 570l88-28 84 28-90 35Z" fill="#f0f8ff" fill-opacity=".78"/>
+  <path d="m1089 496-22-54 29-76 35 83-23 62Z" fill="url(#crystal)" stroke="#f3f8ff" stroke-opacity=".7"/><path d="m1096 366 3 139 32-56M1099 505l-32-63 29 10 35-3" stroke="#eff9ff" stroke-opacity=".6"/><path d="m1045 504-13-29 19-41 20 45-13 31Z" fill="#d9d1ef"/><path d="m1051 434 1 73" stroke="#fff" stroke-opacity=".65"/>
+  <use href="#plant" x="746" y="494"/><use href="#plant" transform="translate(1018 538) scale(.7)"/><use href="#plant" transform="translate(1138 494) scale(.65)"/>
+  <path d="m793 594 221-11-79 137H683Z" fill="url(#reflection)"/>
+  <g stroke="#f6fdff" stroke-opacity=".55" stroke-linecap="round"><path d="M702 647h241M874 673h217M656 686h166M1004 626h146M488 569h144M1068 595h99M804 708h257"/></g>
+  <g fill="#fff" fill-opacity=".74"><circle cx="717" cy="286" r="2"/><circle cx="1127" cy="356" r="2.5"/><circle cx="1073" cy="167" r="1.8"/><circle cx="701" cy="439" r="2"/><circle cx="1073" cy="571" r="2"/></g>
+  <g stroke="#fff" stroke-opacity=".8" stroke-linecap="round"><path d="M1071 326v16m-8-8h16M739 379v10m-5-5h10M985 254v12m-6-6h12"/></g>
+</svg>
