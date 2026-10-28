@@ -909,6 +909,49 @@
           "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.2/release-files.zip"
         }
       ]
+    },
+    {
+      "tag": "v0.4.3",
+      "targetCommit": "68979d5d62d20f109281b3e514cec3c7c305c9ef",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.4.3",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 5197,
+          "sha256": "c255616a2fd6f6dd28f20dc5f3ce55475bb4af9e7cca39570f04344734c2245c",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.3/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 3004,
+          "sha256": "755ad577c7f914ab4c73f0b0cc24820be75cd375563d4c76232e9f99777ac9ab",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.3/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.4.3-source.zip",
+          "bytes": 29860998,
+          "sha256": "e4f90bdcafeb1ecb610809301e11bc256ae97c026138048aa60f64c18fb97e2e",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.3/VRCNext-Mobile-0.4.3-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.4.3.apk",
+          "bytes": 35813536,
+          "sha256": "b964beae08d5bf70279a8e897a673232e6f333c4ce3f5f66f702a442830e034f",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.3/VRCNext-Mobile-0.4.3.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 6620,
+          "sha256": "871fe3a66d3f83bc1f116ea220558586a4d8a30ebbc7564f3ddeb2391d8e1f94",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.3/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 66493964,
+          "sha256": "b3e49cacab5d655c68aae69d412a7a2287d32e0bfa7257aa88152d990805ee47",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.3/release-files.zip"
+        }
+      ]
     }
   ]
 }
