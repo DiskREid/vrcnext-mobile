@@ -1,0 +1,114 @@
+{
+  "version": "0.4.2",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 21,
+  "apk": {
+    "name": "VRCNext-Mobile-0.4.2.apk",
+    "bytes": 5855426,
+    "sha256": "7af5200e5642b033adac961f1be00a2e74bdeeef8b11c591f91c9d027c4c611d",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0410": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 421,
+    "vitestFiles": 37,
+    "vitestWorkers": 2,
+    "playwrightAppearanceAndLanguagesPassed": 22,
+    "playwrightRefractionPassed": 8,
+    "playwrightUniqueCasesConfirmed": 30,
+    "fullExistingUiSuiteRepeated": false,
+    "productionCspSmokePassed": true,
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 41,
+    "packagedAndroidResourcesUnchanged": 350,
+    "androidIconSourcesUnchanged": true,
+    "testAndDevMarkersAbsent": true,
+    "dependencyPackagesUnchanged": true
+  },
+  "refraction": {
+    "method": "SVG feDisplacementMap with a rounded-rectangle normal map applied only to the backdrop",
+    "nominalDisplacementScaleCssPx": [
+      12,
+      24,
+      40
+    ],
+    "maxMapPixels": [
+      256,
+      256
+    ],
+    "cachedMapsLimit": 16,
+    "maximumHomeLenses": 5,
+    "maximumModalLenses": 1,
+    "ordinaryModalHasPriority": true,
+    "fullscreenGraphAndPhotosExcluded": true,
+    "listCardsExcluded": true,
+    "mapsRebuiltOnlyOnGeometryOrIntensityChanges": true,
+    "continuousAnimationLoop": false,
+    "navigationContentUnderlapPreservesInitialCoordinatesAndScroll": true,
+    "weakStandardAndUnsupportedModesAttachNoObservers": true,
+    "physicalAndroidRenderingVerified": false,
+    "pixelProof": {
+      "portrait": {
+        "bentPixels": 3578,
+        "foregroundPixels": 2697,
+        "changedForeground": 0,
+        "displacementScale": 40
+      },
+      "landscape": {
+        "bentPixels": 3578,
+        "foregroundPixels": 2697,
+        "changedForeground": 0,
+        "displacementScale": 40
+      }
+    },
+    "productionCspProof": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "state": "on",
+      "filters": 5,
+      "mapIsPngDataUri": true,
+      "mapWidth": 256,
+      "mapHeight": 217,
+      "renderedImageChangesWhenRefractionDisabled": true,
+      "violations": [],
+      "pageErrors": [],
+      "credentialRequests": []
+    }
+  },
+  "navigation": {
+    "aboutRemovedFromSettings": true,
+    "aboutRetainedInMore": true,
+    "boostyLicenseAndCreditsVerified": true
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "runtimeSmokeExecutedOnAndroid": false,
+    "androidPerformanceMeasured": false,
+    "instrumentationExecuted": false
+  },
+  "unchangedLimitations": {
+    "avatarLoggingFixClaimed": false,
+    "unknownBadgeNamesPreserved": true
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.4.2-source.zip",
+    "sourceCommit": "3d053d21e247cefd2481fe991d40173a144162df",
+    "trackedFiles": 308,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "60b09ef111bdb3878e8d777ddb3300d39564acab910a7762ba6d8e93b9701b48"
+  }
+}
