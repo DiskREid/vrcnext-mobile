@@ -1,0 +1,118 @@
+{
+  "version": "0.4.1",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 20,
+  "apk": {
+    "name": "VRCNext-Mobile-0.4.1.apk",
+    "bytes": 5885730,
+    "sha256": "939fba72ba025d5ce08eaef814a0f380518e73f22047ff176da3179f0b58e6b4",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0400": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 415,
+    "vitestFiles": 36,
+    "playwrightCoreAndDecorPassed": 158,
+    "playwrightAppearancePassed": 14,
+    "playwrightFinalBlurAndFourGbUniqueCasesConfirmed": 4,
+    "finalUiFollowups": {
+      "fourGbEightCorePortraitMatrix": "passed",
+      "fourGbEightCoreLandscapeMatrix": "passed",
+      "weakBlurCasesPassed": 2,
+      "note": "Affected cases were checked separately after adding bounded dashboard blur; test selectors were corrected for the calendar tile visible only in landscape"
+    },
+    "playwrightUniqueCasesConfirmed": 170,
+    "fullUiSuiteExecuted": true,
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 41,
+    "packagedAndroidResourcesUnchanged": 350,
+    "androidIconSourcesUnchanged": true,
+    "testAndDevMarkersAbsent": true,
+    "dependencyPackagesUnchanged": true
+  },
+  "appearance": {
+    "baseThemes": [
+      "standard-dark",
+      "liquid-dark",
+      "liquid-light"
+    ],
+    "glassIntensities": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "holidays": [
+      "valentine",
+      "womens-day",
+      "st-patrick",
+      "easter",
+      "earth-day",
+      "halloween",
+      "christmas"
+    ],
+    "supportedLocales": 11,
+    "localDeviceCalendar": true,
+    "inclusiveBoundariesAndBothEastersVerified": true,
+    "launchResumeAndLocalMidnightVerified": true,
+    "maximumCalendarTimers": 1,
+    "timerPausedInBackgroundAndManualOrDisabledMode": true,
+    "noAddedVrchatRequests": true,
+    "blurExcludedFromListCardsGraphsAndFullscreenPhotos": true,
+    "dashboardTilesWithBlur": 2,
+    "maximumVisibleHomeBlurSurfaces": 4,
+    "maximumVisibleSettingsBlurSurfaces": 2,
+    "fullEffectsVerifiedOnFourGbEightCoreWebView": true,
+    "weakEffectsWhenMemoryGbAtMost": 2,
+    "weakEffectsWhenCoresAtMost": 4,
+    "localHeroScenes": 10,
+    "holidayHeroScenes": 7,
+    "variedDecorSizesPx": {
+      "ambient": [
+        16,
+        62
+      ],
+      "hero": [
+        16,
+        48
+      ]
+    },
+    "stableSessionLayout": true,
+    "staticReducedEffectsFallback": true,
+    "profileDraftAndAccountPreserved": true,
+    "holidayAndBasePreferencesIndependent": true,
+    "browserGraphPanChildDomMutations": 0,
+    "physicalAndroidPerformanceMeasured": false
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "runtimeSmokeExecuted": false,
+    "androidPerformanceMeasured": false,
+    "instrumentationExecuted": false
+  },
+  "unchangedLimitations": {
+    "avatarLoggingFixClaimed": false,
+    "unknownBadgeNamesPreserved": true
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.4.1-source.zip",
+    "sourceCommit": "7962dda0ec8019bf3e0d8a801c8ed4b895f4598c",
+    "trackedFiles": 302,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "07ec9211e7ec5ba479269afe0bc154345871336b86a5c7e7b1515f936a968b78"
+  }
+}
