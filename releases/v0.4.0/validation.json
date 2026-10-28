@@ -1,0 +1,112 @@
+{
+  "version": "0.4.0",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 19,
+  "apk": {
+    "name": "VRCNext-Mobile-0.4.0.apk",
+    "bytes": 5826900,
+    "sha256": "a73448590d05c76a2edfc27779f36b390794a0bf71979e606ad156598ad7ce4d",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0301": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 411,
+    "vitestFiles": 35,
+    "playwrightExistingInitialRun": {
+      "passed": 155,
+      "failed": 1,
+      "failure": "Test read its asynchronous harness state before initialization; now waits for its visible trigger"
+    },
+    "playwrightAffectedFollowupPassed": 2,
+    "playwrightExistingUniqueCasesConfirmed": 156,
+    "playwrightAppearancePassed": 12,
+    "playwrightUniqueCasesConfirmed": 168,
+    "fullUiSuiteExecuted": true,
+    "singleCleanFullUiRun": false,
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 31,
+    "packagedAndroidResourcesUnchanged": 350,
+    "androidIconSourcesUnchanged": true,
+    "testAndDevMarkersAbsent": true,
+    "dependencyPackagesUnchanged": true
+  },
+  "appearance": {
+    "baseThemes": [
+      "standard-dark",
+      "liquid-dark",
+      "liquid-light"
+    ],
+    "glassIntensities": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "holidays": [
+      "valentine",
+      "womens-day",
+      "st-patrick",
+      "easter",
+      "earth-day",
+      "halloween",
+      "christmas"
+    ],
+    "supportedLocales": 11,
+    "localDeviceCalendar": true,
+    "inclusiveBoundariesAndBothEastersVerified": true,
+    "launchResumeAndLocalMidnightVerified": true,
+    "maximumCalendarTimers": 1,
+    "timerPausedInBackgroundAndManualOrDisabledMode": true,
+    "noAddedVrchatRequests": true,
+    "blurExcludedFromCardsGraphsAndFullscreenPhotos": true,
+    "staticReducedEffectsFallback": true,
+    "profileDraftAndAccountPreserved": true,
+    "holidayAndBasePreferencesIndependent": true,
+    "browserGraphPanChildDomMutations": 0,
+    "physicalAndroidPerformanceMeasured": false
+  },
+  "runtime": {
+    "version": "0.4.0",
+    "runtimeSmokeExecuted": false,
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "androidPerformanceMeasured": false,
+    "availableAdbDevices": [],
+    "hardwareAccelerationAvailable": false,
+    "historicalEvidence": {
+      "source": "releases/v0.1.1/runtime-check.json",
+      "scope": "Historical emulator environment failure; not a runtime result for this release",
+      "device": "Android 13/API33 x86_64 software emulator; WebView109.0.5414.123",
+      "minimalIndependentWebViewStages": [
+        "CONTROL_PAGE_TIMEOUT",
+        "CONTROL_RENDERER_GONE"
+      ],
+      "bootDurationMs": 1134752
+    },
+    "decision": "No connected Android device or KVM. Do not restart historically broken software emulator for performance claims. Validate physical Android separately using docs/DEVICE_TEST_PLAN.md."
+  },
+  "unchangedLimitations": {
+    "avatarLoggingFixClaimed": false,
+    "unknownBadgeNamesPreserved": true
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.4.0-source.zip",
+    "sourceCommit": "b3307af5e1b6768ec6a241d7dd75164a49d7bf50",
+    "trackedFiles": 288,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "be158a6ddf11051c5612cabf279c3c3e401fc4cf4472c521b1a097bc59fff6f4"
+  }
+}
