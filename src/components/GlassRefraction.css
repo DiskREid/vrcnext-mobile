@@ -17,6 +17,13 @@
   position: relative;
   z-index: 20;
 }
+/* Page-owned dialogs live inside the scrolling container's stacking context.
+   Lift it while a visible page owns an overlay so the refractive navigation
+   cannot paint above a group/world dialog or intercept its controls. */
+.workspace[data-glass-underlay='on']
+  > .main-content:has(> .retained-screen:not([hidden]) .modal-backdrop) {
+  z-index: 30;
+}
 html[data-glass-refraction='on'] {
   --optical-tint: 0.24;
 }
@@ -64,8 +71,75 @@ html[data-glass-refraction='on'][data-glass-intensity='high'] {
 html[data-glass-refraction='on'][data-theme='liquid-light'][data-glass-intensity='high'] {
   --optical-tint: 0.32;
 }
-html[data-glass-refraction='on'] .modal[data-glass-optic] {
-  --optical-tint: 0.78;
+html[data-glass-refraction='on'] .glass-modal-surface[data-glass-optic] {
+  --optical-tint: var(--modal-optical-tint, 0.82);
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+}
+html[data-glass-intensity='low'] .glass-modal-surface {
+  --modal-optical-tint: 0.9;
+}
+html[data-glass-intensity='high'] .glass-modal-surface {
+  --modal-optical-tint: 0.74;
+}
+html[data-theme='liquid-light'] .glass-modal-surface {
+  --modal-optical-tint: 0.84;
+}
+html[data-theme='liquid-light'][data-glass-intensity='low'] .glass-modal-surface {
+  --modal-optical-tint: 0.92;
+}
+html[data-theme='liquid-light'][data-glass-intensity='high'] .glass-modal-surface {
+  --modal-optical-tint: 0.78;
+}
+/* Blur the sampled scene, not the dialog: underlying search fields and text
+   must not reappear as sharp dark rectangles behind profile/group headings. */
+html[data-glass-refraction='on'][data-theme][data-effects='full']
+  .glass-modal-surface[data-glass-optic] {
+  -webkit-backdrop-filter: var(--glass-lens-filter) blur(min(10px, var(--glass-blur)))
+    saturate(1.12);
+  backdrop-filter: var(--glass-lens-filter) blur(min(10px, var(--glass-blur))) saturate(1.12);
+}
+/* Refraction belongs to this non-scrolling sibling behind the dialog. Keeping
+   the SVG URL off overflow:auto/sticky descendants avoids WebView filter tiles. */
+html[data-theme][data-effects][data-glass-refraction='on']
+  .modal[data-glass-surface-host][data-glass-surface-ready] {
+  z-index: 1;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+html[data-theme] .modal[data-glass-surface-host] {
+  animation: none;
+}
+/* This heading used to be a nearly opaque, square dark slab inside the glass. */
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  .modal:not(.fullscreen-network):not(.fullscreen-image-viewer)
+  > .modal-heading {
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  padding: 8px 10px;
+  background:
+    linear-gradient(118deg, #ffffff1c, transparent 40%, #b8d9ff0a),
+    rgba(var(--glass-chrome-rgb), 0.46);
+  box-shadow: inset 0 1px 0 #ffffff45;
+  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+  backdrop-filter: blur(8px) saturate(1.15);
+}
+html[data-theme='liquid-light']
+  .modal:not(.fullscreen-network):not(.fullscreen-image-viewer)
+  > .modal-heading {
+  background:
+    linear-gradient(118deg, #ffffff66, transparent 40%, #b8d9ff0a),
+    rgba(var(--glass-chrome-rgb), 0.65);
+}
+html[data-effects='reduced'][data-theme]
+  .modal:not(.fullscreen-network):not(.fullscreen-image-viewer)
+  > .modal-heading {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 html[data-glass-refraction='on'] .hero[data-glass-optic]::before {
   content: '';

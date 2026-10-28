@@ -1,4 +1,5 @@
 import { t, useI18n } from '../i18n';
+import BrandLogo from '../components/BrandLogo';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
@@ -123,7 +124,7 @@ export default function Auth({
       <div className="auth-art" aria-hidden="true">
         <div className="orbit orbit-one" />
         <div className="orbit orbit-two" />
-        <img src="/mark.svg" alt="" />
+        <BrandLogo />
         <span>
           YOUR NEXT WORLD
           <br />
@@ -132,7 +133,7 @@ export default function Auth({
       </div>
       <main className="auth-panel">
         <div className="brand">
-          <img src="/mark.svg" alt="" />
+          <BrandLogo />
           <div>
             VRCNext <span>Mobile</span>
           </div>

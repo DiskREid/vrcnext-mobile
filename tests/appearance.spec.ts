@@ -12,6 +12,7 @@ const holidays = [
   'christmas',
 ];
 type Fixture = {
+  ready: boolean;
   requests: { path: string; method: string }[];
   unexpected: string[];
   clearedSessions: number;
@@ -43,6 +44,10 @@ async function device(page: Page, weak = false) {
 }
 async function open(page: Page) {
   await page.goto('/tests/appearance-harness.html');
+  // The load event can precede the fixture's top-level dynamic App import.
+  await page.waitForFunction(
+    () => (window as unknown as { __appearanceTest?: Fixture }).__appearanceTest?.ready === true,
+  );
   await expect(
     page.getByRole('heading', { name: 'Привет, Theme Explorer ✦', exact: true }),
   ).toBeVisible();
@@ -502,8 +507,21 @@ test('light glass preserves network panning, profile opening and fullscreen rend
     .press('Enter');
   const profile = page.getByRole('dialog', { name: 'Профиль', exact: true });
   await expect(profile.getByRole('heading', { name: 'Theme Friend', exact: true })).toBeVisible();
-  expect((await style(profile)).blur).toContain('blur(');
+  await expect(profile).toHaveAttribute('data-glass-surface-ready', 'true');
+  const profileGlass = profile.locator('..').locator('.glass-modal-surface');
+  await expect(profileGlass).toHaveCount(1);
+  const backing = await style(profileGlass);
+  expect(backing.blur).toContain('url(');
+  expect(backing.blur).toContain('blur(');
+  expect(await profileGlass.evaluate((element) => getComputedStyle(element).position)).toBe(
+    'fixed',
+  );
+  // The lens is behind the content; scrolling the profile must not filter
+  // its text or allocate an opaque WebView compositor tile.
+  expect((await style(profile)).blur).toBe('none');
+  await expect(profile).not.toHaveAttribute('data-glass-optic');
   await profile.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await expect(profileGlass).toHaveCount(0);
   await expect(fullscreen).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(fullscreen).toHaveCount(0);

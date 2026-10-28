@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-type Fixture={requests:{path:string;method:string;body?:{tags?:string[];favoriteId?:string;type?:string}}[];unexpected:string[];failRead:boolean;failNextAdd:boolean;friendId:string};
+type Fixture={ready:boolean;requests:{path:string;method:string;body?:{tags?:string[];favoriteId?:string;type?:string}}[];unexpected:string[];failRead:boolean;failNextAdd:boolean;friendId:string};
 const data=(page:Page)=>page.evaluate(()=>(window as unknown as {__favoriteFriendTest:Fixture}).__favoriteFriendTest);
 async function open(page:Page){
   await page.goto('/tests/favorites-friends-harness.html');
+  // Start the UI assertion after the fixture's asynchronous App import has completed.
+  await page.waitForFunction(()=>(window as unknown as {__favoriteFriendTest?:Fixture}).__favoriteFriendTest?.ready===true);
   await expect(page.getByRole('heading',{name:'Привет, Favorite Self ✦',exact:true})).toBeVisible();
   await page.locator('nav[aria-label="Основная навигация"]:visible').getByRole('button',{name:'Друзья',exact:true}).click();
   await expect(page.locator('.friend-card')).toHaveCount(1);

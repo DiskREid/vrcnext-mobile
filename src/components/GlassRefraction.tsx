@@ -1,4 +1,6 @@
 import { useLayoutEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppearance } from '../data/appearance';
 import { createGlassDisplacementMap } from '../data/glass-optics';
 import type { GlassIntensity } from '../data/appearance';
@@ -10,6 +12,13 @@ interface Lens {
   height: number;
   scale: number;
   image: string;
+  modal?: {
+    element: HTMLElement;
+    backdrop: HTMLElement;
+    left: number;
+    top: number;
+    radius: string;
+  };
 }
 let sequence = 0;
 const imageCache = new Map<string, Pick<Lens, 'image' | 'scale'>>();
@@ -120,6 +129,8 @@ export default function GlassRefraction() {
     };
     const clear = (element: HTMLElement) => {
       element.removeAttribute('data-glass-optic');
+      element.removeAttribute('data-glass-surface-host');
+      element.removeAttribute('data-glass-surface-ready');
       element.style.removeProperty('--glass-lens-filter');
       assigned.delete(element);
       resize.unobserve(element);
@@ -174,6 +185,12 @@ export default function GlassRefraction() {
       for (const element of assigned.keys()) if (!selected.has(element)) clear(element);
       const next: Lens[] = [];
       for (const element of targets) {
+        // A scrolling/sticky panel must never be the SVG backdrop-filter target.
+        // WebView can otherwise leave an opaque rectangular filter tile inside it.
+        const modal = element.matches('.modal')
+          ? element.closest<HTMLElement>('.modal-backdrop')
+          : null;
+        if (modal) element.dataset.glassSurfaceHost = 'true';
         const rect = element.getBoundingClientRect();
         const inset = element.classList.contains('hero') ? 12 : 0;
         const width = Math.max(16, Math.round(rect.width - inset * 2));
@@ -182,7 +199,11 @@ export default function GlassRefraction() {
           0,
           Math.round(parseFloat(getComputedStyle(element).borderTopLeftRadius) - inset),
         );
-        const key = `${width}:${height}:${radius}:${settings.glassIntensity}`;
+        const borderRadius = getComputedStyle(element).borderRadius;
+        const position = modal
+          ? `:${Math.round(rect.left)}:${Math.round(rect.top)}:${borderRadius}`
+          : '';
+        const key = `${width}:${height}:${radius}:${settings.glassIntensity}${position}`;
         const previous = assigned.get(element);
         if (previous?.key === key) {
           next.push(previous.lens);
@@ -195,10 +216,28 @@ export default function GlassRefraction() {
             continue;
           }
           const id = previous?.id || `vrc-glass-${++sequence}`;
-          const lens = { id, width, height, ...image };
+          const lens: Lens = {
+            id,
+            width,
+            height,
+            ...image,
+            ...(modal
+              ? {
+                  modal: {
+                    element,
+                    backdrop: modal,
+                    left: rect.left,
+                    top: rect.top,
+                    radius: borderRadius,
+                  },
+                }
+              : {}),
+          };
           assigned.set(element, { id, key, lens });
-          element.dataset.glassOptic = id;
-          element.style.setProperty('--glass-lens-filter', `url("#${id}")`);
+          if (!modal) {
+            element.dataset.glassOptic = id;
+            element.style.setProperty('--glass-lens-filter', `url("#${id}")`);
+          }
           resize.observe(element);
           next.push(lens);
         } catch {
@@ -249,46 +288,79 @@ export default function GlassRefraction() {
     };
   }, [enabled, settings.glassIntensity]);
   return (
-    <svg
-      data-glass-optics-defs=""
-      width="0"
-      height="0"
-      aria-hidden="true"
-      focusable="false"
-      style={{ position: 'absolute', pointerEvents: 'none' }}
-    >
-      <defs>
-        {lenses.map((lens) => (
-          <filter
-            key={lens.id}
-            id={lens.id}
-            x="0"
-            y="0"
-            width={lens.width}
-            height={lens.height}
-            filterUnits="userSpaceOnUse"
-            primitiveUnits="userSpaceOnUse"
-            colorInterpolationFilters="sRGB"
-          >
-            <feImage
-              href={lens.image}
+    <>
+      <svg
+        data-glass-optics-defs=""
+        width="0"
+        height="0"
+        aria-hidden="true"
+        focusable="false"
+        style={{ position: 'absolute', pointerEvents: 'none' }}
+      >
+        <defs>
+          {lenses.map((lens) => (
+            <filter
+              key={lens.id}
+              id={lens.id}
               x="0"
               y="0"
               width={lens.width}
               height={lens.height}
-              preserveAspectRatio="none"
-              result="normal-map"
-            />
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="normal-map"
-              scale={lens.scale}
-              xChannelSelector="R"
-              yChannelSelector="G"
-            />
-          </filter>
-        ))}
-      </defs>
-    </svg>
+              filterUnits="userSpaceOnUse"
+              primitiveUnits="userSpaceOnUse"
+              colorInterpolationFilters="sRGB"
+            >
+              <feImage
+                href={lens.image}
+                x="0"
+                y="0"
+                width={lens.width}
+                height={lens.height}
+                preserveAspectRatio="none"
+                result="normal-map"
+              />
+              <feDisplacementMap
+                in="SourceGraphic"
+                in2="normal-map"
+                scale={lens.scale}
+                xChannelSelector="R"
+                yChannelSelector="G"
+              />
+            </filter>
+          ))}
+        </defs>
+      </svg>
+      {lenses.map((lens) =>
+        lens.modal
+          ? createPortal(
+              <div
+                key={lens.id}
+                className="glass-modal-surface"
+                data-glass-optic={lens.id}
+                aria-hidden="true"
+                ref={(node) => {
+                  if (node) lens.modal!.element.dataset.glassSurfaceReady = 'true';
+                  else delete lens.modal!.element.dataset.glassSurfaceReady;
+                }}
+                style={
+                  {
+                    position: 'fixed',
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                    left: lens.modal.left,
+                    top: lens.modal.top,
+                    width: lens.width,
+                    height: lens.height,
+                    borderRadius: lens.modal.radius,
+                    '--glass-lens-filter': `url("#${lens.id}")`,
+                  } as CSSProperties
+                }
+              />,
+              lens.modal.backdrop,
+              lens.id,
+            )
+          : null,
+      )}
+    </>
   );
 }

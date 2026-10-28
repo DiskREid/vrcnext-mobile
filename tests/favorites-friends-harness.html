@@ -9,7 +9,7 @@ const friend={id:'usr_favorite-friend',displayName:'Favorite Friend',state:'acti
 let favorite;
 let sequence=0;
 const listeners=new Map();
-window.__favoriteFriendTest={requests:[],unexpected:[],failRead:false,failNextAdd:false,selfId:self.id,friendId:friend.id};
+window.__favoriteFriendTest={ready:false,requests:[],unexpected:[],failRead:false,failNextAdd:false,selfId:self.id,friendId:friend.id};
 const bridge={async sessionState(){return{hasAuth:true};},async request(options){
  const url=new URL(options.path,'https://synthetic.invalid');
  const method=options.method||'GET';
@@ -40,4 +40,5 @@ registerPlugin('App',{web:()=>({getState:async()=>({isActive:true}),addListener:
 Capacitor.isNativePlatform=()=>true;
 const {default:App}=await import('/src/App.tsx');
 createRoot(document.getElementById('root')).render(React.createElement(App));
+window.__favoriteFriendTest.ready=true;
 </script></body></html>

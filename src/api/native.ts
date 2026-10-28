@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 import type { UploadTag } from './types';
+import type { HolidayId } from '../data/holiday-calendar';
 
 export interface NativeResponse {
   status: number;
@@ -18,14 +19,23 @@ export interface PipelineEvent {
   content: Record<string, unknown>;
 }
 export interface NativeBridge {
+  setLauncherIcon(options: {
+    holiday: HolidayId | null;
+  }): Promise<{ icon: HolidayId | 'standard'; changed: boolean }>;
   sessionState(): Promise<{ hasAuth: boolean }>;
   screenProtection(): Promise<{ enabled: boolean }>;
   setScreenProtection(options: { enabled: boolean }): Promise<{ enabled: boolean }>;
   loadImage(options: { url: string; maxDimension?: number }): Promise<{ dataUrl: string }>;
-  downloadImage(options: { url: string; fileName: string }): Promise<{ saved: boolean; fileName: string }>;
+  downloadImage(options: {
+    url: string;
+    fileName: string;
+  }): Promise<{ saved: boolean; fileName: string }>;
   request(options: NativeRequest): Promise<NativeResponse>;
   searchPublicAvatars(options: { query: string; page: number }): Promise<NativeResponse>;
-  resolvePublicAvatar(options: { fileId: string; source?: 'avtrdb' | 'icu' }): Promise<NativeResponse>;
+  resolvePublicAvatar(options: {
+    fileId: string;
+    source?: 'avtrdb' | 'icu';
+  }): Promise<NativeResponse>;
   clearSession(): Promise<void>;
   connectPipeline(): Promise<void>;
   disconnectPipeline(): Promise<void>;

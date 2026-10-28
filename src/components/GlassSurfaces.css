@@ -1,0 +1,170 @@
+/* Shared material for interactive controls and detail cards. These surfaces are
+   static: lists and buttons do not allocate their own blur or SVG filter. */
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+  --control-glass-fill: rgba(var(--glass-chrome-rgb), 0.34);
+  --control-glass-edge: rgba(213, 234, 255, 0.29);
+  --control-glass-glint: rgba(255, 255, 255, 0.25);
+  --control-glass-bottom: rgba(160, 202, 247, 0.13);
+  --detail-glass-fill: rgba(var(--glass-surface-rgb), 0.3);
+  --detail-glass-shadow: rgba(3, 12, 32, 0.13);
+}
+html[data-theme='liquid-light'] {
+  --control-glass-fill: rgba(255, 255, 255, 0.48);
+  --control-glass-edge: rgba(255, 255, 255, 0.92);
+  --control-glass-glint: rgba(255, 255, 255, 0.94);
+  --control-glass-bottom: rgba(102, 137, 177, 0.18);
+  --detail-glass-fill: rgba(255, 255, 255, 0.38);
+  --detail-glass-shadow: rgba(56, 85, 125, 0.09);
+}
+html[data-glass-intensity='low']:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+  --control-glass-fill: rgba(var(--glass-chrome-rgb), 0.62);
+  --detail-glass-fill: rgba(var(--glass-surface-rgb), 0.55);
+}
+html[data-glass-intensity='high']:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+  --control-glass-fill: rgba(var(--glass-chrome-rgb), 0.22);
+  --detail-glass-fill: rgba(var(--glass-surface-rgb), 0.22);
+}
+
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .button:not(.primary):not(.danger),
+    .modal:not(.fullscreen-network):not(.fullscreen-image-viewer) .icon-button,
+    .card .icon-button,
+    .favorite-card-actions .icon-button,
+    .user-profile-panel .copy-id,
+    .link-row
+  ) {
+  background:
+    linear-gradient(115deg, #ffffff1c, transparent 28%, #ffffff04 68%, #c5e5ff0c),
+    var(--control-glass-fill);
+  border: 1px solid var(--control-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 0 -1px 0 var(--control-glass-bottom),
+    0 3px 9px var(--detail-glass-shadow);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.button:not(.primary):not(.danger), .link-row) {
+  color: var(--text);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.user-profile-panel .copy-id, .link-row) {
+  border-radius: 11px;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .button.primary {
+  background:
+    linear-gradient(115deg, #ffffff3d, transparent 36%, #ffffff09 68%, #ffffff1c), var(--accent);
+  color: var(--accent-ink);
+  border-color: rgba(255, 255, 255, 0.36);
+  box-shadow:
+    inset 0 1px 0 #ffffff70,
+    inset 0 -1px 0 #161d3c1f,
+    0 4px 12px rgba(var(--accent-rgb), 0.15);
+}
+html[data-theme='liquid-light'] .button.primary {
+  /* The light theme uses white ink: keep the accent fill dark enough beneath it. */
+  background: linear-gradient(115deg, #071b2f14, transparent 45%, #071b2f0a), var(--accent);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .button.danger {
+  background: linear-gradient(115deg, #ffffff12, transparent 48%), #e268871a;
+  color: #ffc3d1;
+  border-color: #f394ae66;
+  box-shadow: inset 0 1px 0 #ffffff24;
+}
+html[data-theme='liquid-light'] .button.danger {
+  background: linear-gradient(115deg, #ffffffb3, #ffffff12), #ffe4ecb8;
+  color: #91223f;
+  border-color: #c96a8594;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.button, .icon-button, .link-row, .segmented > button):focus-visible {
+  outline-color: var(--accent);
+  outline-offset: 3px;
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.button, .link-row):not(:disabled):active {
+  box-shadow:
+    inset 0 1px 5px #0616302b,
+    inset 0 -1px 0 var(--control-glass-glint);
+}
+
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.segmented, .inset-panel, .confirm-inline, .friend-favorite-category) {
+  background:
+    linear-gradient(120deg, #ffffff12, transparent 45%, #d3e5ff05), var(--detail-glass-fill);
+  border-color: var(--control-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 0 -1px 0 var(--control-glass-bottom);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .segmented > button.active {
+  background: linear-gradient(115deg, #ffffff29, transparent 58%), var(--accent-soft);
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 0 -1px 0 var(--control-glass-bottom),
+    0 2px 6px var(--detail-glass-shadow);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  .badge:not(.current-avatar):not(.inventory-image-badges .badge) {
+  background: linear-gradient(120deg, #ffffff12, transparent 65%), var(--accent-soft);
+  border: 1px solid var(--glass-line);
+  box-shadow: inset 0 1px 0 #ffffff29;
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .friend-card,
+    .world-card,
+    .group-card,
+    .avatar-card,
+    .user-content-card,
+    .group-post,
+    .group-instance,
+    .favorite-card
+  ) {
+  background:
+    radial-gradient(ellipse at 0 0, rgba(255, 255, 255, var(--glass-reflection)), transparent 58%),
+    linear-gradient(125deg, #ffffff04, transparent 42%, rgba(var(--holiday-rgb), 0.035)),
+    var(--detail-glass-fill);
+  border-color: var(--control-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 1px 0 0 #ffffff0d,
+    inset 0 -1px 0 var(--control-glass-bottom),
+    0 6px 16px var(--detail-glass-shadow);
+}
+@media (hover: hover) {
+  html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+    :is(.friend-card, .world-card, .group-card, .avatar-card, .user-content-card):hover {
+    border-color: var(--accent);
+    box-shadow:
+      inset 0 1px 0 var(--control-glass-glint),
+      inset 0 -1px 0 var(--control-glass-bottom),
+      0 6px 18px var(--detail-glass-shadow);
+  }
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.group-detail-title h3, .detail-title, .profile-identity h2, .user-content-card strong) {
+  color: var(--text);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.group-detail-title p, .group-code, .user-content-card small, .user-meta-row dt) {
+  color: var(--muted);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.profile-identity > .avatar, .group-banner .avatar) {
+  border-color: rgba(var(--glass-chrome-rgb), 0.7);
+  box-shadow: 0 0 0 1px var(--control-glass-edge);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .favorite-card-actions {
+  background: linear-gradient(180deg, #ffffff07, transparent), var(--detail-glass-fill);
+}
+html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .friend-favorite-toggle.selected {
+  color: var(--accent-readable);
+  background: linear-gradient(115deg, #ffffff24, transparent 65%), var(--accent-soft);
+  border-color: var(--accent);
+}
+html[data-effects='reduced']:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
+  --detail-glass-fill: rgba(var(--glass-surface-rgb), 0.7);
+  --control-glass-fill: rgba(var(--glass-chrome-rgb), 0.68);
+}

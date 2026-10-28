@@ -1,8 +1,11 @@
 import { useAppearanceRuntime } from './data/appearance';
 import HolidayDecor from './components/HolidayDecor';
 import GlassRefraction from './components/GlassRefraction';
+import BrandLogo from './components/BrandLogo';
+import { useLauncherIconRuntime } from './data/launcher-icons';
 import './appearance.css';
 import './hero-artwork.css';
+import './components/GlassSurfaces.css';
 import type { UiMessage } from './i18n';
 import { t, useI18n, dateLocale } from './i18n';
 import SecureImage, { clearImageCache } from './components/SecureImage';
@@ -125,6 +128,7 @@ const tabs: { id: Screen; label: string; icon: ComponentType<{ size?: number }> 
 export default function App() {
   useI18n();
   useAppearanceRuntime();
+  useLauncherIconRuntime();
   const [user, setUser] = useState<User | null>(null),
     [demo, setDemo] = useState(false),
     [screen, setScreen] = useState<Screen>('home'),
@@ -480,7 +484,7 @@ export default function App() {
             onClick={() => navigate('home')}
             aria-label={t('VRCNext Mobile, главная')}
           >
-            <SecureImage src="/mark.svg" alt="" />
+            <BrandLogo />
             <div>
               VRCNext <span>Mobile</span>
             </div>
@@ -544,7 +548,7 @@ export default function App() {
                   <ArrowLeft size={21} />
                 </button>
               ) : (
-                <SecureImage className="mobile-mark" src="/mark.svg" alt="VRCNext Mobile" />
+                <BrandLogo className="mobile-mark" alt="VRCNext Mobile" />
               )}
               <div className="breadcrumb">
                 VRCNext <span>/</span>{' '}

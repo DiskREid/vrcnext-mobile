@@ -21,7 +21,7 @@ const badgeFixture = new URLSearchParams(location.search).has('badges') ? [
 ] : undefined;
 const listeners = new Map();
 const appListeners = new Map();
-window.__appearanceTest = {requests:[],unexpected:[],links:[],copiedText:[],badges:badgeFixture,chooseLanguage:setLanguage,clearedSessions:0,selfId:self.id,friendId:friend.id};
+window.__appearanceTest = {ready:false,requests:[],unexpected:[],links:[],copiedText:[],badges:badgeFixture,chooseLanguage:setLanguage,clearedSessions:0,selfId:self.id,friendId:friend.id};
 const bridge = {
  async sessionState(){return{hasAuth:true};},
  async request(options){
@@ -53,4 +53,5 @@ window.__appearanceTest.emitAppState=(isActive)=>{for(const listener of appListe
 window.__appearanceTest.appStateListenerCount=()=>appListeners.get('appStateChange')?.size||0;
 const {default:App}=await import('/src/App.tsx');
 createRoot(document.getElementById('root')).render(React.createElement(App));
+window.__appearanceTest.ready=true;
 </script></body></html>

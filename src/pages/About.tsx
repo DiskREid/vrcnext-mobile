@@ -6,7 +6,6 @@ import {
   Heart,
   Info,
   Radio,
-  Sparkles,
   Users,
   Waves,
 } from 'lucide-react';
@@ -14,6 +13,7 @@ import { useApp, useLoad } from '../state';
 import { isNative, native } from '../api/native';
 import { PageHeader, Badge, Loading, ErrorState } from '../components/ui';
 import { t, useI18n } from '../i18n';
+import BrandLogo from '../components/BrandLogo';
 import './About.css';
 
 const BOOSTY_URL = 'https://boosty.to/mr.diskreid';
@@ -86,7 +86,7 @@ export default function AboutPage() {
         </div>
         <div className="about-hero-copy">
           <div className="about-kicker">
-            <Sparkles size={15} /> VRCNext Mobile <Badge>0.4.2</Badge>
+            <BrandLogo /> VRCNext Mobile <Badge>0.4.3</Badge>
           </div>
           <h2>
             {t('Оставайтесь рядом.')}

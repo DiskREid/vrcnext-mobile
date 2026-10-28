@@ -1,0 +1,15 @@
+/* Preserve the artwork's own rounded silhouette instead of cropping its corners. */
+.brand img.brand-logo,
+.brand-logo.mobile-mark,
+.auth-art > img.brand-logo,
+.about-kicker > img.brand-logo {
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+.about-kicker > img.brand-logo {
+  width: 48px;
+  height: 48px;
+}

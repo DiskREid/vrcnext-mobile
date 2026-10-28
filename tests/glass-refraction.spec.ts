@@ -386,7 +386,16 @@ test('lens intensity changes the optical maps and base-theme switching cleans up
     .press('Enter');
   const profile = page.getByRole('dialog', { name: 'Профиль', exact: true });
   await expect(profile.getByRole('heading', { name: 'Theme Friend', exact: true })).toBeVisible();
-  await expect(profile).toHaveAttribute('data-glass-optic', /vrc-glass-/);
+  await expect(profile).toHaveAttribute('data-glass-surface-host', 'true');
+  await expect(profile).toHaveAttribute('data-glass-surface-ready', 'true');
+  // The fixed backing layer owns the lens; filtering the scrolling dialog
+  // itself leaves rectangular compositor tiles in Android WebView.
+  await expect(profile).not.toHaveAttribute('data-glass-optic');
+  const profileSurface = profile.locator('..').locator('.glass-modal-surface');
+  await expect(profileSurface).toHaveAttribute('data-glass-optic', /vrc-glass-/);
+  expect(await profile.evaluate((element) => getComputedStyle(element).backdropFilter)).toBe(
+    'none',
+  );
   await expect(page.locator('[data-glass-optic]')).toHaveCount(1);
   await profile.getByRole('button', { name: 'Закрыть', exact: true }).click();
   await expect(fullscreen).toBeVisible();

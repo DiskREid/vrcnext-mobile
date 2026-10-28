@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Branding synthetic Android transport fixture only</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      // Only this fixture impersonates Android; no production endpoint or launcher is used.
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { Capacitor, registerPlugin } from '@capacitor/core';
+      import '/src/styles.css';
+      const image =
+        'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      const self = {
+        id: 'usr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        displayName: 'Theme Explorer',
+        state: 'offline',
+        location: 'offline',
+        status: 'active',
+        currentAvatarThumbnailImageUrl: image,
+        friends: ['usr_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb'],
+        currentAvatar: 'avtr_cccccccc-3333-4333-8333-cccccccccccc',
+      };
+      const friend = {
+        id: self.friends[0],
+        displayName: 'Theme Friend',
+        state: 'active',
+        location: 'offline',
+        status: 'busy',
+        isFriend: true,
+        tags: [],
+        currentAvatarThumbnailImageUrl: image,
+      };
+      const avatar = {
+        id: self.currentAvatar,
+        name: 'Theme Avatar',
+        authorName: self.displayName,
+        imageUrl: image,
+        thumbnailImageUrl: image,
+        releaseStatus: 'private',
+      };
+      const listeners = new Map();
+      const appListeners = new Map();
+      const hasAuth = new URLSearchParams(location.search).get('auth') !== '0';
+      window.__brandingTest = { requests: [], unexpected: [], launcherCalls: [] };
+      const bridge = {
+        async sessionState() {
+          return { hasAuth };
+        },
+        async setLauncherIcon({ holiday }) {
+          window.__brandingTest.launcherCalls.push(holiday);
+          return { icon: holiday || 'standard', changed: true };
+        },
+        async request(options) {
+          const url = new URL(options.path, 'https://synthetic.invalid');
+          window.__brandingTest.requests.push({
+            path: options.path,
+            method: options.method || 'GET',
+          });
+          if (url.pathname === '/auth/user' || url.pathname === `/users/${self.id}`)
+            return { status: 200, data: self };
+          if (url.pathname === '/auth/user/friends')
+            return {
+              status: 200,
+              data: url.searchParams.get('offline') === 'false' ? [friend] : [],
+            };
+          if (url.pathname === `/users/${friend.id}`) return { status: 200, data: friend };
+          if (url.pathname === `/profile/${friend.id}`)
+            return { status: 200, data: { id: friend.id, bio: '' } };
+          if (url.pathname === `/profile/${self.id}`)
+            return {
+              status: 200,
+              data: { id: self.id, bio: '', languages: ['eng'], bioLinks: [] },
+            };
+          if (url.pathname === '/avatars')
+            return { status: 200, data: url.searchParams.get('offset') === '0' ? [avatar] : [] };
+          if (
+            ['/worlds', '/favorites', '/calendar', `/users/${self.id}/groups`].includes(
+              url.pathname,
+            )
+          )
+            return { status: 200, data: [] };
+          window.__brandingTest.unexpected.push(options.path);
+          return { status: 500, data: { error: { message: 'Unexpected branding fixture route' } } };
+        },
+        async screenProtection() {
+          return { enabled: false };
+        },
+        async setScreenProtection({ enabled }) {
+          return { enabled };
+        },
+        async addListener(name, listener) {
+          listeners.set(name, listener);
+          return {
+            remove: async () => {
+              if (listeners.get(name) === listener) listeners.delete(name);
+            },
+          };
+        },
+        async connectPipeline() {
+          listeners.get('connection')?.({ state: 'connected' });
+        },
+        async disconnectPipeline() {},
+        async clearSession() {},
+        async loadImage() {
+          return { dataUrl: image };
+        },
+      };
+      const appBridge = {
+        getState: async () => ({ isActive: true }),
+        addListener: async (name, listener) => {
+          if (!appListeners.has(name)) appListeners.set(name, new Set());
+          appListeners.get(name).add(listener);
+          return { remove: async () => appListeners.get(name)?.delete(listener) };
+        },
+        exitApp: async () => {},
+      };
+      registerPlugin('VrcNative', { web: () => bridge, android: () => bridge });
+      registerPlugin('App', { web: () => appBridge, android: () => appBridge });
+      Capacitor.isNativePlatform = () => true;
+      Capacitor.getPlatform = () => 'android';
+      const { appearanceStore } = await import('/src/data/appearance.ts');
+      window.__brandingTest.setAppearance = appearanceStore.updateSettings;
+      window.__brandingTest.emitAppState = (isActive) => {
+        for (const listener of appListeners.get('appStateChange') || []) listener({ isActive });
+      };
+      window.__brandingTest.appStateListenerCount = () =>
+        appListeners.get('appStateChange')?.size || 0;
+      const { default: App } = await import('/src/App.tsx');
+      createRoot(document.getElementById('root')).render(React.createElement(App));
+    </script>
+  </body>
+</html>

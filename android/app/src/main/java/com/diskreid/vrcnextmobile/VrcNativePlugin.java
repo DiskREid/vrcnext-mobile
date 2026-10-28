@@ -57,7 +57,7 @@ import org.json.JSONTokener;
         @Permission(alias = "legacyPictures", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE })
 })
 public class VrcNativePlugin extends Plugin {
-    private static final String USER_AGENT = "Mobile-VRCNext/0.4.2 (https://github.com/DiskREid/vrcnext-mobile/issues)";
+    private static final String USER_AGENT = "Mobile-VRCNext/0.4.3 (https://github.com/DiskREid/vrcnext-mobile/issues)";
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -67,6 +67,7 @@ public class VrcNativePlugin extends Plugin {
     private final LifecycleTasks tasks = new LifecycleTasks();
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final ExecutorService imageIo = Executors.newFixedThreadPool(2);
+    private final ExecutorService launcherIo = Executors.newSingleThreadExecutor();
     private final Object imageTimingLock = new Object();
     private long nextImageRequestAt;
     private final LruCache<String, String> imageCache = new LruCache<String, String>(8 * 1024 * 1024) {
@@ -163,6 +164,29 @@ public class VrcNativePlugin extends Plugin {
     @PluginMethod public void screenProtection(PluginCall call) {
         if (tasks.isClosed()) { release(call); return; }
         resolve(call, new JSObject().put("enabled", ScreenProtection.isEnabled(getContext())));
+    }
+
+    @PluginMethod public void setLauncherIcon(PluginCall call) {
+        if (tasks.isClosed()) { release(call); return; }
+        final LauncherIconPolicy.Icon icon;
+        try {
+            Object holiday = call.getData().opt("holiday");
+            if (holiday != null && holiday != JSONObject.NULL && !(holiday instanceof String))
+                throw new IllegalArgumentException("Holiday must be a string or null");
+            icon = LauncherIconPolicy.Icon.fromHoliday(call.getString("holiday"));
+        } catch (IllegalArgumentException invalid) {
+            reject(call, "Unknown launcher icon", "INVALID_ARGUMENT");
+            return;
+        }
+        submit(launcherIo, call, () -> {
+            if (tasks.isClosed()) { release(call); return; }
+            try {
+                boolean changed = LauncherIconController.apply(getContext(), icon);
+                resolve(call, new JSObject().put("icon", icon.id).put("changed", changed));
+            } catch (RuntimeException failure) {
+                reject(call, "Could not change the launcher icon", "LAUNCHER_ICON_FAILED");
+            }
+        });
     }
 
     @PluginMethod public void setScreenProtection(PluginCall call) {
@@ -621,6 +645,7 @@ public class VrcNativePlugin extends Plugin {
         if (http != null) { http.dispatcher().cancelAll(); http.connectionPool().evictAll(); }
         io.shutdownNow();
         imageIo.shutdownNow();
+        launcherIo.shutdownNow();
         imageCache.evictAll();
         socketScheduler.shutdownNow();
     }
