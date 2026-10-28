@@ -1,0 +1,207 @@
+{
+  "version": "0.4.3",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 22,
+  "apk": {
+    "name": "VRCNext-Mobile-0.4.3.apk",
+    "bytes": 35813536,
+    "sha256": "b964beae08d5bf70279a8e897a673232e6f333c4ce3f5f66f702a442830e034f",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0420": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 429,
+    "vitestFiles": 38,
+    "vitestWorkers": 2,
+    "playwrightPassed": 186,
+    "playwrightFiles": 18,
+    "fullExistingUiSuiteRepeated": true,
+    "productionCspSmokePassed": true,
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 44,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 11,
+    "distFilesComparedByteForByte": 49,
+    "existingAndroidSourceResourcesUnchanged": 7,
+    "existingPackagedAndroidResourcesByteIdentical": 322,
+    "testAndDevMarkersAbsent": true,
+    "dependencyPackagesUnchanged": true,
+    "compiledAndroidPermissionsUnchanged": true
+  },
+  "branding": {
+    "variants": [
+      {
+        "id": "standard",
+        "bytes": 1625367,
+        "dimensions": [
+          1254,
+          1254
+        ],
+        "sha256": "eef59bb9bc2afb87350852cb2d7a1e6337e896d5c3ebce0478729fcd35e9b3ba",
+        "packagedNativePath": "res/drawable-nodpi-v4/launcher_standard.png",
+        "webAndNativeSourcesAndPackagedBytesIdentical": true
+      },
+      {
+        "id": "valentine",
+        "bytes": 1684627,
+        "dimensions": [
+          1254,
+          1254
+        ],
+        "sha256": "bfd6afb49990292e5b4b245db7699ef94cf27ffbae1ee2cf9c855e469d11fb67",
+        "packagedNativePath": "res/drawable-nodpi-v4/launcher_valentine.png",
+        "webAndNativeSourcesAndPackagedBytesIdentical": true
+      },
+      {
+        "id": "womens-day",
+        "bytes": 1516627,
+        "dimensions": [
+          1254,
+          1254
+        ],
+        "sha256": "a59b94398fcdf298ec5939932c471f041d4da873260eb432a4540f07c10500ea",
+        "packagedNativePath": "res/drawable-nodpi-v4/launcher_womens_day.png",
+        "webAndNativeSourcesAndPackagedBytesIdentical": true
+      },
+      {
+        "id": "st-patrick",
+        "bytes": 1942651,
+        "dimensions": [
+          1254,
+          1254
+        ],
+        "sha256": "14a6e0c7265b2e4acbb9c7e2284c02a09915e2eacd18057138d8d170bdf2f211",
+        "packagedNativePath": "res/drawable-nodpi-v4/launcher_st_patrick.png",
+        "webAndNativeSourcesAndPackagedBytesIdentical": true
+      },
+      {
+        "id": "easter",
+        "bytes": 2064542,
+        "dimensions": [
+          1254,
+          1254
+        ],
+        "sha256": "687cd68583139f9aa90e93af6fdae8cc65e7b9c266bac6dbd607ac25e28993ab",
+        "packagedNativePath": "res/drawable-nodpi-v4/launcher_easter.png",
+        "webAndNativeSourcesAndPackagedBytesIdentical": true
+      },
+      {
+        "id": "earth-day",
+        "bytes": 2045759,
+        "dimensions": [
+          1254,
+          1254
+        ],
+        "sha256": "d56508dc1758af737279bd1e36bca84593183b5ce9e5fd82801ce746dd424c54",
+        "packagedNativePath": "res/drawable-nodpi-v4/launcher_earth_day.png",
+        "webAndNativeSourcesAndPackagedBytesIdentical": true
+      },
+      {
+        "id": "halloween",
+        "bytes": 2025783,
+        "dimensions": [
+          1254,
+          1254
+        ],
+        "sha256": "5fe085cd4b86143f609e38c843cf1b54b8af1a44031217ae9f39884cadfaf9fd",
+        "packagedNativePath": "res/drawable-nodpi-v4/launcher_halloween.png",
+        "webAndNativeSourcesAndPackagedBytesIdentical": true
+      },
+      {
+        "id": "christmas",
+        "bytes": 2048082,
+        "dimensions": [
+          1254,
+          1254
+        ],
+        "sha256": "3a901dfe4e774bc6d64ef08457f4d560e3bea3bb25cc8f339022de2f9347b6f3",
+        "packagedNativePath": "res/drawable-nodpi-v4/launcher_christmas.png",
+        "webAndNativeSourcesAndPackagedBytesIdentical": true
+      }
+    ],
+    "applicationScreens": [
+      "auth",
+      "header",
+      "sidebar",
+      "about"
+    ],
+    "androidLauncherAliases": 8,
+    "exactlyOneDefaultEnabledAlias": "Standard",
+    "mainActivityAlwaysEnabled": true,
+    "mainActivityHasNoLauncherIntentFilter": true,
+    "compiledManifestVerified": true,
+    "adaptiveIcons": true,
+    "physicalLauncherTested": false,
+    "closedAppCalendarChangeDeferredUntilNextLaunch": true,
+    "launcherCacheAndOldPinnedShortcutBehaviorMayVary": true
+  },
+  "refraction": {
+    "method": "SVG feDisplacementMap using a rounded-rectangle normal map",
+    "modalUsesSeparateFixedSurface": true,
+    "scrollingModalHasNoSvgBackdropFilter": true,
+    "roundedTranslucentHeading": true,
+    "denseModalTintProtectsReadability": true,
+    "nestedDialogsCoverNavigation": true,
+    "maximumHomeLenses": 5,
+    "maximumModalLenses": 1,
+    "fullscreenGraphAndPhotosExcluded": true,
+    "perListCardAndButtonSvgFilters": false,
+    "continuousAnimationLoop": false,
+    "physicalAndroidRenderingVerified": false,
+    "pixelProof": {
+      "portrait": {
+        "bentPixels": 3578,
+        "foregroundPixels": 2697,
+        "changedForeground": 0,
+        "displacementScale": 40
+      },
+      "landscape": {
+        "bentPixels": 3578,
+        "foregroundPixels": 2697,
+        "changedForeground": 0,
+        "displacementScale": 40
+      }
+    },
+    "productionCspProof": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "state": "on",
+      "filters": 5,
+      "mapIsPngDataUri": true,
+      "mapWidth": 256,
+      "mapHeight": 217,
+      "renderedImageChangesWhenRefractionDisabled": true,
+      "violations": [],
+      "pageErrors": [],
+      "credentialRequests": []
+    }
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "runtimeSmokeExecutedOnAndroid": false,
+    "androidPerformanceMeasured": false,
+    "instrumentationExecuted": false
+  },
+  "unchangedLimitations": {
+    "avatarLoggingFixClaimed": false,
+    "unknownBadgeNamesPreserved": true
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.4.3-source.zip",
+    "sourceCommit": "0ca9cfce5be734ed116d14dabc989d3258b46b94",
+    "trackedFiles": 354,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "e4f90bdcafeb1ecb610809301e11bc256ae97c026138048aa60f64c18fb97e2e"
+  }
+}

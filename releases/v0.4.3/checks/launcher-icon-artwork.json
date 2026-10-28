@@ -1,0 +1,74 @@
+[
+  {
+    "id": "standard",
+    "bytes": 1625367,
+    "dimensions": [
+      1254,
+      1254
+    ],
+    "sha256": "eef59bb9bc2afb87350852cb2d7a1e6337e896d5c3ebce0478729fcd35e9b3ba"
+  },
+  {
+    "id": "valentine",
+    "bytes": 1684627,
+    "dimensions": [
+      1254,
+      1254
+    ],
+    "sha256": "bfd6afb49990292e5b4b245db7699ef94cf27ffbae1ee2cf9c855e469d11fb67"
+  },
+  {
+    "id": "womens-day",
+    "bytes": 1516627,
+    "dimensions": [
+      1254,
+      1254
+    ],
+    "sha256": "a59b94398fcdf298ec5939932c471f041d4da873260eb432a4540f07c10500ea"
+  },
+  {
+    "id": "st-patrick",
+    "bytes": 1942651,
+    "dimensions": [
+      1254,
+      1254
+    ],
+    "sha256": "14a6e0c7265b2e4acbb9c7e2284c02a09915e2eacd18057138d8d170bdf2f211"
+  },
+  {
+    "id": "easter",
+    "bytes": 2064542,
+    "dimensions": [
+      1254,
+      1254
+    ],
+    "sha256": "687cd68583139f9aa90e93af6fdae8cc65e7b9c266bac6dbd607ac25e28993ab"
+  },
+  {
+    "id": "earth-day",
+    "bytes": 2045759,
+    "dimensions": [
+      1254,
+      1254
+    ],
+    "sha256": "d56508dc1758af737279bd1e36bca84593183b5ce9e5fd82801ce746dd424c54"
+  },
+  {
+    "id": "halloween",
+    "bytes": 2025783,
+    "dimensions": [
+      1254,
+      1254
+    ],
+    "sha256": "5fe085cd4b86143f609e38c843cf1b54b8af1a44031217ae9f39884cadfaf9fd"
+  },
+  {
+    "id": "christmas",
+    "bytes": 2048082,
+    "dimensions": [
+      1254,
+      1254
+    ],
+    "sha256": "3a901dfe4e774bc6d64ef08457f4d560e3bea3bb25cc8f339022de2f9347b6f3"
+  }
+]

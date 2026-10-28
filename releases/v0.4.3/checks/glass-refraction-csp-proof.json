@@ -1,0 +1,12 @@
+{
+  "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'",
+  "state": "on",
+  "filters": 5,
+  "mapIsPngDataUri": true,
+  "mapWidth": 256,
+  "mapHeight": 217,
+  "renderedImageChangesWhenRefractionDisabled": true,
+  "violations": [],
+  "pageErrors": [],
+  "credentialRequests": []
+}
