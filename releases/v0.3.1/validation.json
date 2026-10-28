@@ -1,0 +1,64 @@
+{
+  "version": "0.3.1",
+  "package": "com.diskreid.vrcnextmobile",
+  "versionCode": 18,
+  "apk": {
+    "name": "VRCNext-Mobile-0.3.1.apk",
+    "bytes": 6220507,
+    "sha256": "9ea94baf27a17b705af0b6bea209dc30ae0504bf42302c853693fe9549f3ea0f",
+    "signatureScheme": "v2",
+    "certificateSha256": "da079fb018189e9c847a3a7eac6f934b43ba564ec679fd9f9f4f64f35a6b3d94",
+    "sameCertificateAsPublished0300": true,
+    "debugBuild": true
+  },
+  "checks": {
+    "typescriptAndVite": "passed",
+    "vitestPassed": 380,
+    "vitestFiles": 33,
+    "latestBadgeUnitPassed": 6,
+    "playwrightPassed": 10,
+    "fullUiSuite": false,
+    "uiScope": "Badge localization, all language preferences, profile edits and project links",
+    "orientations": [
+      "390x844",
+      "844x390"
+    ],
+    "nativeUnitTests": {
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lintErrors": 0,
+    "lintWarnings": 9,
+    "distFilesComparedByteForByte": 31,
+    "testAndDevMarkersAbsent": true
+  },
+  "badges": {
+    "supportedLocales": 11,
+    "exactNameAliasFamilies": 10,
+    "recapYearNames": true,
+    "exactDescriptionPhrases": 3,
+    "unknownTextPreserved": true,
+    "noBadgeIdentityOrCountsGuessed": true,
+    "alreadyOpenProfileUpdatesWithoutRefetch": true,
+    "rawJsonAndImagesPreserved": true,
+    "hiddenBadgeFilteringPreserved": true,
+    "runtimeTranslationServiceUsed": false,
+    "fullServerBadgeCatalogAvailable": false,
+    "userSpecificBadgeExampleReceived": false
+  },
+  "runtime": {
+    "physicalDeviceTested": false,
+    "liveVrchatAccountTested": false,
+    "instrumentationExecuted": false,
+    "avatarLoggingFixClaimedInThisVersion": false
+  },
+  "sourceArchive": {
+    "name": "VRCNext-Mobile-0.3.1-source.zip",
+    "sourceCommit": "a28a5006eeed4703faef47215ad67e2b6b1db687",
+    "trackedFiles": 275,
+    "allFilesVerifiedAgainstGitBlobs": true,
+    "sha256": "72d5134ffa894daa841b93ecc393e1b176a7cc502b9c04a7c6f206b8ea51178d"
+  }
+}
