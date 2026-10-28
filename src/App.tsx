@@ -1,8 +1,11 @@
+import type { UiMessage } from './i18n';
+import { t, useI18n, dateLocale } from './i18n';
 import SecureImage, { clearImageCache } from './components/SecureImage';
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import {
   Home,
+  Info,
   Users,
   Compass,
   Bell,
@@ -41,7 +44,11 @@ import { AppProvider, PageScope, useApp, useLoad } from './state';
 import type { Activity as ActivityItem } from './state';
 import { demoUser, demoWorlds, demoEvents } from './demo';
 import { useFriends } from './data/friends';
-import { clearFriendFavoritesCache, invalidateFriendFavoritesCache, useFriendFavorites } from './data/favorite-friends';
+import {
+  clearFriendFavoritesCache,
+  invalidateFriendFavoritesCache,
+  useFriendFavorites,
+} from './data/favorite-friends';
 import { useHistory } from './data/history';
 import { useAvatarHistoryResolver } from './data/use-avatar-history-resolver';
 import { useObservation } from './data/observation';
@@ -75,7 +82,13 @@ import {
 } from './components/ui';
 import Auth from './pages/Auth';
 import Explore, { GroupDetail } from './pages/Explore';
-import { CalendarPage, CalendarEventDetail, InventoryPage, MessengerPage } from './pages/Collections';
+import {
+  CalendarPage,
+  CalendarEventDetail,
+  InventoryPage,
+  MessengerPage,
+} from './pages/Collections';
+import AboutPage from './pages/About';
 import { ProfilePage, SettingsPage, TimelinePage, ModerationPage } from './pages/Personal';
 import { UserDetails, WorldDetails, statusName, rankOf } from './pages/Details';
 type Screen =
@@ -89,6 +102,7 @@ type Screen =
   | 'inventory'
   | 'messenger'
   | 'timeline'
+  | 'about'
   | 'settings'
   | 'moderation'
   | 'feed'
@@ -104,6 +118,7 @@ const tabs: { id: Screen; label: string; icon: ComponentType<{ size?: number }> 
   { id: 'more', label: 'Ещё', icon: Grid2X2 },
 ];
 export default function App() {
+  useI18n();
   const [user, setUser] = useState<User | null>(null),
     [demo, setDemo] = useState(false),
     [screen, setScreen] = useState<Screen>('home'),
@@ -134,9 +149,17 @@ export default function App() {
   const history = useHistory(user?.id, demo);
   const avatarHistory = useAvatarHistoryResolver(user?.id, demo, online, history);
   const calendarSync = useCalendarSync(user?.id, demo, online);
-  const observation = useObservation(user, demo, online, pipeline === 'connected', friends, history, setUser);
-  const pipelineSnapshot = useRef({friends, user, history, avatarHistory});
-  pipelineSnapshot.current = {friends, user, history, avatarHistory};
+  const observation = useObservation(
+    user,
+    demo,
+    online,
+    pipeline === 'connected',
+    friends,
+    history,
+    setUser,
+  );
+  const pipelineSnapshot = useRef({ friends, user, history, avatarHistory });
+  pipelineSnapshot.current = { friends, user, history, avatarHistory };
   useEffect(() => {
     // The list establishes missing baselines. Feed changes are observed from
     // the actual update event, not manufactured by checking the whole list.
@@ -147,12 +170,27 @@ export default function App() {
     setToast(text);
     toastTimer.current = setTimeout(() => setToast(''), 5000);
   };
-  const record = (title: string, detail = '', targets: Partial<Pick<ActivityItem, 'userId' | 'displayName' | 'beforeLocation' | 'location' | 'worldId'>> = {}) =>
+  const record = (
+    title: string,
+    detail = '',
+    targets: Partial<
+      Pick<
+        ActivityItem,
+        'userId' | 'displayName' | 'beforeLocation' | 'location' | 'worldId' | 'titleParams'
+      >
+    > = {},
+  ) =>
     setActivity((a) =>
-      [{ id: crypto.randomUUID(), title, detail, time: new Date().toISOString(), ...targets }, ...a].slice(
-        0,
-        200,
-      ),
+      [
+        {
+          id: crypto.randomUUID(),
+          title,
+          detail,
+          time: new Date().toISOString(),
+          ...targets,
+        },
+        ...a,
+      ].slice(0, 200),
     );
   const refresh = () => {
     clearFavoriteEntityCache();
@@ -169,7 +207,9 @@ export default function App() {
     setDemo(false);
     setUser(u);
     setScreen('home');
-    setVisited(['home']); setPageRevisions({}); scrollPositions.current = {};
+    setVisited(['home']);
+    setPageRevisions({});
+    scrollPositions.current = {};
     record('Вход в аккаунт', u.displayName);
   };
   const logout = async () => {
@@ -177,9 +217,9 @@ export default function App() {
       try {
         const result = await api.logout();
         if (!result.serverLoggedOut)
-          notify('Сессия удалена с устройства. Сервер VRChat недоступен.');
+          notify(t('Сессия удалена с устройства. Сервер VRChat недоступен.'));
       } catch {
-        notify('Не удалось удалить локальную сессию. Повторите выход.');
+        notify(t('Не удалось удалить локальную сессию. Повторите выход.'));
         return;
       }
     }
@@ -190,19 +230,24 @@ export default function App() {
     setDemo(false);
     setActivity([]);
     setScreen('home');
-    setVisited(['home']); setPageRevisions({}); scrollPositions.current = {};
+    setVisited(['home']);
+    setPageRevisions({});
+    scrollPositions.current = {};
     setSelectedUser(null);
     setSelectedWorld(null);
     setSelectedGroup(null);
     setSelectedEvent(null);
   };
-  const act = async <T,>(operation: () => Promise<T>, success?: string): Promise<T | undefined> => {
+  const act = async <T,>(
+    operation: () => Promise<T>,
+    success?: string | UiMessage,
+  ): Promise<T | undefined> => {
     if (demo) {
-      notify('Деморежим: для этого действия войдите в аккаунт в Android APK.');
+      notify(t('Деморежим: для этого действия войдите в аккаунт в Android APK.'));
       return;
     }
     if (mutationLock.current) {
-      notify('Дождитесь завершения текущего действия.');
+      notify(t('Дождитесь завершения текущего действия.'));
       return;
     }
     mutationLock.current = true;
@@ -210,14 +255,18 @@ export default function App() {
     try {
       const result = await operation();
       if (success) {
-        notify(success);
-        record(success);
+        notify(typeof success === 'string' ? t(success) : t(success.key, success.params));
+        record(
+          typeof success === 'string' ? success : success.key,
+          '',
+          typeof success === 'string' ? {} : { titleParams: success.params },
+        );
       }
       refresh();
       setMutationRevision((value) => value + 1);
       return result;
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Не удалось выполнить действие');
+      notify(e instanceof Error ? e.message : t('Не удалось выполнить действие'));
       if (e instanceof ApiError && e.status === 401) record('Требуется повторный вход');
       return;
     } finally {
@@ -228,11 +277,14 @@ export default function App() {
   const navigate = (s: Screen) => {
     scrollPositions.current[screen] = contentRef.current?.scrollTop || 0;
     setPrevious(screen);
-    setVisited((current) => current.includes(s) ? current : [...current, s]);
+    setVisited((current) => (current.includes(s) ? current : [...current, s]));
     setScreen(s);
   };
   useLayoutEffect(() => {
-    contentRef.current?.scrollTo({ top: scrollPositions.current[screen] || 0, behavior: 'instant' });
+    contentRef.current?.scrollTo({
+      top: scrollPositions.current[screen] || 0,
+      behavior: 'instant',
+    });
   }, [screen]);
   useEffect(() => {
     const c = localStorage.getItem('accent');
@@ -259,17 +311,31 @@ export default function App() {
           const item = pipelineActivity(event, latest.friends.data, latest.user);
           if (item) record(item.title, item.detail, item);
         }
-        if (latest.user) latest.avatarHistory.observe(latest.history.observePipeline(event, latest.friends.data, latest.user));
+        if (latest.user)
+          latest.avatarHistory.observe(
+            latest.history.observePipeline(event, latest.friends.data, latest.user),
+          );
         latest.friends.apply(event);
         if (event.type === 'user-update' && latest.user) {
           const partial = event.content.user as Partial<User> | undefined;
           const id = String(event.content.userId || partial?.id || '');
           if (partial && id === latest.user.id) {
-            setUser((current) => current ? { ...current, ...partial, id: current.id } : current);
-            if (typeof partial.location === 'string' || typeof partial.worldId === 'string' && typeof partial.instanceId === 'string') latest.history.observeSession({ ...partial, id, displayName: partial.displayName || latest.user.displayName }, latest.friends.refreshing ? [] : latest.friends.data, 'pipeline');
+            setUser((current) => (current ? { ...current, ...partial, id: current.id } : current));
+            if (
+              typeof partial.location === 'string' ||
+              (typeof partial.worldId === 'string' && typeof partial.instanceId === 'string')
+            )
+              latest.history.observeSession(
+                { ...partial, id, displayName: partial.displayName || latest.user.displayName },
+                latest.friends.refreshing ? [] : latest.friends.data,
+                'pipeline',
+              );
           }
         }
-        if (event.type.startsWith('notification')) { clearTimeout(notificationTimer.current); notificationTimer.current = setTimeout(() => setNotificationsRefresh((v) => v + 1), 1000); }
+        if (event.type.startsWith('notification')) {
+          clearTimeout(notificationTimer.current);
+          notificationTimer.current = setTimeout(() => setNotificationsRefresh((v) => v + 1), 1000);
+        }
       });
       if (!live) {
         await h.remove();
@@ -277,7 +343,11 @@ export default function App() {
       }
       handles.push(h);
       const c = await native.addListener('connection', (event) => {
-        if (live) { setPipeline(event.state); if (event.state !== 'connected') pipelineSnapshot.current.history.pauseSession(); else if (pipelineConnected.current) pipelineSnapshot.current.friends.reload(); }
+        if (live) {
+          setPipeline(event.state);
+          if (event.state !== 'connected') pipelineSnapshot.current.history.pauseSession();
+          else if (pipelineConnected.current) pipelineSnapshot.current.friends.reload();
+        }
       });
       if (!live) {
         await c.remove();
@@ -339,7 +409,9 @@ export default function App() {
             setUser(demoUser);
             setScreen('home');
             setShowDemo(true);
-            setVisited(['home']); setPageRevisions({}); scrollPositions.current = {};
+            setVisited(['home']);
+            setPageRevisions({});
+            scrollPositions.current = {};
           }}
         />
         {toast && (
@@ -379,8 +451,18 @@ export default function App() {
           setSelectedWorldLocation(instanceLocation);
           setSelectedWorld(target);
         },
-        openGroup: (target) => { setSelectedUser(null); setSelectedWorld(null); setSelectedEvent(null); setSelectedGroup(target); },
-        openCalendarEvent: (target) => { setSelectedUser(null); setSelectedWorld(null); setSelectedGroup(null); setSelectedEvent(target); },
+        openGroup: (target) => {
+          setSelectedUser(null);
+          setSelectedWorld(null);
+          setSelectedEvent(null);
+          setSelectedGroup(target);
+        },
+        openCalendarEvent: (target) => {
+          setSelectedUser(null);
+          setSelectedWorld(null);
+          setSelectedGroup(null);
+          setSelectedEvent(target);
+        },
         onRefresh: refresh,
         logout,
         activity,
@@ -391,25 +473,25 @@ export default function App() {
           <button
             className="brand"
             onClick={() => navigate('home')}
-            aria-label="VRCNext Mobile, главная"
+            aria-label={t('VRCNext Mobile, главная')}
           >
             <SecureImage src="/mark.svg" alt="" />
             <div>
               VRCNext <span>Mobile</span>
             </div>
           </button>
-          <span className="nav-caption">ВАШЕ ПРОСТРАНСТВО</span>
-          <nav className="side-nav" aria-label="Основная навигация">
-            {tabs.map((t) => (
+          <span className="nav-caption">{t('ВАШЕ ПРОСТРАНСТВО')}</span>
+          <nav className="side-nav" aria-label={t('Основная навигация')}>
+            {tabs.map((tab) => (
               <button
-                key={t.id}
-                aria-label={t.label}
-                className={navScreen === t.id ? 'active' : ''}
-                onClick={() => navigate(t.id)}
-                aria-current={navScreen === t.id ? 'page' : undefined}
+                key={tab.id}
+                aria-label={t(tab.label)}
+                className={navScreen === tab.id ? 'active' : ''}
+                onClick={() => navigate(tab.id)}
+                aria-current={navScreen === tab.id ? 'page' : undefined}
               >
-                <t.icon size={21} />
-                <span>{t.label}</span>
+                <tab.icon size={21} />
+                <span>{t(tab.label)}</span>
               </button>
             ))}
           </nav>
@@ -420,12 +502,12 @@ export default function App() {
               />
               <span>
                 {demo
-                  ? 'Демонстрация'
+                  ? t('Демонстрация')
                   : !online
-                    ? 'Нет подключения'
+                    ? t('Нет подключения')
                     : pipeline === 'connected'
-                      ? 'VRChat подключён'
-                      : 'Обновление по запросу'}
+                      ? t('VRChat подключён')
+                      : t('Обновление по запросу')}
               </span>
             </div>
             <button className="account-button" onClick={() => navigate('profile')}>
@@ -433,11 +515,12 @@ export default function App() {
                 src={imageOf(user)}
                 name={user.displayName}
                 size={38}
-                user={user} fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl}
+                user={user}
+                fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl}
               />
               <div>
                 <strong>{user.displayName}</strong>
-                <span>{demo ? 'Деморежим' : statusName(user.status)}</span>
+                <span>{demo ? t('Деморежим') : t(statusName(user.status))}</span>
               </div>
               <Settings size={17} />
             </button>
@@ -449,7 +532,7 @@ export default function App() {
               {!topLevel ? (
                 <button
                   className="icon-button"
-                  aria-label="Назад"
+                  aria-label={t('Назад')}
                   onClick={() => navigate(previous === screen ? 'more' : previous)}
                 >
                   <ArrowLeft size={21} />
@@ -460,16 +543,21 @@ export default function App() {
               <div className="breadcrumb">
                 VRCNext <span>/</span>{' '}
                 <strong>
-                  {tabs.find((t) => t.id === screen)?.label ||
+                  {t(tabs.find((tab) => tab.id === screen)?.label || '') ||
                     {
-                      profile: 'Профиль',
-                      calendar: 'Календарь',
-                      inventory: 'Медиатека',
-                      messenger: 'Сообщения',
-                      timeline: 'Активность',
-                      feed: 'Лента', locations: 'Friends Locations', favorites: 'Избранное', social: 'Social', charts: 'Диаграммы',
-                      settings: 'Настройки',
-                      moderation: 'Модерация',
+                      profile: t('Профиль'),
+                      calendar: t('Календарь'),
+                      inventory: t('Медиатека'),
+                      messenger: t('Сообщения'),
+                      timeline: t('Активность'),
+                      feed: t('Лента'),
+                      locations: 'Friends Locations',
+                      favorites: t('Избранное'),
+                      social: 'Social',
+                      charts: t('Диаграммы'),
+                      settings: t('Настройки'),
+                      about: t('О проекте'),
+                      moderation: t('Модерация'),
                     }[screen as string as 'profile']}
                 </strong>
               </div>
@@ -478,17 +566,17 @@ export default function App() {
               {demo && <Badge className="demo-badge">DEMO</Badge>}
               <button
                 className="icon-button"
-                aria-label="Обновить данные"
+                aria-label={t('Обновить данные')}
                 onClick={() => {
                   refresh();
-                  notify('Обновляем данные');
+                  notify(t('Обновляем данные'));
                 }}
               >
                 <RefreshCw size={18} />
               </button>
               <button
                 className="avatar-button"
-                aria-label="Мой профиль"
+                aria-label={t('Мой профиль')}
                 onClick={() => navigate('profile')}
               >
                 <AvatarImage src={imageOf(user)} name={user.displayName} size={34} />
@@ -498,78 +586,142 @@ export default function App() {
           {!online && (
             <div className="offline-banner" role="status">
               <WifiOff size={16} />
-              Нет подключения к интернету. Данные могут быть устаревшими.
+              {t('Нет подключения к интернету. Данные могут быть устаревшими.')}
             </div>
           )}
           {demo && showDemo && (
             <div className="demo-banner">
-              <span>Вы в деморежиме. Данные примеров не связаны с VRChat.</span>
+              <span>{t('Вы в деморежиме. Данные примеров не связаны с VRChat.')}</span>
               <button
                 onClick={() => setShowDemo(false)}
                 className="icon-button"
-                aria-label="Скрыть подсказку деморежима"
+                aria-label={t('Скрыть подсказку деморежима')}
               >
                 <X size={15} />
               </button>
             </div>
           )}
-          {calendarSync.reminders[0] && <div className="calendar-reminder-banner" role="status">
-            <button onClick={() => { setSelectedUser(null); setSelectedWorld(null); setSelectedGroup(null); setSelectedEvent(calendarSync.reminders[0].event); calendarSync.dismissReminder(calendarSync.reminders[0].id); }}><CalendarDays size={17} /><span>Скоро: {calendarSync.reminders[0].event.title || 'Событие группы'}</span></button>
-            <button className="icon-button" aria-label="Скрыть напоминание события" onClick={() => calendarSync.dismissReminder(calendarSync.reminders[0].id)}><X size={16} /></button>
-          </div>}
+          {calendarSync.reminders[0] && (
+            <div className="calendar-reminder-banner" role="status">
+              <button
+                onClick={() => {
+                  setSelectedUser(null);
+                  setSelectedWorld(null);
+                  setSelectedGroup(null);
+                  setSelectedEvent(calendarSync.reminders[0].event);
+                  calendarSync.dismissReminder(calendarSync.reminders[0].id);
+                }}
+              >
+                <CalendarDays size={17} />
+                <span>
+                  {t('Скоро:')} {calendarSync.reminders[0].event.title || t('Событие группы')}
+                </span>
+              </button>
+              <button
+                className="icon-button"
+                aria-label={t('Скрыть напоминание события')}
+                onClick={() => calendarSync.dismissReminder(calendarSync.reminders[0].id)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
           {pending > 0 && (
-            <div className="progress-line" aria-label="Выполняется действие" role="status" />
+            <div className="progress-line" aria-label={t('Выполняется действие')} role="status" />
           )}
           <PullRefresh mainRef={contentRef} onRefresh={refresh}>
-            {visited.map((page) => <section key={page} hidden={screen !== page} className="retained-screen" data-screen={page}>
-              <PageScope active={screen === page} refresh={mutationRevision + (pageRevisions[page] || 0)}>
-                <Suspense fallback={<Loading />}>
-                  {page === 'home' ? <HomePage navigate={navigate} />
-                    : page === 'friends' ? <FriendsPage />
-                    : page === 'explore' ? <Explore />
-                    : page === 'notifications' ? <NotificationsPage />
-                    : page === 'more' ? <MorePage navigate={navigate} />
-                    : page === 'profile' ? <ProfilePage onUpdated={setUser} />
-                    : page === 'calendar' ? <CalendarPage />
-                    : page === 'inventory' ? <InventoryPage />
-                    : page === 'messenger' ? <MessengerPage />
-                    : page === 'charts' ? <ChartsPage />
-                    : page === 'social' ? <Social />
-                    : page === 'favorites' ? <FavoritesPage />
-                    : page === 'locations' ? <Locations />
-                    : page === 'feed' ? <Feed />
-                    : page === 'timeline' ? <TimelinePage />
-                    : page === 'moderation' ? <ModerationPage /> : <SettingsPage />}
-                </Suspense>
-              </PageScope>
-            </section>)}
+            {visited.map((page) => (
+              <section
+                key={page}
+                hidden={screen !== page}
+                className="retained-screen"
+                data-screen={page}
+              >
+                <PageScope
+                  active={screen === page}
+                  refresh={mutationRevision + (pageRevisions[page] || 0)}
+                >
+                  <Suspense fallback={<Loading />}>
+                    {page === 'home' ? (
+                      <HomePage navigate={navigate} />
+                    ) : page === 'friends' ? (
+                      <FriendsPage />
+                    ) : page === 'explore' ? (
+                      <Explore />
+                    ) : page === 'notifications' ? (
+                      <NotificationsPage />
+                    ) : page === 'more' ? (
+                      <MorePage navigate={navigate} />
+                    ) : page === 'profile' ? (
+                      <ProfilePage onUpdated={setUser} />
+                    ) : page === 'calendar' ? (
+                      <CalendarPage />
+                    ) : page === 'inventory' ? (
+                      <InventoryPage />
+                    ) : page === 'messenger' ? (
+                      <MessengerPage />
+                    ) : page === 'charts' ? (
+                      <ChartsPage />
+                    ) : page === 'social' ? (
+                      <Social />
+                    ) : page === 'favorites' ? (
+                      <FavoritesPage />
+                    ) : page === 'locations' ? (
+                      <Locations />
+                    ) : page === 'feed' ? (
+                      <Feed />
+                    ) : page === 'timeline' ? (
+                      <TimelinePage />
+                    ) : page === 'moderation' ? (
+                      <ModerationPage />
+                    ) : page === 'about' ? (
+                      <AboutPage />
+                    ) : (
+                      <SettingsPage onAbout={() => navigate('about')} />
+                    )}
+                  </Suspense>
+                </PageScope>
+              </section>
+            ))}
             <footer className="page-footer">
-              VRCNext Mobile <span>✦</span> Рядом с вашими мирами
+              VRCNext Mobile <span>✦</span> {t('Рядом с вашими мирами')}
             </footer>
           </PullRefresh>
-          <nav className="bottom-nav" aria-label="Основная навигация">
-            {tabs.map((t) => (
+          <nav className="bottom-nav" aria-label={t('Основная навигация')}>
+            {tabs.map((tab) => (
               <button
-                key={t.id}
-                aria-label={t.label}
-                className={navScreen === t.id ? 'active' : ''}
-                onClick={() => navigate(t.id)}
-                aria-current={navScreen === t.id ? 'page' : undefined}
+                key={tab.id}
+                aria-label={t(tab.label)}
+                className={navScreen === tab.id ? 'active' : ''}
+                onClick={() => navigate(tab.id)}
+                aria-current={navScreen === tab.id ? 'page' : undefined}
               >
                 <span>
-                  <t.icon size={21} />
+                  <tab.icon size={21} />
                 </span>
-                <small>{t.label}</small>
+                <small>{t(tab.label)}</small>
               </button>
             ))}
           </nav>
         </div>
       </div>
-      {selectedEvent && <CalendarEventDetail initial={selectedEvent} onClose={() => setSelectedEvent(null)} />}
-      {selectedGroup && <GroupDetail initial={selectedGroup} onClose={() => setSelectedGroup(null)} onChanged={refresh} />}
+      {selectedEvent && (
+        <CalendarEventDetail initial={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      )}
+      {selectedGroup && (
+        <GroupDetail
+          initial={selectedGroup}
+          onClose={() => setSelectedGroup(null)}
+          onChanged={refresh}
+        />
+      )}
       {selectedUser && <UserDetails target={selectedUser} onClose={() => setSelectedUser(null)} />}
       {selectedWorld && (
-        <WorldDetails target={selectedWorld} initialLocation={selectedWorldLocation} onClose={() => setSelectedWorld(null)} />
+        <WorldDetails
+          target={selectedWorld}
+          initialLocation={selectedWorldLocation}
+          onClose={() => setSelectedWorld(null)}
+        />
       )}
       {toast && (
         <div role="status" className="toast">
@@ -577,7 +729,7 @@ export default function App() {
           {toast}
           <button
             className="icon-button"
-            aria-label="Закрыть уведомление"
+            aria-label={t('Закрыть уведомление')}
             onClick={() => setToast('')}
           >
             <X size={16} />
@@ -588,31 +740,40 @@ export default function App() {
   );
 }
 function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
+  const { locale } = useI18n();
   const ctx = useApp();
   const worldSnapshot = useRef<World[]>([]);
-  const data = { ...ctx.friends, data: ctx.friends.data.filter((f) => ['game', 'website'].includes(presenceMode(f))) };
+  const data = {
+    ...ctx.friends,
+    data: ctx.friends.data.filter((f) => ['game', 'website'].includes(presenceMode(f))),
+  };
   const online = data.data.filter((f) => presenceMode(f) === 'game');
-  const friendWorldIds = [...new Set(online.flatMap((f) => {
-    const location = disclosedUserLocation(f);
-    return location ? [location.split(':')[0]] : [];
-  }))].sort();
+  const friendWorldIds = [
+    ...new Set(
+      online.flatMap((f) => {
+        const location = disclosedUserLocation(f);
+        return location ? [location.split(':')[0]] : [];
+      }),
+    ),
+  ].sort();
   const worlds = useLoad(async () => {
     if (ctx.demo) return demoWorlds;
     const result = await Promise.allSettled(friendWorldIds.slice(0, 8).map((id) => api.world(id)));
     const incoming = result.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
-    if (result.length && !incoming.length) throw new Error('Не удалось загрузить миры друзей. Повторите обновление.');
+    if (result.length && !incoming.length)
+      throw new Error(t('Не удалось загрузить миры друзей. Повторите обновление.'));
     worldSnapshot.current = reconcilePage(worldSnapshot.current, incoming);
     return worldSnapshot.current;
   }, [friendWorldIds.join(','), ctx.demo, ctx.refresh]);
   return (
     <>
       <PageHeader
-        eyebrow="ВАШЕ ПРОСТРАНСТВО"
-        title={`Привет, ${ctx.user.displayName} ✦`}
-        subtitle="Следующая встреча ближе, чем кажется."
+        eyebrow={t('ВАШЕ ПРОСТРАНСТВО')}
+        title={t('Привет, {value0} ✦', { value0: ctx.user.displayName })}
+        subtitle={t('Следующая встреча ближе, чем кажется.')}
         actions={
           <span className="date-label">
-            {new Date().toLocaleDateString('ru', { day: 'numeric', month: 'long' })}
+            {new Date().toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long' })}
           </span>
         }
       />
@@ -621,27 +782,29 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
         <div className="hero-content">
           <span className="hero-kicker">
             <span className="live-dot" />
-            СНОВА ВМЕСТЕ
+            {t('СНОВА ВМЕСТЕ')}
           </span>
           <h2>
-            Хороший мир —<br />
-            там, где ваши друзья.
+            {t('Хороший мир —')}
+            <br />
+            {t('там, где ваши друзья.')}
           </h2>
           <p>
             {ctx.demo
-              ? 'Luna и ещё 3 друга уже исследуют миры.'
+              ? t('Luna и ещё 3 друга уже исследуют миры.')
               : online.length
-                ? `${online.length} друзей в VRChat. Загляните к ним.`
-                : 'Найдите новое место для следующей встречи.'}
+                ? t('{value0} друзей в VRChat. Загляните к ним.', { value0: online.length })
+                : t('Найдите новое место для следующей встречи.')}
           </p>
           <button className="button light" onClick={() => navigate('friends')}>
-            Найти свою компанию
+            {t('Найти свою компанию')}
             <ArrowUpRight size={18} />
           </button>
         </div>
         <span className="hero-world">
           <MapPin size={13} />
-          Beyond the Clouds{ctx.demo ? ' · Демо' : ''}
+          {t('Ваш портал в VRChat')}
+          {ctx.demo ? t(' · Демо') : ''}
         </span>
       </section>
       <div className="dashboard-stats">
@@ -651,7 +814,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
           </span>
           <div>
             <strong>{data.loading ? '—' : online.length}</strong>
-            <span>друзей в VRChat</span>
+            <span>{t('друзей в VRChat')}</span>
           </div>
           <ChevronRight size={16} />
         </button>
@@ -661,7 +824,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
           </span>
           <div>
             <strong>{worlds.loading ? '—' : worlds.data?.length || 0}</strong>
-            <span>миров с друзьями</span>
+            <span>{t('миров с друзьями')}</span>
           </div>
           <ChevronRight size={16} />
         </button>
@@ -670,13 +833,16 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
             <CalendarDays size={20} />
           </span>
           <div>
-            <strong>Календарь</strong>
-            <span>следующая встреча</span>
+            <strong>{t('Календарь')}</strong>
+            <span>{t('следующая встреча')}</span>
           </div>
           <ChevronRight size={16} />
         </button>
       </div>
-      <Section title="Друзья рядом" action={<MoreButton onClick={() => navigate('friends')} />}>
+      <Section
+        title={t('Друзья рядом')}
+        action={<MoreButton onClick={() => navigate('friends')} />}
+      >
         {data.loading ? (
           <Loading />
         ) : data.error ? (
@@ -685,21 +851,27 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
           <div className="friends-strip">
             {data.data.slice(0, 7).map((f) => (
               <button className="friend-bubble" key={f.id} onClick={() => ctx.openUser(f)}>
-                <AvatarImage src={imageOf(f)} name={f.displayName} size={58} user={f} fallbackSrc={f.currentAvatarThumbnailImageUrl || f.currentAvatarImageUrl} />
+                <AvatarImage
+                  src={imageOf(f)}
+                  name={f.displayName}
+                  size={58}
+                  user={f}
+                  fallbackSrc={f.currentAvatarThumbnailImageUrl || f.currentAvatarImageUrl}
+                />
                 <strong>{f.displayName}</strong>
-                <span>{presenceLabel(f)}</span>
+                <span>{t(presenceLabel(f))}</span>
               </button>
             ))}
           </div>
         ) : (
-          <Empty title="Пока никого нет" text="Найдите друзей на вкладке «Друзья»." />
+          <Empty title={t('Пока никого нет')} text={t('Найдите друзей на вкладке «Друзья».')} />
         )}
       </Section>
       <Section
-        title="Где сейчас друзья"
+        title={t('Где сейчас друзья')}
         action={
           <MoreButton onClick={() => navigate('locations')}>
-            Миры
+            {t('Миры')}
             <ChevronRight size={16} />
           </MoreButton>
         }
@@ -724,7 +896,7 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
                     )}
                     <span className="world-population">
                       <Users size={12} />
-                      {(w.occupants || 0).toLocaleString('ru')}
+                      {(w.occupants || 0).toLocaleString(dateLocale())}
                     </span>
                   </div>
                   <div className="card-body">
@@ -738,8 +910,16 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
                       </span>
                       <span>
                         {users.length
-                          ? `${users.length} ${users.length === 1 ? 'друг' : 'друга'} здесь`
-                          : 'Открыть мир'}
+                          ? t('{value0} {value1} здесь', {
+                              value0: users.length,
+                              value1:
+                                users.length === 1
+                                  ? t('друг')
+                                  : locale === 'ru'
+                                    ? 'друга'
+                                    : t('друзей'),
+                            })
+                          : t('Открыть мир')}
                       </span>
                       <ArrowUpRight size={15} />
                     </div>
@@ -750,20 +930,20 @@ function HomePage({ navigate }: { navigate: (s: Screen) => void }) {
           </div>
         ) : (
           <Empty
-            title="Здесь появятся миры друзей"
-            text="Миры отображаются, когда их местоположение доступно."
+            title={t('Здесь появятся миры друзей')}
+            text={t('Миры отображаются, когда их местоположение доступно.')}
           />
         )}
       </Section>
       <section className="discover-banner">
         <Compass size={30} />
         <div>
-          <h3>За пределами привычного</h3>
-          <p>Найдите мир, в котором ещё не были.</p>
+          <h3>{t('За пределами привычного')}</h3>
+          <p>{t('Найдите мир, в котором ещё не были.')}</p>
         </div>
         <button
           className="icon-button"
-          aria-label="Исследовать миры"
+          aria-label={t('Исследовать миры')}
           onClick={() => navigate('explore')}
         >
           <ArrowUpRight size={24} />
@@ -789,10 +969,20 @@ function FriendsPage() {
     return () => clearTimeout(t);
   }, [query, search]);
   const results = useLoad(
-    () => ctx.demo ? Promise.resolve(ctx.friends.data) : search && debounced ? api.searchUsers(debounced, page * 50) : Promise.resolve([]),
+    () =>
+      ctx.demo
+        ? Promise.resolve(ctx.friends.data)
+        : search && debounced
+          ? api.searchUsers(debounced, page * 50)
+          : Promise.resolve([]),
     [ctx.refresh, search, debounced, page],
   );
-  const favorites = useFriendFavorites(ctx.user.id, ctx.demo, ctx.refresh, ctx.pageActive !== false);
+  const favorites = useFriendFavorites(
+    ctx.user.id,
+    ctx.demo,
+    ctx.refresh,
+    ctx.pageActive !== false,
+  );
   const favoriteIds = new Set(favorites.records.map((record) => record.favoriteId));
   const friends = search ? results : ctx.friends;
   useEffect(() => {
@@ -814,9 +1004,9 @@ function FriendsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ВАШ КРУГ"
-        title={search ? 'Найти людей' : 'Друзья'}
-        subtitle="Хорошая компания всегда рядом"
+        eyebrow={t('ВАШ КРУГ')}
+        title={search ? t('Найти людей') : t('Друзья')}
+        subtitle={t('Хорошая компания всегда рядом')}
         actions={
           <button
             className="button secondary compact"
@@ -826,29 +1016,29 @@ function FriendsPage() {
             }}
           >
             {search ? <Users size={17} /> : <Plus size={17} />}
-            {search ? 'Мои друзья' : 'Найти людей'}
+            {search ? t('Мои друзья') : t('Найти людей')}
           </button>
         }
       />
       <SearchField
         value={query}
         onChange={setQuery}
-        placeholder={search ? 'Имя пользователя VRChat' : 'Поиск по друзьям'}
+        placeholder={search ? t('Имя пользователя VRChat') : t('Поиск по друзьям')}
       />
       {!search && (
         <Segmented
           value={filter}
           onChange={setFilter}
           items={[
-            { id: 'all', label: 'Все' },
-            { id: 'online', label: 'В VRChat' },
-            { id: 'web', label: 'На сайте' },
-            { id: 'offline', label: 'Не в сети' },
+            { id: 'all', label: t('Все') },
+            { id: 'online', label: t('В VRChat') },
+            { id: 'web', label: t('На сайте') },
+            { id: 'offline', label: t('Не в сети') },
           ]}
         />
       )}
       <div className="section-heading">
-        <h2>{search ? 'Результаты поиска' : 'Ваша компания'}</h2>
+        <h2>{search ? t('Результаты поиска') : t('Ваша компания')}</h2>
         <span className="count-label">{items.length}</span>
       </div>
       {friends.loading && !items.length ? (
@@ -858,14 +1048,31 @@ function FriendsPage() {
       ) : items.length ? (
         <div className="friend-grid">
           {items.map((f) => (
-            <button className={`friend-card card ${favoriteIds.has(f.id) ? 'is-favorite' : ''}`} key={f.id} onClick={() => ctx.openUser(f)}>
-              <AvatarImage name={f.displayName} src={imageOf(f)} size={54} user={f} fallbackSrc={f.currentAvatarThumbnailImageUrl || f.currentAvatarImageUrl} />
+            <button
+              className={`friend-card card ${favoriteIds.has(f.id) ? 'is-favorite' : ''}`}
+              key={f.id}
+              onClick={() => ctx.openUser(f)}
+            >
+              <AvatarImage
+                name={f.displayName}
+                src={imageOf(f)}
+                size={54}
+                user={f}
+                fallbackSrc={f.currentAvatarThumbnailImageUrl || f.currentAvatarImageUrl}
+              />
               <div className="friend-card-text">
-                <div className="friend-card-title"><h3>{f.displayName}</h3>{favoriteIds.has(f.id) && <span className="friend-favorite-badge" aria-label="Избранный друг"><Star size={13} fill="currentColor" /></span>}</div>
-                <p>{f.statusDescription || statusName(f.status)}</p>
+                <div className="friend-card-title">
+                  <h3>{f.displayName}</h3>
+                  {favoriteIds.has(f.id) && (
+                    <span className="friend-favorite-badge" aria-label={t('Избранный друг')}>
+                      <Star size={13} fill="currentColor" />
+                    </span>
+                  )}
+                </div>
+                <p>{f.statusDescription || t(statusName(f.status))}</p>
                 <span className="friend-location">
                   <PresenceIndicator user={f} />
-                  {presenceLabel(f)}
+                  {t(presenceLabel(f))}
                 </span>
               </div>
               <span className="friend-rank">{rankOf(f.tags)}</span>
@@ -875,11 +1082,11 @@ function FriendsPage() {
         </div>
       ) : (
         <Empty
-          title={search && !query ? 'Кого ищем?' : 'Никого не найдено'}
+          title={search && !query ? t('Кого ищем?') : t('Никого не найдено')}
           text={
             search
-              ? 'Введите имя пользователя, чтобы найти человека в VRChat.'
-              : 'Попробуйте другой фильтр или поисковый запрос.'
+              ? t('Введите имя пользователя, чтобы найти человека в VRChat.')
+              : t('Попробуйте другой фильтр или поисковый запрос.')
           }
         />
       )}{' '}
@@ -889,7 +1096,7 @@ function FriendsPage() {
           disabled={friends.loading}
           onClick={() => setPage((p) => p + 1)}
         >
-          Загрузить ещё
+          {t('Загрузить ещё')}
         </button>
       )}
     </>
@@ -904,57 +1111,94 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
     icon: ComponentType<{ size?: number }>;
     color: string;
   }[] = [
-    { id: 'charts', title: 'Диаграммы', text: 'Время, встречи и известные связи', icon: Activity, color: 'purple' },
-    { id: 'feed', title: 'Лента', text: 'История наблюдаемых событий', icon: Activity, color: 'purple' },
-    { id: 'locations', title: 'Friends Locations', text: 'Друзья по мирам и инстансам', icon: MapPin, color: 'green' },
-    { id: 'favorites', title: 'Избранное', text: 'Друзья, миры и аватары', icon: Star, color: 'peach' },
-    { id: 'social', title: 'Social', text: 'Друзья, журнал и модерация', icon: Users, color: 'blue' },
+    {
+      id: 'charts',
+      title: t('Диаграммы'),
+      text: t('Время, встречи и известные связи'),
+      icon: Activity,
+      color: 'purple',
+    },
+    {
+      id: 'feed',
+      title: t('Лента'),
+      text: t('История наблюдаемых событий'),
+      icon: Activity,
+      color: 'purple',
+    },
+    {
+      id: 'locations',
+      title: 'Friends Locations',
+      text: t('Друзья по мирам и инстансам'),
+      icon: MapPin,
+      color: 'green',
+    },
+    {
+      id: 'favorites',
+      title: t('Избранное'),
+      text: t('Друзья, миры и аватары'),
+      icon: Star,
+      color: 'peach',
+    },
+    {
+      id: 'social',
+      title: 'Social',
+      text: t('Друзья, журнал и модерация'),
+      icon: Users,
+      color: 'blue',
+    },
     {
       id: 'profile',
-      title: 'Мой профиль',
-      text: 'Статус, описание и ссылки',
+      title: t('Мой профиль'),
+      text: t('Статус, описание и ссылки'),
       icon: UserRound,
       color: 'purple',
     },
     {
       id: 'messenger',
-      title: 'Сообщения',
-      text: 'Короткое сообщение другу',
+      title: t('Сообщения'),
+      text: t('Короткое сообщение другу'),
       icon: MessageSquare,
       color: 'green',
     },
     {
       id: 'calendar',
-      title: 'Календарь',
-      text: 'События и встречи',
+      title: t('Календарь'),
+      text: t('События и встречи'),
       icon: CalendarDays,
       color: 'peach',
     },
     {
       id: 'inventory',
-      title: 'Медиатека',
-      text: 'Фото, emoji и инвентарь',
+      title: t('Медиатека'),
+      text: t('Фото, emoji и инвентарь'),
       icon: Images,
       color: 'blue',
     },
     {
       id: 'timeline',
-      title: 'Действия',
-      text: 'Действия текущей сессии',
+      title: t('Действия'),
+      text: t('Действия текущей сессии'),
       icon: Activity,
       color: 'purple',
     },
     {
       id: 'moderation',
-      title: 'Блокировки',
-      text: 'Списки block и mute',
+      title: t('Блокировки'),
+      text: t('Списки block и mute'),
       icon: ShieldCheck,
       color: 'peach',
     },
     {
+      id: 'about',
+      title: t('О проекте'),
+      text: t('О приложении, авторе и поддержке'),
+      icon: Info,
+      color: 'purple',
+    },
+    {
       id: 'settings',
-      title: 'Настройки',
-      text: 'Внешний вид и приложение',
+      title: t('Настройки'),
+      text: t('Внешний вид и приложение'),
       icon: Settings,
       color: 'blue',
     },
@@ -962,15 +1206,23 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
   return (
     <>
       <PageHeader
-        eyebrow="ВСЁ ПОД РУКОЙ"
-        title="Ваш VRCNext"
-        subtitle="Аккаунт, события и ваши коллекции"
+        eyebrow={t('ВСЁ ПОД РУКОЙ')}
+        title={t('Ваш VRCNext')}
+        subtitle={t('Аккаунт, события и ваши коллекции')}
       />
       <button className="card more-profile" onClick={() => navigate('profile')}>
-        <AvatarImage name={user.displayName} src={imageOf(user)} size={60} user={user} fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl} />
+        <AvatarImage
+          name={user.displayName}
+          src={imageOf(user)}
+          size={60}
+          user={user}
+          fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl}
+        />
         <div>
           <h2>{user.displayName}</h2>
-          <p className="muted">{demo ? 'Демонстрационный аккаунт' : statusName(user.status)}</p>
+          <p className="muted">
+            {demo ? t('Демонстрационный аккаунт') : t(statusName(user.status))}
+          </p>
         </div>
         <ChevronRight size={22} />
       </button>

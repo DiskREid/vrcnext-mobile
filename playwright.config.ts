@@ -11,6 +11,7 @@ export default defineConfig({
   reporter: [['list']],
   outputDir: process.env.VRCNEXT_UI_OUTPUT_DIR || `test-results/ui-${uiPort}`,
   use: {
+    locale: 'ru-RU',
     baseURL: `http://127.0.0.1:${uiPort}`,
     browserName: 'chromium',
     launchOptions: {

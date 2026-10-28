@@ -1,9 +1,11 @@
+import { t, useI18n } from '../i18n';
 import { useState } from 'react';
 import { Copy, RefreshCw, FileText } from 'lucide-react';
 import { isNative } from '../api/native';
 import { diagnostics } from '../api/diagnostics';
 import type { StartupReport } from '../api/diagnostics';
 export default function DiagnosticsPanel() {
+  useI18n();
   const [report, setReport] = useState<StartupReport>(),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
@@ -14,7 +16,7 @@ export default function DiagnosticsPanel() {
     try {
       setReport(await diagnostics.getReport());
     } catch {
-      setMessage('Не удалось прочитать отчёт.');
+      setMessage(t('Не удалось прочитать отчёт.'));
     } finally {
       setBusy(false);
     }
@@ -23,9 +25,9 @@ export default function DiagnosticsPanel() {
     setBusy(true);
     try {
       await diagnostics.copyReport();
-      setMessage('Отчёт скопирован. Его можно отправить разработчику.');
+      setMessage(t('Отчёт скопирован. Его можно отправить разработчику.'));
     } catch {
-      setMessage('Не удалось скопировать отчёт.');
+      setMessage(t('Не удалось скопировать отчёт.'));
     } finally {
       setBusy(false);
     }
@@ -35,9 +37,9 @@ export default function DiagnosticsPanel() {
     try {
       await diagnostics.clearReport();
       setReport(await diagnostics.getReport());
-      setMessage('Сведения о предыдущем сбое очищены.');
+      setMessage(t('Сведения о предыдущем сбое очищены.'));
     } catch {
-      setMessage('Не удалось очистить отчёт.');
+      setMessage(t('Не удалось очистить отчёт.'));
     } finally {
       setBusy(false);
     }
@@ -51,14 +53,15 @@ export default function DiagnosticsPanel() {
     >
       <summary>
         <FileText size={15} />
-        Диагностика запуска
+        {t('Диагностика запуска')}
       </summary>
       <p>
-        Локальный технический отчёт: версия приложения, Android, WebView и сведения о сбое. Паролей,
-        кодов, cookie и токенов в нём нет. Автоматически никуда не отправляется.
+        {t(
+          'Локальный технический отчёт: версия приложения, Android, WebView и сведения о сбое. Паролей, кодов, cookie и токенов в нём нет. Автоматически никуда не отправляется.',
+        )}
       </p>
       {busy && !report ? (
-        <p role="status">Подготовка отчёта…</p>
+        <p role="status">{t('Подготовка отчёта…')}</p>
       ) : (
         report && (
           <>
@@ -70,19 +73,19 @@ export default function DiagnosticsPanel() {
                 onClick={() => void copy()}
               >
                 <Copy size={15} />
-                Скопировать отчёт
+                {t('Скопировать отчёт')}
               </button>
               <button
                 className="icon-button"
                 disabled={busy}
                 onClick={() => void read()}
-                aria-label="Обновить отчёт"
+                aria-label={t('Обновить отчёт')}
               >
                 <RefreshCw size={17} />
               </button>
               {report.hasPreviousCrash && (
                 <button className="text-button" disabled={busy} onClick={() => void clear()}>
-                  Очистить
+                  {t('Очистить')}
                 </button>
               )}
             </div>

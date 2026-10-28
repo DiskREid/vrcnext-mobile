@@ -1,3 +1,5 @@
+import { uiMessage } from '../i18n';
+import { t, useI18n, dateLocale } from '../i18n';
 import SecureImage, { useSecureImage } from '../components/SecureImage';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -48,14 +50,14 @@ import {
 } from '../components/ui';
 export const statusName = (s?: string) =>
   ({
-    'join me': 'Заходите',
-    active: 'В сети',
-    'ask me': 'Спросите меня',
-    busy: 'Не беспокоить',
-    offline: 'Не в сети',
-  })[s || ''] || 'В сети';
+    'join me': t('Заходите'),
+    active: t('В сети'),
+    'ask me': t('Спросите меня'),
+    busy: t('Не беспокоить'),
+    offline: t('Не в сети'),
+  })[s || ''] || t('В сети');
 export function rankOf(tags?: string[]) {
-  if (!tags) return 'Неизвестен';
+  if (!tags) return t('Неизвестен');
   return tags.includes('system_trust_veteran')
     ? 'Trusted'
     : tags.includes('system_trust_trusted')
@@ -75,19 +77,20 @@ function FavoritePicker({
   type: 'friend' | 'world';
   onClose: () => void;
 }) {
+  useI18n();
   const { user, demo, act } = useApp();
   const groups = useLoad<FavoriteGroup[]>(
     () =>
       demo
         ? Promise.resolve([
-            { name: type === 'friend' ? 'group_0' : 'worlds1', displayName: 'Избранное', type },
+            { name: type === 'friend' ? 'group_0' : 'worlds1', displayName: t('Избранное'), type },
           ])
         : loadFavoriteGroups(user.id, type),
     [id, type, demo, user.id],
   );
   return (
     <div className="inset-panel">
-      <h3>Коллекция избранного</h3>
+      <h3>{t('Коллекция избранного')}</h3>
       {groups.loading ? (
         <Loading />
       ) : groups.error ? (
@@ -101,7 +104,7 @@ function FavoritePicker({
               void act(async () => {
                 await api.addFavorite(id, g.type, g.name);
                 onClose();
-              }, 'Добавлено в избранное')
+              }, uiMessage('Добавлено в избранное'))
             }
           >
             <Star size={17} />
@@ -109,20 +112,22 @@ function FavoritePicker({
           </button>
         ))
       ) : (
-        <Empty text="Нет доступных коллекций VRChat." />
+        <Empty text={t('Нет доступных коллекций VRChat.')} />
       )}
       <button className="text-button" onClick={onClose}>
-        Отмена
+        {t('Отмена')}
       </button>
     </div>
   );
 }
 export function UserDetails({ target, onClose }: { target: User | string; onClose: () => void }) {
+  useI18n();
   const id = typeof target === 'string' ? target : target.id;
   // A different target gets a different loader and form, never retained data from the last profile.
   return <UserDetailsContent key={id} id={id} onClose={onClose} />;
 }
 function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }) {
+  useI18n();
   const ctx = useApp(),
     isSelf = ctx.user.id === id;
   const load = useLoad(
@@ -131,7 +136,7 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
         ? Promise.resolve(demoFriends.find((x) => x.id === id) || ctx.user)
         : api.user(id)
       ).then((user) => {
-        if (user.id !== id) throw new Error('VRChat не вернул запрошенного пользователя.');
+        if (user.id !== id) throw new Error(t('VRChat не вернул запрошенного пользователя.'));
         return user;
       }),
     [id, ctx.refresh],
@@ -149,8 +154,11 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
   );
   const liveUser = isSelf ? ctx.user : ctx.friends.data.find((friend) => friend.id === id);
   const baseline = useRef<{ profile?: User; friend?: User }>({});
-  if (baseline.current.profile !== load.data) baseline.current = { profile: load.data, friend: liveUser };
-  const u = load.data && overlayLiveUser(mergePublicProfile(load.data, profile.data), baseline.current.friend, liveUser);
+  if (baseline.current.profile !== load.data)
+    baseline.current = { profile: load.data, friend: liveUser };
+  const u =
+    load.data &&
+    overlayLiveUser(mergePublicProfile(load.data, profile.data), baseline.current.friend, liveUser);
   const banner = useSecureImage(u?.profileBannerUrl);
   const [tab, setTab] = useState('profile'),
     [note, setNote] = useState(''),
@@ -164,9 +172,12 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
     setNote(u?.note || '');
   }, [u?.id, u?.note]);
   const invite = (user: User) =>
-    void ctx.act(() => api.invite(user.id, ctx.user.location || ''), 'Приглашение отправлено');
+    void ctx.act(
+      () => api.invite(user.id, ctx.user.location || ''),
+      uiMessage('Приглашение отправлено'),
+    );
   return (
-    <Modal title="Профиль" onClose={onClose} wide>
+    <Modal title={t('Профиль')} onClose={onClose} wide>
       {load.loading && !u ? (
         <Loading />
       ) : load.error ? (
@@ -181,52 +192,74 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
               }
             />
             <div className="profile-identity">
-              <AvatarImage src={imageOf(u)} name={u.displayName} size={84} user={u} fallbackSrc={u.currentAvatarThumbnailImageUrl || u.currentAvatarImageUrl} />
+              <AvatarImage
+                src={imageOf(u)}
+                name={u.displayName}
+                size={84}
+                user={u}
+                fallbackSrc={u.currentAvatarThumbnailImageUrl || u.currentAvatarImageUrl}
+              />
               <div>
                 <h2>{u.displayName}</h2>
                 <div className="chips">
                   <Badge className="rank">{rankOf(u.tags)}</Badge>
-                  {u.ageVerificationStatus === 'verified' && <Badge>18+ подтверждено</Badge>}
+                  {u.ageVerificationStatus === 'verified' && <Badge>{t('18+ подтверждено')}</Badge>}
                 </div>
               </div>
             </div>
             <p className="status-line">
               <PresenceIndicator user={u} />
-              {presenceIndicator(u).label} {u.pronouns && `· ${u.pronouns}`}
+              {t(presenceIndicator(u).label)} {u.pronouns && `· ${u.pronouns}`}
             </p>
             {u.statusDescription && <p className="status-description">{u.statusDescription}</p>}
             <div className="detail-actions">
-              <button className="button primary" disabled={!accessibleLocation(ctx.user.location)} onClick={() => invite(u)}>
+              <button
+                className="button primary"
+                disabled={!accessibleLocation(ctx.user.location)}
+                onClick={() => invite(u)}
+              >
                 <Send size={16} />
-                Пригласить друга
+                {t('Пригласить друга')}
               </button>
               <button
                 className="button secondary"
                 onClick={() =>
-                  void ctx.act(() => api.requestInvite(u.id), 'Запрос приглашения отправлен')
+                  void ctx.act(
+                    () => api.requestInvite(u.id),
+                    uiMessage('Запрос приглашения отправлен'),
+                  )
                 }
               >
                 <MessageSquare size={16} />
-                Попросить инвайт
+                {t('Попросить инвайт')}
               </button>
               {!u.isFriend && !isSelf && (
                 <button
                   className="button secondary"
                   onClick={() =>
-                    void ctx.act(() => api.friendRequest(u.id), 'Заявка в друзья отправлена')
+                    void ctx.act(
+                      () => api.friendRequest(u.id),
+                      uiMessage('Заявка в друзья отправлена'),
+                    )
                   }
                 >
                   <UserPlus size={16} />
-                  Добавить
+                  {t('Добавить')}
                 </button>
               )}
               {(u.isFriend || u.friendKey) && u.id !== ctx.user.id && (
-                <button className="button secondary" onClick={() => setBoopOpen(true)}>Boop</button>
+                <button className="button secondary" onClick={() => setBoopOpen(true)}>
+                  Boop
+                </button>
               )}
               {!isSelf && <FriendFavoriteButton user={u} />}
             </div>
             {boopOpen && <BoopPicker target={u} onClose={() => setBoopOpen(false)} />}
-            <Segmented value={tab} onChange={setTab} items={userProfileTabs} />
+            <Segmented
+              value={tab}
+              onChange={setTab}
+              items={userProfileTabs.map((item) => ({ ...item, label: t(item.label) }))}
+            />
             <div className="form-stack user-profile-panel" hidden={tab !== 'profile'}>
               {profile.loading && typeof u.bio !== 'string' ? (
                 <Loading />
@@ -235,10 +268,10 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
                   {profile.error && <ErrorState error={profile.error} retry={profile.reload} />}
                   {typeof u.bio === 'string' ? (
                     <p className="preserve-lines">
-                      {u.bio.trim() ? u.bio : 'Описание пока не добавлено.'}
+                      {u.bio.trim() ? u.bio : t('Описание пока не добавлено.')}
                     </p>
                   ) : !profile.error ? (
-                    <p className="muted">VRChat не передал биографию в публичном профиле.</p>
+                    <p className="muted">{t('VRChat не передал биографию в публичном профиле.')}</p>
                   ) : null}
                 </>
               )}
@@ -255,32 +288,34 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
               <div className="chips">{u.languages?.map((l) => <Badge key={l}>{l}</Badge>)}</div>
               <ProfileInformation user={u} profile={profile.data} />
               <label className="field">
-                Личная заметка
+                {t('Личная заметка')}
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   maxLength={256}
-                  placeholder="Видна только вам"
+                  placeholder={t('Видна только вам')}
                 />
               </label>
               <button
                 className="button secondary"
-                onClick={() => void ctx.act(() => api.note(id, note), 'Заметка сохранена')}
+                onClick={() =>
+                  void ctx.act(() => api.note(id, note), uiMessage('Заметка сохранена'))
+                }
               >
-                Сохранить заметку
+                {t('Сохранить заметку')}
               </button>
               <div className="divider" />
-              <h3>Управление</h3>
+              <h3>{t('Управление')}</h3>
               <div className="detail-actions">
                 <button className="button secondary" onClick={() => setConfirm('mute')}>
-                  Заглушить
+                  {t('Заглушить')}
                 </button>
                 <button className="button danger" onClick={() => setConfirm('block')}>
-                  Заблокировать
+                  {t('Заблокировать')}
                 </button>
                 {u.isFriend && (
                   <button className="button danger" onClick={() => setConfirm('unfriend')}>
-                    Удалить из друзей
+                    {t('Удалить из друзей')}
                   </button>
                 )}
               </div>
@@ -291,15 +326,15 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
                 <Shield size={22} />
                 <p>
                   {confirm === 'block'
-                    ? 'Заблокировать'
+                    ? t('Заблокировать')
                     : confirm === 'mute'
-                      ? 'Заглушить'
-                      : 'Удалить из друзей'}{' '}
+                      ? t('Заглушить')
+                      : t('Удалить из друзей')}{' '}
                   {u.displayName}?
                 </p>
                 <div className="row">
                   <button className="button secondary" onClick={() => setConfirm('')}>
-                    Отмена
+                    {t('Отмена')}
                   </button>
                   <button
                     className="button danger"
@@ -314,10 +349,10 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
                         }
                         setConfirm('');
                         load.reload();
-                      }, 'Готово')
+                      }, uiMessage('Готово'))
                     }
                   >
-                    Подтвердить
+                    {t('Подтвердить')}
                   </button>
                 </div>
               </div>
@@ -328,11 +363,36 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
     </Modal>
   );
 }
-export function WorldDetails({ target, initialLocation, onClose }: { target: World | string; initialLocation?: string; onClose: () => void }) {
+export function WorldDetails({
+  target,
+  initialLocation,
+  onClose,
+}: {
+  target: World | string;
+  initialLocation?: string;
+  onClose: () => void;
+}) {
+  useI18n();
   const id = typeof target === 'string' ? target : target.id;
-  return <WorldDetailsContent key={`${id}:${initialLocation || ''}`} id={id} initialLocation={initialLocation} onClose={onClose} />;
+  return (
+    <WorldDetailsContent
+      key={`${id}:${initialLocation || ''}`}
+      id={id}
+      initialLocation={initialLocation}
+      onClose={onClose}
+    />
+  );
 }
-function WorldDetailsContent({ id, initialLocation, onClose }: { id: string; initialLocation?: string; onClose: () => void }) {
+function WorldDetailsContent({
+  id,
+  initialLocation,
+  onClose,
+}: {
+  id: string;
+  initialLocation?: string;
+  onClose: () => void;
+}) {
+  useI18n();
   const ctx = useApp();
   const world = useLoad(
     () =>
@@ -341,14 +401,18 @@ function WorldDetailsContent({ id, initialLocation, onClose }: { id: string; ini
         : api.world(id),
     [id, ctx.refresh],
   );
-  const [fav, setFav] = useState(false), [create, setCreate] = useState(false);
+  const [fav, setFav] = useState(false),
+    [create, setCreate] = useState(false);
   const [invitation, setInvitation] = useState<{ mode: 'self' | 'friends'; location?: string }>();
   const [createdInstances, setCreatedInstances] = useState<KnownInstance[]>([]);
-  const scopedLocation = accessibleLocation(initialLocation) && initialLocation.split(':')[0] === id ? initialLocation : undefined;
+  const scopedLocation =
+    accessibleLocation(initialLocation) && initialLocation.split(':')[0] === id
+      ? initialLocation
+      : undefined;
   const invalidTarget = initialLocation !== undefined && !scopedLocation;
   const w = world.data;
   return (
-    <Modal title="Мир" onClose={onClose} wide>
+    <Modal title={t('Мир')} onClose={onClose} wide>
       {world.loading && !w ? (
         <Loading />
       ) : world.error && !w ? (
@@ -367,30 +431,40 @@ function WorldDetailsContent({ id, initialLocation, onClose }: { id: string; ini
             </div>
             <h2 className="detail-title">{w.name}</h2>
             <button className="text-button" onClick={() => w.authorId && ctx.openUser(w.authorId)}>
-              by {w.authorName || 'Неизвестный автор'}
+              by {w.authorName || t('Неизвестный автор')}
               <ExternalLink size={14} />
             </button>
             <div className="stat-row">
               <div>
-                <strong>{(w.occupants || 0).toLocaleString('ru')}</strong>
-                <span>сейчас в мире</span>
+                <strong>{(w.occupants || 0).toLocaleString(dateLocale())}</strong>
+                <span>{t('сейчас в мире')}</span>
               </div>
               <div>
                 <strong>{w.capacity || '—'}</strong>
-                <span>вместимость</span>
+                <span>{t('вместимость')}</span>
               </div>
               <div>
-                <strong>{(w.favorites || 0).toLocaleString('ru')}</strong>
-                <span>в избранном</span>
+                <strong>{(w.favorites || 0).toLocaleString(dateLocale())}</strong>
+                <span>{t('в избранном')}</span>
               </div>
             </div>
             <p className="preserve-lines">{w.description}</p>
-            {scopedLocation && <section className="inset-panel" aria-label="Выбранный инстанс">
-              <h3>Выбранный инстанс</h3>
-              <p className="id-text">{scopedLocation}</p>
-              <p className="muted small">Приглашение ведёт именно в этот инстанс. Примите его в VRChat, чтобы присоединиться.</p>
-            </section>}
-            {invalidTarget && <p className="error-inline" role="alert">Адрес выбранного инстанса недоступен. Обновите профиль пользователя.</p>}
+            {scopedLocation && (
+              <section className="inset-panel" aria-label={t('Выбранный инстанс')}>
+                <h3>{t('Выбранный инстанс')}</h3>
+                <p className="id-text">{scopedLocation}</p>
+                <p className="muted small">
+                  {t(
+                    'Приглашение ведёт именно в этот инстанс. Примите его в VRChat, чтобы присоединиться.',
+                  )}
+                </p>
+              </section>
+            )}
+            {invalidTarget && (
+              <p className="error-inline" role="alert">
+                {t('Адрес выбранного инстанса недоступен. Обновите профиль пользователя.')}
+              </p>
+            )}
             <div className="chips">
               {w.unityPackages?.some((p) => p.platform === 'android') && (
                 <Badge className="green">Android / Quest</Badge>
@@ -404,20 +478,65 @@ function WorldDetailsContent({ id, initialLocation, onClose }: { id: string; ini
                 .map((t) => <Badge key={t}>{t.replace('author_tag_', '')}</Badge>)}
             </div>
             <div className="detail-actions">
-              <button className="button primary" disabled={invalidTarget} onClick={() => setInvitation({ mode: 'self', location: scopedLocation })}><Send size={16} />Пригласить себя</button>
-              <button className="button secondary" disabled={invalidTarget} onClick={() => setInvitation({ mode: 'friends', location: scopedLocation })}><Users size={16} />Пригласить друзей</button>
-              {!initialLocation && <button className="button primary" onClick={() => setCreate(!create)}>
-                Создать инстанс
-              </button>}
+              <button
+                className="button primary"
+                disabled={invalidTarget}
+                onClick={() => setInvitation({ mode: 'self', location: scopedLocation })}
+              >
+                <Send size={16} />
+                {t('Пригласить себя')}
+              </button>
+              <button
+                className="button secondary"
+                disabled={invalidTarget}
+                onClick={() => setInvitation({ mode: 'friends', location: scopedLocation })}
+              >
+                <Users size={16} />
+                {t('Пригласить друзей')}
+              </button>
+              {!initialLocation && (
+                <button className="button primary" onClick={() => setCreate(!create)}>
+                  {t('Создать инстанс')}
+                </button>
+              )}
               <button className="button secondary" onClick={() => setFav(!fav)}>
-                <Heart size={17} />В избранное
+                <Heart size={17} />
+                {t('В избранное')}
               </button>
             </div>
             {fav && <FavoritePicker id={id} type="world" onClose={() => setFav(false)} />}
-            {create && <InstanceCreator world={w} onClose={() => setCreate(false)} onCreated={(instance, location) => setCreatedInstances((old) => [...old.filter((entry) => entry.location !== location), { location, count: instanceCount(instance.n_users) ?? instanceCount(instance.userCount) }])} />}
-            {!initialLocation && <WorldInstances world={w} created={createdInstances} onInviteFriends={(location) => setInvitation({ mode: 'friends', location })} />}
-            {invitation && <InstanceInviteDialog world={w} created={createdInstances} mode={invitation.mode} initialLocation={invitation.location} fixedLocation={!!scopedLocation} onClose={() => setInvitation(undefined)} />}
-
+            {create && (
+              <InstanceCreator
+                world={w}
+                onClose={() => setCreate(false)}
+                onCreated={(instance, location) =>
+                  setCreatedInstances((old) => [
+                    ...old.filter((entry) => entry.location !== location),
+                    {
+                      location,
+                      count: instanceCount(instance.n_users) ?? instanceCount(instance.userCount),
+                    },
+                  ])
+                }
+              />
+            )}
+            {!initialLocation && (
+              <WorldInstances
+                world={w}
+                created={createdInstances}
+                onInviteFriends={(location) => setInvitation({ mode: 'friends', location })}
+              />
+            )}
+            {invitation && (
+              <InstanceInviteDialog
+                world={w}
+                created={createdInstances}
+                mode={invitation.mode}
+                initialLocation={invitation.location}
+                fixedLocation={!!scopedLocation}
+                onClose={() => setInvitation(undefined)}
+              />
+            )}
           </>
         )
       )}

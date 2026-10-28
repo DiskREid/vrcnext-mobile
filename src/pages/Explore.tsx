@@ -1,3 +1,5 @@
+import { uiMessage } from '../i18n';
+import { t, useI18n, dateLocale } from '../i18n';
 import SecureImage from '../components/SecureImage';
 import { FullscreenImageViewer } from '../components/FullscreenImageViewer';
 import { useEffect, useState } from 'react';
@@ -24,7 +26,12 @@ import type { Avatar, Group, World, FavoriteType, GroupPost, VrcFile } from '../
 import { demoAvatars, demoGroups, demoWorlds } from '../demo';
 import { PageScope, useApp, useLoad } from '../state';
 import { usePaged } from '../hooks/usePaged';
-import { clearFavoriteEntityCache, loadFavoriteGroups, loadFavoriteWorlds, loadFavoriteAvatars } from '../api/favorites';
+import {
+  clearFavoriteEntityCache,
+  loadFavoriteGroups,
+  loadFavoriteWorlds,
+  loadFavoriteAvatars,
+} from '../api/favorites';
 import { FavoriteCategoryPicker, demoFavoriteGroups } from './Favorites';
 import { InstanceFriends } from '../components/WorldInstances';
 import { disclosedInstanceLocation } from '../data/world-instances';
@@ -59,7 +66,10 @@ function list(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 function shortNumber(n: number) {
-  return new Intl.NumberFormat('ru', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+  return new Intl.NumberFormat(dateLocale(), {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(n);
 }
 function useDebounced(value: string) {
   const [debounced, setDebounced] = useState(value);
@@ -71,6 +81,7 @@ function useDebounced(value: string) {
 }
 
 export function PlatformBadges({ packages }: { packages: unknown }) {
+  useI18n();
   const platforms = list(packages).map((item) => text(record(item).platform));
   return (
     <span className="platform-badges">
@@ -99,39 +110,41 @@ function MoreResults({
   loading: boolean;
   onClick: () => void;
 }) {
+  useI18n();
   if (!hasMore) return null;
   return (
     <div className="explore-more">
       <button className="button secondary" onClick={onClick} disabled={loading}>
         {loading ? <RefreshCw size={16} className="spin" /> : <Plus size={16} />}{' '}
-        {loading ? 'Загрузка…' : 'Загрузить ещё'}
+        {loading ? t('Загрузка…') : t('Загрузить ещё')}
       </button>
     </div>
   );
 }
 
 export default function Explore({ initialTab = 'worlds' }: { initialTab?: ExploreTab }) {
+  useI18n();
   const ctx = useApp();
   const [tab, setTab] = useState<ExploreTab>(initialTab);
   const [visited, setVisited] = useState<ExploreTab[]>([initialTab]);
   const selectTab = (next: ExploreTab) => {
-    setVisited((current) => current.includes(next) ? current : [...current, next]);
+    setVisited((current) => (current.includes(next) ? current : [...current, next]));
     setTab(next);
   };
   useEffect(() => selectTab(initialTab), [initialTab]);
   return (
     <div className="explore-page">
       <PageHeader
-        eyebrow="ОТКРЫВАЙТЕ НОВОЕ"
-        title="Исследовать"
-        subtitle="Следующий любимый мир уже где-то рядом."
+        eyebrow={t('ОТКРЫВАЙТЕ НОВОЕ')}
+        title={t('Исследовать')}
+        subtitle={t('Следующий любимый мир уже где-то рядом.')}
       />
-      <div className="explore-main-tabs" role="group" aria-label="Разделы поиска">
+      <div className="explore-main-tabs" role="group" aria-label={t('Разделы поиска')}>
         {(
           [
-            { id: 'worlds', label: 'Миры', Icon: Globe2 },
-            { id: 'groups', label: 'Группы', Icon: Users },
-            { id: 'avatars', label: 'Аватары', Icon: Sparkles },
+            { id: 'worlds', label: t('Миры'), Icon: Globe2 },
+            { id: 'groups', label: t('Группы'), Icon: Users },
+            { id: 'avatars', label: t('Аватары'), Icon: Sparkles },
           ] as const
         ).map(({ id, label, Icon }) => (
           <button
@@ -145,32 +158,57 @@ export default function Explore({ initialTab = 'worlds' }: { initialTab?: Explor
           </button>
         ))}
       </div>
-      {visited.map((page) => <div key={page} hidden={tab !== page} data-explore-tab={page}>
-        <PageScope active={tab === page} refresh={ctx.refresh}>
-          {page === 'worlds' ? <Worlds /> : page === 'groups' ? <Groups /> : <Avatars />}
-        </PageScope>
-      </div>)}
+      {visited.map((page) => (
+        <div key={page} hidden={tab !== page} data-explore-tab={page}>
+          <PageScope active={tab === page} refresh={ctx.refresh}>
+            {page === 'worlds' ? <Worlds /> : page === 'groups' ? <Groups /> : <Avatars />}
+          </PageScope>
+        </div>
+      ))}
     </div>
   );
 }
 
 function Worlds() {
+  useI18n();
   const { demo, user, openWorld, refresh } = useApp();
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<'popular' | 'active' | 'mine' | 'favorites'>('popular');
   const [collections, setCollections] = useState(false);
   const [category, setCategory] = useState('');
-  const categories = useLoad(() => mode !== 'favorites' ? Promise.resolve([]) : demo ? Promise.resolve(demoFavoriteGroups('world')) : loadFavoriteGroups(user.id, 'world'), [mode, demo, user.id, refresh]);
+  const categories = useLoad(
+    () =>
+      mode !== 'favorites'
+        ? Promise.resolve([])
+        : demo
+          ? Promise.resolve(demoFavoriteGroups('world'))
+          : loadFavoriteGroups(user.id, 'world'),
+    [mode, demo, user.id, refresh],
+  );
   const search = useDebounced(query);
   const page = usePaged<World>(
     async (offset) => {
       if (demo)
         return offset
           ? []
-          : demoWorlds.filter((w, i) => w.name.toLowerCase().includes(search.toLowerCase()) && (mode !== 'favorites' || !category || demoFavoriteGroups('world')[i % 2].name === category));
+          : demoWorlds.filter(
+              (w, i) =>
+                w.name.toLowerCase().includes(search.toLowerCase()) &&
+                (mode !== 'favorites' ||
+                  !category ||
+                  demoFavoriteGroups('world')[i % 2].name === category),
+            );
       if (mode === 'favorites') {
         const all = await loadFavoriteWorlds(user.id);
-        return all.filter((w) => (!category || w.favoriteGroupNames.includes(category)) && `${w.name} ${w.authorName || ''} ${w.id}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())).slice(offset, offset + 50);
+        return all
+          .filter(
+            (w) =>
+              (!category || w.favoriteGroupNames.includes(category)) &&
+              `${w.name} ${w.authorName || ''} ${w.id}`
+                .toLocaleLowerCase()
+                .includes(search.toLocaleLowerCase()),
+          )
+          .slice(offset, offset + 50);
       }
       if (/^wrld_[0-9a-f-]{36}$/i.test(search)) return offset ? [] : [await api.world(search)];
       return api.worlds(search, offset, mode);
@@ -182,12 +220,20 @@ function Worlds() {
   return (
     <>
       <div className="toolbar">
-        <SearchField value={query} onChange={setQuery} placeholder="Название мира или wrld_…" />
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder={t('Название мира или wrld_…')}
+        />
         <button
           className="icon-button"
-          title="Обновить миры"
-          aria-label="Обновить миры"
-          onClick={() => { clearFavoriteEntityCache(); categories.reload(); page.reload(); }}
+          title={t('Обновить миры')}
+          aria-label={t('Обновить миры')}
+          onClick={() => {
+            clearFavoriteEntityCache();
+            categories.reload();
+            page.reload();
+          }}
           disabled={page.loading || page.refreshing || page.moreLoading}
           aria-busy={page.refreshing}
         >
@@ -197,10 +243,10 @@ function Worlds() {
       <div className="explore-filters">
         <Segmented
           items={[
-            { id: 'popular', label: 'Популярные' },
-            { id: 'active', label: 'Сейчас играют' },
-            { id: 'favorites', label: 'Избранное' },
-            { id: 'mine', label: 'Мои миры' },
+            { id: 'popular', label: t('Популярные') },
+            { id: 'active', label: t('Сейчас играют') },
+            { id: 'favorites', label: t('Избранное') },
+            { id: 'mine', label: t('Мои миры') },
           ]}
           value={mode}
           onChange={(v) => setMode(v as typeof mode)}
@@ -208,14 +254,20 @@ function Worlds() {
         {mode === 'favorites' && (
           <button className="text-button" onClick={() => setCollections(true)}>
             <Layers3 size={16} />
-            Коллекции
+            {t('Коллекции')}
           </button>
         )}
       </div>
-      {mode === 'favorites' && <>
-        <FavoriteCategoryPicker groups={categories.data || []} value={category} onChange={setCategory} />
-        {categories.error && <ErrorState error={categories.error} retry={categories.reload} />}
-      </>}
+      {mode === 'favorites' && (
+        <>
+          <FavoriteCategoryPicker
+            groups={categories.data || []}
+            value={category}
+            onChange={setCategory}
+          />
+          {categories.error && <ErrorState error={categories.error} retry={categories.reload} />}
+        </>
+      )}
       {page.loading ? (
         <Loading />
       ) : (
@@ -225,15 +277,15 @@ function Worlds() {
             <Empty
               title={
                 search
-                  ? 'Миры не найдены'
+                  ? t('Миры не найдены')
                   : mode === 'mine'
-                    ? 'Ваши миры появятся здесь'
-                    : 'Здесь пока пусто'
+                    ? t('Ваши миры появятся здесь')
+                    : t('Здесь пока пусто')
               }
               text={
                 search
-                  ? 'Попробуйте другое название.'
-                  : 'Сохраняйте понравившиеся миры, чтобы вернуться к ним позже.'
+                  ? t('Попробуйте другое название.')
+                  : t('Сохраняйте понравившиеся миры, чтобы вернуться к ним позже.')
               }
               icon={<Globe2 size={32} />}
             />
@@ -257,7 +309,7 @@ function Worlds() {
                 </div>
                 <div className="card-body">
                   <h3>{world.name}</h3>
-                  <p className="muted">{text(world.authorName, 'Неизвестный автор')}</p>
+                  <p className="muted">{text(world.authorName, t('Неизвестный автор'))}</p>
                   <div className="world-card-bottom">
                     <PlatformBadges packages={world.unityPackages} />
                     <span className="muted">
@@ -288,6 +340,7 @@ function normalizeGroup(group: Group): Group {
   return { ...group, id: text(raw.groupId, group.id) };
 }
 function Groups() {
+  useI18n();
   const { user, demo, refresh } = useApp();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Group>();
@@ -308,10 +361,14 @@ function Groups() {
   return (
     <>
       <div className="toolbar">
-        <SearchField value={query} onChange={setQuery} placeholder="Найти группу по названию" />
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder={t('Найти группу по названию')}
+        />
         <button
           className="icon-button"
-          aria-label="Обновить группы"
+          aria-label={t('Обновить группы')}
           onClick={page.reload}
           disabled={page.loading || page.refreshing || page.moreLoading}
           aria-busy={page.refreshing}
@@ -319,7 +376,7 @@ function Groups() {
           <RefreshCw size={18} className={page.refreshing ? 'spin' : undefined} />
         </button>
       </div>
-      <p className="explore-list-label">{search ? 'РЕЗУЛЬТАТЫ ПОИСКА' : 'ВАШИ СООБЩЕСТВА'}</p>
+      <p className="explore-list-label">{search ? t('РЕЗУЛЬТАТЫ ПОИСКА') : t('ВАШИ СООБЩЕСТВА')}</p>
       {page.loading ? (
         <Loading />
       ) : (
@@ -327,11 +384,11 @@ function Groups() {
           {page.error && <ErrorState error={page.error} retry={page.reload} />}
           {!page.items.length && !page.error && (
             <Empty
-              title={search ? 'Группы не найдены' : 'Найдите свою компанию'}
+              title={search ? t('Группы не найдены') : t('Найдите свою компанию')}
               text={
                 search
-                  ? 'Попробуйте другое название или код группы.'
-                  : 'Введите название, чтобы найти сообщество и вступить в него.'
+                  ? t('Попробуйте другое название или код группы.')
+                  : t('Введите название, чтобы найти сообщество и вступить в него.')
               }
               icon={<Users size={32} />}
             />
@@ -350,12 +407,13 @@ function Groups() {
                     {group.discriminator ? `.${group.discriminator}` : ''}
                   </p>
                   <p className="group-description">
-                    {text(group.description, 'Откройте группу, чтобы узнать больше.')}
+                    {text(group.description, t('Откройте группу, чтобы узнать больше.'))}
                   </p>
                   <div className="world-card-bottom">
                     <span>
                       <Users size={14} />
-                      {shortNumber(numeric(group.memberCount))} участников
+                      {shortNumber(numeric(group.memberCount))}
+                      {t(' участников')}
                     </span>
                     <ChevronRight size={18} />
                   </div>
@@ -392,6 +450,7 @@ export function GroupDetail({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  useI18n();
   const ctx = useApp();
   const { user, demo, act, openWorld } = ctx;
   const [tab, setTab] = useState('about');
@@ -416,8 +475,8 @@ export function GroupDetail({
             : [
                 {
                   id: 'post_demo',
-                  title: 'Добро пожаловать, исследователь!',
-                  text: 'Впереди новые миры и встречи. Это демонстрационная публикация.',
+                  title: t('Добро пожаловать, исследователь!'),
+                  text: t('Впереди новые миры и встречи. Это демонстрационная публикация.'),
                   createdAt: new Date().toISOString(),
                 },
               ]
@@ -450,13 +509,19 @@ export function GroupDetail({
       async () => {
         const result = await (remove ? api.leaveGroup(initial.id) : api.joinGroup(initial.id));
         // A confirmed mutation invalidates the initial card immediately; never offer a second join/leave from old data.
-        detail.setData({ ...group, myMember: remove ? null : undefined, membershipStatus: remove ? 'inactive' : text(record(result).membershipStatus), isMember: remove ? false : undefined, mutualGroup: false });
+        detail.setData({
+          ...group,
+          myMember: remove ? null : undefined,
+          membershipStatus: remove ? 'inactive' : text(record(result).membershipStatus),
+          isMember: remove ? false : undefined,
+          mutualGroup: false,
+        });
         detail.reload();
         onChanged();
         setLeave(false);
         return result;
       },
-      remove ? 'Вы вышли из группы' : 'Запрос на вступление отправлен',
+      remove ? uiMessage('Вы вышли из группы') : uiMessage('Запрос на вступление отправлен'),
     );
     setBusy(false);
   }
@@ -470,7 +535,9 @@ export function GroupDetail({
         <div>
           <h3>{group.name}</h3>
           <p className="muted">
-            {shortNumber(numeric(group.memberCount))} участников · {text(group.shortCode)}
+            {shortNumber(numeric(group.memberCount))}
+            {t(' участников · ')}
+            {text(group.shortCode)}
             {group.discriminator ? `.${group.discriminator}` : ''}
           </p>
         </div>
@@ -479,36 +546,54 @@ export function GroupDetail({
       <div className="detail-actions">
         <button
           className={`button ${joined ? 'secondary' : ''}`}
-          disabled={busy || detail.loading || membershipUnknown || membershipPending || membership === 'blocked'}
+          disabled={
+            busy ||
+            detail.loading ||
+            membershipUnknown ||
+            membershipPending ||
+            membership === 'blocked'
+          }
           onClick={() => (joined ? setLeave(true) : void changeMembership(false))}
         >
           {joined ? <Check size={17} /> : <Plus size={17} />}
-          {joined ? 'Вы участник · выйти' : membershipUnknown ? detail.loading ? 'Проверяем участие…' : 'Участие не подтверждено' : membershipPending ? 'Запрос отправлен' : membership === 'blocked' ? 'Вступление недоступно' : membership === 'invited' ? 'Вы приглашены · вступить' : 'Вступить в группу'}
+          {joined
+            ? t('Вы участник · выйти')
+            : membershipUnknown
+              ? detail.loading
+                ? t('Проверяем участие…')
+                : t('Участие не подтверждено')
+              : membershipPending
+                ? t('Запрос отправлен')
+                : membership === 'blocked'
+                  ? t('Вступление недоступно')
+                  : membership === 'invited'
+                    ? t('Вы приглашены · вступить')
+                    : t('Вступить в группу')}
         </button>
       </div>
       {leave && (
         <div className="confirm-inline">
-          <p>Выйти из группы «{group.name}»?</p>
+          <p>{t('Выйти из группы «{name}»?', { name: group.name })}</p>
           <div className="row">
             <button
               className="button danger"
               disabled={busy}
               onClick={() => void changeMembership(true)}
             >
-              Выйти
+              {t('Выйти из группы')}
             </button>
             <button className="button secondary" onClick={() => setLeave(false)}>
-              Отмена
+              {t('Отмена')}
             </button>
           </div>
         </div>
       )}
       <Segmented
         items={[
-          { id: 'about', label: 'О группе' },
-          { id: 'posts', label: 'Публикации' },
-          { id: 'instances', label: 'Инстансы' },
-          { id: 'gallery', label: 'Галерея' },
+          { id: 'about', label: t('О группе') },
+          { id: 'posts', label: t('Публикации') },
+          { id: 'instances', label: t('Инстансы') },
+          { id: 'gallery', label: t('Галерея') },
         ]}
         value={tab}
         onChange={setTab}
@@ -516,10 +601,10 @@ export function GroupDetail({
       <div className="group-tab-content">
         {tab === 'about' && (
           <>
-            <p className="preserve-text">{text(group.description, 'Описание не указано.')}</p>
+            <p className="preserve-text">{text(group.description, t('Описание не указано.'))}</p>
             {text(raw.rules) && (
               <section>
-                <h3>Правила</h3>
+                <h3>{t('Правила')}</h3>
                 <p className="preserve-text muted">{text(raw.rules)}</p>
               </section>
             )}
@@ -533,10 +618,10 @@ export function GroupDetail({
         {tab === 'posts' && (
           <>
             <div className="section-heading">
-              <h3>Последние публикации</h3>
+              <h3>{t('Последние публикации')}</h3>
               <button className="text-button" onClick={() => setPosting(!posting)}>
                 <Plus size={16} />
-                Написать
+                {t('Написать')}
               </button>
             </div>
             {posting && (
@@ -553,7 +638,7 @@ export function GroupDetail({
             ) : posts.error ? (
               <ErrorState error={posts.error} retry={posts.reload} />
             ) : !posts.items.length ? (
-              <Empty title="Публикаций пока нет" />
+              <Empty title={t('Публикаций пока нет')} />
             ) : (
               <div className="explore-post-list">
                 {posts.items.map((value, index) => {
@@ -562,8 +647,8 @@ export function GroupDetail({
                     <article className="card group-post" key={text(post.id, String(index))}>
                       <div className="muted small">
                         {text(post.createdAt)
-                          ? new Date(text(post.createdAt)).toLocaleDateString('ru')
-                          : 'Публикация'}
+                          ? new Date(text(post.createdAt)).toLocaleDateString(dateLocale())
+                          : t('Публикация')}
                       </div>
                       <h3>{text(post.title)}</h3>
                       <p className="preserve-text">{text(post.text)}</p>
@@ -571,7 +656,7 @@ export function GroupDetail({
                         <SecureImage
                           className="post-image"
                           src={text(post.imageUrl)}
-                          alt="Вложение публикации"
+                          alt={t('Вложение публикации')}
                           loading="lazy"
                         />
                       )}
@@ -597,8 +682,8 @@ export function GroupDetail({
               <ErrorState error={instances.error} retry={instances.reload} />
             ) : !instances.data?.length ? (
               <Empty
-                title="Активных инстансов нет"
-                text="Здесь появятся доступные вам инстансы группы."
+                title={t('Активных инстансов нет')}
+                text={t('Здесь появятся доступные вам инстансы группы.')}
                 icon={<Globe2 size={28} />}
               />
             ) : (
@@ -608,24 +693,53 @@ export function GroupDetail({
                     world = record(instance.world);
                   const worldId = text(instance.worldId, text(world.id));
                   const location = disclosedInstanceLocation(value);
-                  const presentFriends = location ? friendsInInstance(location, ctx.friends.data) : [];
-                  const count = instanceCount(instance.n_users) ?? instanceCount(instance.userCount);
+                  const presentFriends = location
+                    ? friendsInInstance(location, ctx.friends.data)
+                    : [];
+                  const count =
+                    instanceCount(instance.n_users) ?? instanceCount(instance.userCount);
                   return (
                     <article
                       className="group-instance card"
                       key={text(instance.id, String(index))}
                       data-location={location}
                     >
-                      <button className="list-row group-instance-world" disabled={!worldId} onClick={() => {
-                        if (worldId) { onClose(); openWorld(worldId); }
-                      }}>
+                      <button
+                        className="list-row group-instance-world"
+                        disabled={!worldId}
+                        onClick={() => {
+                          if (worldId) {
+                            onClose();
+                            openWorld(worldId);
+                          }
+                        }}
+                      >
                         <Globe2 size={22} />
-                        <div><strong>{text(world.name, text(instance.name, worldId || 'Инстанс группы'))}</strong>
-                          <p className="muted">{count !== undefined ? `${count} игроков` : 'Число игроков не передано'} · {text(instance.region, 'Регион не указан')}</p>
-                        </div><ChevronRight size={18} />
+                        <div>
+                          <strong>
+                            {text(world.name, text(instance.name, worldId || t('Инстанс группы')))}
+                          </strong>
+                          <p className="muted">
+                            {count !== undefined
+                              ? t('{value0} игроков', { value0: count })
+                              : t('Число игроков не передано')}{' '}
+                            · {text(instance.region, t('Регион не указан'))}
+                          </p>
+                        </div>
+                        <ChevronRight size={18} />
                       </button>
-                      <p className="group-instance-friend-count muted small"><Users size={13} />Друзья · {presentFriends.length}</p>
-                      <InstanceFriends friends={presentFriends} onOpenUser={(friend) => { onClose(); ctx.openUser(friend); }} />
+                      <p className="group-instance-friend-count muted small">
+                        <Users size={13} />
+                        {t('Друзья · ')}
+                        {presentFriends.length}
+                      </p>
+                      <InstanceFriends
+                        friends={presentFriends}
+                        onOpenUser={(friend) => {
+                          onClose();
+                          ctx.openUser(friend);
+                        }}
+                      />
                     </article>
                   );
                 })}
@@ -638,11 +752,11 @@ export function GroupDetail({
             {galleryList.length ? (
               <>
                 <label className="field">
-                  Альбом
+                  {t('Альбом')}
                   <select value={gallery} onChange={(e) => setGallery(e.target.value)}>
                     {galleryList.map((item) => (
                       <option key={text(item.id)} value={text(item.id)}>
-                        {text(item.name, 'Галерея')}
+                        {text(item.name, t('Галерея'))}
                       </option>
                     ))}
                   </select>
@@ -656,16 +770,30 @@ export function GroupDetail({
                     {galleryImages.items.map((value, index) => {
                       const image = record(value);
                       return (
-                        <button className="gallery-image-button" key={text(image.id, String(index))}
-                          aria-label={`Открыть изображение группы ${index + 1}`}
-                          onClick={() => setViewingImage({ src: text(image.imageUrl, text(image.url)), title: text(image.description, 'Изображение группы') })}>
-                          <SecureImage src={text(image.imageUrl, text(image.url))} alt={text(image.description, 'Изображение группы')} loading="lazy" />
+                        <button
+                          className="gallery-image-button"
+                          key={text(image.id, String(index))}
+                          aria-label={t('Открыть изображение группы {value0}', {
+                            value0: index + 1,
+                          })}
+                          onClick={() =>
+                            setViewingImage({
+                              src: text(image.imageUrl, text(image.url)),
+                              title: text(image.description, t('Изображение группы')),
+                            })
+                          }
+                        >
+                          <SecureImage
+                            src={text(image.imageUrl, text(image.url))}
+                            alt={text(image.description, t('Изображение группы'))}
+                            loading="lazy"
+                          />
                         </button>
                       );
                     })}
                   </div>
                 ) : (
-                  <Empty title="В альбоме пока нет изображений" />
+                  <Empty title={t('В альбоме пока нет изображений')} />
                 )}
                 {!demo && (
                   <MoreResults
@@ -677,20 +805,28 @@ export function GroupDetail({
               </>
             ) : (
               <Empty
-                title="Галереи пока нет"
-                text="У этой группы нет доступных альбомов."
+                title={t('Галереи пока нет')}
+                text={t('У этой группы нет доступных альбомов.')}
                 icon={<Image size={28} />}
               />
             )}
           </>
         )}
       </div>
-      {viewingImage && <FullscreenImageViewer src={viewingImage.src} originalUrl={viewingImage.src} title={viewingImage.title} onClose={() => setViewingImage(null)} />}
+      {viewingImage && (
+        <FullscreenImageViewer
+          src={viewingImage.src}
+          originalUrl={viewingImage.src}
+          title={viewingImage.title}
+          onClose={() => setViewingImage(null)}
+        />
+      )}
     </Modal>
   );
 }
 
 function GroupPostComposer({ groupId, onComplete }: { groupId: string; onComplete: () => void }) {
+  useI18n();
   const { act } = useApp();
   const [title, setTitle] = useState(''),
     [body, setBody] = useState(''),
@@ -716,17 +852,17 @@ function GroupPostComposer({ groupId, onComplete }: { groupId: string; onComplet
           });
           onComplete();
           return result;
-        }, 'Публикация создана');
+        }, uiMessage('Публикация создана'));
         setBusy(false);
       }}
     >
-      <p className="muted small">Для публикации нужны права, выданные владельцем группы.</p>
+      <p className="muted small">{t('Для публикации нужны права, выданные владельцем группы.')}</p>
       <label className="field">
-        Заголовок
+        {t('Заголовок')}
         <input required maxLength={64} value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
       <label className="field">
-        Текст
+        {t('Текст')}
         <textarea
           required
           maxLength={2000}
@@ -736,7 +872,7 @@ function GroupPostComposer({ groupId, onComplete }: { groupId: string; onComplet
         />
       </label>
       <label className="field">
-        Изображение (необязательно)
+        {t('Изображение (необязательно)')}
         <input
           type="file"
           accept="image/png,image/jpeg,image/gif,image/webp"
@@ -744,10 +880,10 @@ function GroupPostComposer({ groupId, onComplete }: { groupId: string; onComplet
         />
       </label>
       <label className="field">
-        Видимость
+        {t('Видимость')}
         <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-          <option value="group">Участникам группы</option>
-          <option value="public">Всем</option>
+          <option value="group">{t('Участникам группы')}</option>
+          <option value="public">{t('Всем')}</option>
         </select>
       </label>
       <label className="check-label">
@@ -756,17 +892,18 @@ function GroupPostComposer({ groupId, onComplete }: { groupId: string; onComplet
           checked={sendNotification}
           onChange={(e) => setSendNotification(e.target.checked)}
         />
-        Отправить уведомление участникам
+        {t('Отправить уведомление участникам')}
       </label>
       <button className="button" disabled={busy || !title.trim() || !body.trim()}>
         <Send size={16} />
-        {busy ? 'Публикуем…' : 'Опубликовать'}
+        {busy ? t('Публикуем…') : t('Опубликовать')}
       </button>
     </form>
   );
 }
 
 function Avatars() {
+  useI18n();
   const { user, demo, refresh, notify } = useApp();
   const [mode, setMode] = useState<'mine' | 'favorites' | 'public'>('mine');
   const [query, setQuery] = useState('');
@@ -774,22 +911,52 @@ function Avatars() {
   const [collections, setCollections] = useState(false);
   const [lookup, setLookup] = useState(false);
   const [category, setCategory] = useState('');
-  const categories = useLoad(() => mode !== 'favorites' ? Promise.resolve([]) : demo ? Promise.resolve(demoFavoriteGroups('avatar')) : loadFavoriteGroups(user.id, 'avatar'), [mode, demo, user.id, refresh]);
+  const categories = useLoad(
+    () =>
+      mode !== 'favorites'
+        ? Promise.resolve([])
+        : demo
+          ? Promise.resolve(demoFavoriteGroups('avatar'))
+          : loadFavoriteGroups(user.id, 'avatar'),
+    [mode, demo, user.id, refresh],
+  );
   const search = useDebounced(query).toLowerCase();
   const page = usePaged<Avatar>(
     async (offset) => {
       if (mode === 'favorites') {
         const all = demo
-          ? demoAvatars.map((avatar, index) => ({ ...avatar, favoriteGroupNames: [demoFavoriteGroups('avatar')[index % 2].name] }))
-          : await loadFavoriteAvatars(user.id, false, categories.data?.length ? categories.data : undefined, category);
-        return all.filter((avatar) => (!category || avatar.favoriteGroupNames.includes(category)) && `${avatar.name} ${avatar.authorName || ''} ${avatar.id}`.toLocaleLowerCase().includes(search)).slice(offset, offset + 50);
+          ? demoAvatars.map((avatar, index) => ({
+              ...avatar,
+              favoriteGroupNames: [demoFavoriteGroups('avatar')[index % 2].name],
+            }))
+          : await loadFavoriteAvatars(
+              user.id,
+              false,
+              categories.data?.length ? categories.data : undefined,
+              category,
+            );
+        return all
+          .filter(
+            (avatar) =>
+              (!category || avatar.favoriteGroupNames.includes(category)) &&
+              `${avatar.name} ${avatar.authorName || ''} ${avatar.id}`
+                .toLocaleLowerCase()
+                .includes(search),
+          )
+          .slice(offset, offset + 50);
       }
       if (demo) return offset ? [] : demoAvatars;
       if (mode === 'public')
         return search ? api.searchPublicAvatars(query.trim(), Math.floor(offset / 20)) : [];
       return api.avatars(mode, offset);
     },
-    [demo, user.id, mode, mode === 'public' || mode === 'favorites' ? search : '', mode === 'favorites' ? category : ''],
+    [
+      demo,
+      user.id,
+      mode,
+      mode === 'public' || mode === 'favorites' ? search : '',
+      mode === 'favorites' ? category : '',
+    ],
     mode === 'public' ? 20 : 50,
     refresh,
   );
@@ -800,11 +967,11 @@ function Avatars() {
   async function lookupById() {
     const id = query.trim();
     if (!/^avtr_[0-9a-f-]{36}$/i.test(id)) {
-      notify('Введите полный ID аватара, начинающийся с avtr_.');
+      notify(t('Введите полный ID аватара, начинающийся с avtr_.'));
       return;
     }
     if (demo) {
-      notify('Поиск по ID доступен после входа на Android.');
+      notify(t('Поиск по ID доступен после входа на Android.'));
       return;
     }
     setLookup(true);
@@ -824,16 +991,22 @@ function Avatars() {
           onChange={setQuery}
           placeholder={
             mode === 'public'
-              ? 'Название аватара в публичной базе'
+              ? t('Название аватара в публичной базе')
               : mode === 'favorites'
-                ? 'Поиск в избранных аватарах или avtr_…'
-                : 'Поиск в загруженных аватарах или avtr_…'
+                ? t('Поиск в избранных аватарах или avtr_…')
+                : t('Поиск в загруженных аватарах или avtr_…')
           }
         />
         <button
           className="icon-button"
-          aria-label="Обновить аватары"
-          onClick={() => { if (mode === 'favorites') { clearFavoriteEntityCache(); categories.reload(); } page.reload(); }}
+          aria-label={t('Обновить аватары')}
+          onClick={() => {
+            if (mode === 'favorites') {
+              clearFavoriteEntityCache();
+              categories.reload();
+            }
+            page.reload();
+          }}
           disabled={page.loading || page.refreshing || page.moreLoading}
           aria-busy={page.refreshing}
         >
@@ -843,25 +1016,31 @@ function Avatars() {
       <div className="explore-filters">
         <Segmented
           items={[
-            { id: 'mine', label: 'Мои аватары' },
-            { id: 'favorites', label: 'Избранные' },
-            { id: 'public', label: 'Публичные' },
+            { id: 'mine', label: t('Мои аватары') },
+            { id: 'favorites', label: t('Избранные') },
+            { id: 'public', label: t('Публичные') },
           ]}
           value={mode}
           onChange={(v) => setMode(v as typeof mode)}
         />
         <button className="text-button" onClick={() => setCollections(true)}>
           <Layers3 size={16} />
-          Коллекции
+          {t('Коллекции')}
         </button>
       </div>
-      {mode === 'favorites' && <>
-        <FavoriteCategoryPicker groups={categories.data || []} value={category} onChange={setCategory} />
-        {categories.error && <ErrorState error={categories.error} retry={categories.reload} />}
-      </>}
+      {mode === 'favorites' && (
+        <>
+          <FavoriteCategoryPicker
+            groups={categories.data || []}
+            value={category}
+            onChange={setCategory}
+          />
+          {categories.error && <ErrorState error={categories.error} retry={categories.reload} />}
+        </>
+      )}
       {mode === 'public' && (
         <p className="muted small">
-          Поиск в публичной базе avtrdb.com. Поисковый запрос передаётся её оператору.
+          {t('Поиск в публичной базе avtrdb.com. Поисковый запрос передаётся её оператору.')}
         </p>
       )}
       {query.trim().startsWith('avtr_') && (
@@ -871,7 +1050,7 @@ function Avatars() {
           onClick={() => void lookupById()}
         >
           <Search size={16} />
-          {lookup ? 'Ищем…' : 'Открыть аватар по ID'}
+          {lookup ? t('Ищем…') : t('Открыть аватар по ID')}
         </button>
       )}
       {page.loading || (mode === 'favorites' && categories.loading) ? (
@@ -883,21 +1062,27 @@ function Avatars() {
             <Empty
               title={
                 search
-                  ? 'Аватары не найдены'
+                  ? t('Аватары не найдены')
                   : mode === 'public'
-                    ? 'Найдите новый образ'
+                    ? t('Найдите новый образ')
                     : mode === 'mine'
-                      ? 'Ваш гардероб'
-                      : category ? 'В этой коллекции пока нет аватаров' : 'Избранных аватаров пока нет'
+                      ? t('Ваш гардероб')
+                      : category
+                        ? t('В этой коллекции пока нет аватаров')
+                        : t('Избранных аватаров пока нет')
               }
               text={
                 mode === 'public'
-                  ? 'Введите название, чтобы найти аватар в публичной базе.'
+                  ? t('Введите название, чтобы найти аватар в публичной базе.')
                   : search && mode !== 'favorites'
-                    ? 'Поиск выполняется по уже загруженным карточкам. Загрузите следующую страницу или вставьте ID аватара.'
+                    ? t(
+                        'Поиск выполняется по уже загруженным карточкам. Загрузите следующую страницу или вставьте ID аватара.',
+                      )
                     : mode === 'mine'
-                      ? 'Здесь появятся загруженные вами аватары. Другой аватар можно открыть по его ID.'
-                      : 'Добавьте аватар в коллекцию через его карточку.'
+                      ? t(
+                          'Здесь появятся загруженные вами аватары. Другой аватар можно открыть по его ID.',
+                        )
+                      : t('Добавьте аватар в коллекцию через его карточку.')
               }
               icon={<Sparkles size={32} />}
             />
@@ -914,13 +1099,13 @@ function Avatars() {
                   {user.currentAvatar === avatar.id && (
                     <Badge className="current-avatar">
                       <Check size={12} />
-                      Текущий
+                      {t('Текущий')}
                     </Badge>
                   )}
                 </div>
                 <div className="card-body">
                   <h3>{avatar.name}</h3>
-                  <p className="muted">{text(avatar.authorName, 'Неизвестный автор')}</p>
+                  <p className="muted">{text(avatar.authorName, t('Неизвестный автор'))}</p>
                   <PlatformBadges packages={avatar.unityPackages} />
                 </div>
               </button>
@@ -942,6 +1127,7 @@ function Avatars() {
 }
 
 export function AvatarDetail({ initial, onClose }: { initial: Avatar; onClose: () => void }) {
+  useI18n();
   const { demo, user, act, openUser, onRefresh } = useApp();
   const detail = useLoad(async () => (demo ? initial : api.avatar(initial.id)), [initial.id, demo]);
   const avatar = detail.data || initial;
@@ -962,7 +1148,7 @@ export function AvatarDetail({ initial, onClose }: { initial: Avatar; onClose: (
         {current && (
           <Badge className="quest">
             <Check size={12} />
-            Текущий
+            {t('Текущий')}
           </Badge>
         )}
       </div>
@@ -975,24 +1161,25 @@ export function AvatarDetail({ initial, onClose }: { initial: Avatar; onClose: (
           }
         }}
       >
-        {text(avatar.authorName, 'Автор аватара')}
+        {text(avatar.authorName, t('Автор аватара'))}
         <ChevronRight size={15} />
       </button>
       <PlatformBadges packages={avatar.unityPackages} />
-      <p className="preserve-text">{text(avatar.description, 'Автор не добавил описание.')}</p>
+      <p className="preserve-text">{text(avatar.description, t('Автор не добавил описание.'))}</p>
       <div className="detail-actions">
         <button className="button" onClick={() => setConfirm(true)} disabled={current || busy}>
           <Sparkles size={17} />
-          {current ? 'Уже выбран' : 'Выбрать аватар'}
+          {current ? t('Уже выбран') : t('Выбрать аватар')}
         </button>
         <button className="button secondary" onClick={() => setFavorite(!favorite)}>
-          <Heart size={17} />В коллекцию
+          <Heart size={17} />
+          {t('В коллекцию')}
         </button>
       </div>
       {confirm && (
         <div className="confirm-inline">
-          <p>Сменить текущий аватар на «{avatar.name}»?</p>
-          <p className="small muted">Выбор изменится в вашем аккаунте VRChat.</p>
+          <p>{t('Сменить текущий аватар на «{name}»?', { name: avatar.name })}</p>
+          <p className="small muted">{t('Выбор изменится в вашем аккаунте VRChat.')}</p>
           <div className="row">
             <button
               className="button"
@@ -1004,14 +1191,14 @@ export function AvatarDetail({ initial, onClose }: { initial: Avatar; onClose: (
                   setConfirm(false);
                   onRefresh();
                   return result;
-                }, 'Аватар выбран');
+                }, uiMessage('Аватар выбран'));
                 setBusy(false);
               }}
             >
-              Подтвердить
+              {t('Подтвердить')}
             </button>
             <button className="button secondary" onClick={() => setConfirm(false)}>
-              Отмена
+              {t('Отмена')}
             </button>
           </div>
         </div>
@@ -1032,11 +1219,12 @@ export function FavoritePicker({
   type: 'avatar' | 'world' | 'friend';
   onComplete: () => void;
 }) {
+  useI18n();
   const { demo, user, act } = useApp();
   const groups = useLoad(
     async () =>
       demo
-        ? [{ id: 'fav_demo', type, name: 'avatars1', displayName: 'Любимое' }]
+        ? [{ id: 'fav_demo', type, name: 'avatars1', displayName: t('Любимое') }]
         : loadFavoriteGroups(user.id, type),
     [demo, type],
   );
@@ -1044,7 +1232,10 @@ export function FavoritePicker({
     [busy, setBusy] = useState(false);
   const relevant = (groups.data || [])
     .map(record)
-    .filter((group) => text(group.type) === type || type === 'world' && text(group.type) === 'vrcPlusWorld');
+    .filter(
+      (group) =>
+        text(group.type) === type || (type === 'world' && text(group.type) === 'vrcPlusWorld'),
+    );
   return (
     <form
       className="card form-stack favorite-picker"
@@ -1054,26 +1245,30 @@ export function FavoritePicker({
         setBusy(true);
         await act(async () => {
           const selectedGroup = relevant.find((g) => g.name === selected);
-          if (!selectedGroup) throw new Error('Выберите доступную коллекцию.');
-          const result = await api.addFavorite(entityId, text(selectedGroup.type) as FavoriteType, selected);
+          if (!selectedGroup) throw new Error(t('Выберите доступную коллекцию.'));
+          const result = await api.addFavorite(
+            entityId,
+            text(selectedGroup.type) as FavoriteType,
+            selected,
+          );
           onComplete();
           return result;
-        }, 'Добавлено в избранное');
+        }, uiMessage('Добавлено в избранное'));
         setBusy(false);
       }}
     >
-      <h3>Добавить в коллекцию</h3>
+      <h3>{t('Добавить в коллекцию')}</h3>
       {groups.loading ? (
         <Loading />
       ) : groups.error ? (
         <ErrorState error={groups.error} retry={groups.reload} />
       ) : !relevant.length ? (
-        <p className="muted">Нет доступных коллекций этого типа.</p>
+        <p className="muted">{t('Нет доступных коллекций этого типа.')}</p>
       ) : (
         <label className="field">
-          Коллекция
+          {t('Коллекция')}
           <select required value={selected} onChange={(e) => setSelected(e.target.value)}>
-            <option value="">Выберите коллекцию</option>
+            <option value="">{t('Выберите коллекцию')}</option>
             {relevant.map((group) => (
               <option key={text(group.id, text(group.name))} value={text(group.name)}>
                 {text(group.displayName, text(group.name))}
@@ -1085,10 +1280,10 @@ export function FavoritePicker({
       <div className="row">
         <button className="button" disabled={!selected || busy}>
           <Heart size={16} />
-          Добавить
+          {t('Добавить')}
         </button>
         <button type="button" className="button secondary" onClick={onComplete}>
-          Отмена
+          {t('Отмена')}
         </button>
       </div>
     </form>
@@ -1096,6 +1291,7 @@ export function FavoritePicker({
 }
 
 function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () => void }) {
+  useI18n();
   const { demo, user, act } = useApp();
   const groups = useLoad(
     async () =>
@@ -1105,7 +1301,7 @@ function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () 
               id: 'fav_demo',
               type,
               name: type === 'world' ? 'worlds1' : 'avatars1',
-              displayName: 'Любимое',
+              displayName: t('Любимое'),
             },
           ]
         : loadFavoriteGroups(user.id, type),
@@ -1116,18 +1312,24 @@ function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () 
     [busy, setBusy] = useState(false);
   const relevant = (groups.data || [])
     .map(record)
-    .filter((group) => text(group.type) === type || type === 'world' && text(group.type) === 'vrcPlusWorld');
+    .filter(
+      (group) =>
+        text(group.type) === type || (type === 'world' && text(group.type) === 'vrcPlusWorld'),
+    );
   return (
-    <Modal title={type === 'world' ? 'Коллекции миров' : 'Коллекции аватаров'} onClose={onClose}>
+    <Modal
+      title={type === 'world' ? t('Коллекции миров') : t('Коллекции аватаров')}
+      onClose={onClose}
+    >
       <p className="muted">
-        Переименуйте коллекции. Изменения сохраняются в вашем аккаунте VRChat.
+        {t('Переименуйте коллекции. Изменения сохраняются в вашем аккаунте VRChat.')}
       </p>
       {groups.loading ? (
         <Loading />
       ) : groups.error ? (
         <ErrorState error={groups.error} retry={groups.reload} />
       ) : !relevant.length ? (
-        <Empty title="Коллекции не найдены" />
+        <Empty title={t('Коллекции не найдены')} />
       ) : (
         <div className="explore-post-list">
           {relevant.map((group) => (
@@ -1142,7 +1344,7 @@ function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () 
                     setName(text(group.displayName, text(group.name)));
                   }}
                 >
-                  Изменить
+                  {t('Изменить')}
                 </button>
               </div>
               {editing === group.name && (
@@ -1162,12 +1364,12 @@ function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () 
                       setEditing('');
                       groups.reload();
                       return result;
-                    }, 'Коллекция переименована');
+                    }, uiMessage('Коллекция переименована'));
                     setBusy(false);
                   }}
                 >
                   <label className="field">
-                    Название
+                    {t('Название')}
                     <input
                       maxLength={32}
                       required
@@ -1177,14 +1379,14 @@ function Collections({ type, onClose }: { type: 'world' | 'avatar'; onClose: () 
                   </label>
                   <div className="row">
                     <button className="button" disabled={busy || !name.trim()}>
-                      Сохранить
+                      {t('Сохранить')}
                     </button>
                     <button
                       type="button"
                       className="button secondary"
                       onClick={() => setEditing('')}
                     >
-                      Отмена
+                      {t('Отмена')}
                     </button>
                   </div>
                 </form>

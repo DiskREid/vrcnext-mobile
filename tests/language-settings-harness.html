@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Language settings synthetic transport fixture only</title></head>
+<body><div id="root"></div><script type="module">
+// These app-owned transport fixtures never enter the production bundle.
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+import '/src/styles.css';
+const image = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const self = {id:'usr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',displayName:'Настройки',state:'offline',location:'offline',status:'active',currentAvatarThumbnailImageUrl:image,friends:['usr_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb']};
+// Deliberately equal to UI translation keys: user content must remain untouched.
+const friend = {id:'usr_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb',displayName:'Миры',state:'active',location:'offline',status:'busy',statusDescription:'На сайте',bio:'Настройки',isFriend:true,tags:[],currentAvatarThumbnailImageUrl:image};
+const listeners = new Map();
+window.__languageSettingsTest = {requests:[],unexpected:[],links:[],clearedSessions:0,selfId:self.id,friendId:friend.id};
+const bridge = {
+ async sessionState(){return{hasAuth:true};},
+ async request(options){
+  const url = new URL(options.path,'https://synthetic.invalid');
+  window.__languageSettingsTest.requests.push({path:options.path,method:options.method||'GET'});
+  if(url.pathname==='/auth/user'||url.pathname===`/users/${self.id}`)return{status:200,data:self};
+  if(url.pathname==='/auth/user/friends')return{status:200,data:url.searchParams.get('offline')==='false'?[friend]:[]};
+  if(url.pathname===`/users/${friend.id}`)return{status:200,data:friend};
+  if(url.pathname===`/profile/${friend.id}`)return{status:200,data:{id:friend.id,bio:friend.bio}};
+  if(url.pathname===`/profile/${self.id}`)return{status:200,data:{id:self.id,bio:'Original self biography',languages:['eng'],bioLinks:[]}};
+  if(url.pathname==='/favorites'||url.pathname==='/calendar'||url.pathname===`/users/${self.id}/groups`)return{status:200,data:[]};
+  window.__languageSettingsTest.unexpected.push(options.path);
+  return{status:500,data:{error:{message:'Unexpected synthetic language route'}}};
+ },
+ async screenProtection(){return{enabled:false};}, async setScreenProtection({enabled}){return{enabled};},
+ async addListener(name,listener){listeners.set(name,listener);return{remove:async()=>{if(listeners.get(name)===listener)listeners.delete(name);}};},
+ async connectPipeline(){listeners.get('connection')?.({state:'connected'});}, async disconnectPipeline(){},
+ async clearSession(){window.__languageSettingsTest.clearedSessions++;}, async loadImage(){return{dataUrl:image};},
+ async openLink({url}){window.__languageSettingsTest.links.push(url);}, async copyText(){}, async exportJson(){return{saved:true};},
+};
+registerPlugin('VrcNative',{web:()=>bridge});
+registerPlugin('App',{web:()=>({getState:async()=>({isActive:true}),addListener:async()=>({remove:async()=>{}}),exitApp:async()=>{}})});
+Capacitor.isNativePlatform=()=>true;
+const {default:App}=await import('/src/App.tsx');
+createRoot(document.getElementById('root')).render(React.createElement(App));
+</script></body></html>

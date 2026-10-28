@@ -1,3 +1,4 @@
+import type { UiMessage } from './i18n';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { FriendState } from './data/friends';
 import type { HistoryState } from './data/history';
@@ -6,9 +7,16 @@ import type { CalendarSync } from './data/calendar-sync';
 import type { ReactNode } from 'react';
 import type { User, World, Group, CalendarEvent } from './api';
 export type Activity = {
-  id: string; title: string; detail: string; time: string;
-  userId?: string; displayName?: string;
-  beforeLocation?: string; location?: string; worldId?: string;
+  id: string;
+  title: string;
+  titleParams?: Record<string, string | number>;
+  detail: string;
+  time: string;
+  userId?: string;
+  displayName?: string;
+  beforeLocation?: string;
+  location?: string;
+  worldId?: string;
 };
 export type AppState = {
   user: User;
@@ -23,7 +31,7 @@ export type AppState = {
   calendarSync: CalendarSync;
   notificationsRefresh: number;
   notify: (text: string) => void;
-  act: <T>(operation: () => Promise<T>, success?: string) => Promise<T | undefined>;
+  act: <T>(operation: () => Promise<T>, success?: string | UiMessage) => Promise<T | undefined>;
   openUser: (user: User | string) => void;
   openWorld: (world: World | string, instanceLocation?: string) => void;
   openGroup: (group: Group) => void;
@@ -49,20 +57,30 @@ export function useLoad<T>(loader: () => Promise<T>, deps: unknown[] = []) {
   useEffect(() => {
     if (!enabled) return;
     const signature = [...deps, revision];
-    if (completed.current?.length === signature.length && completed.current.every((value, index) => Object.is(value, signature[index]))) return;
+    if (
+      completed.current?.length === signature.length &&
+      completed.current.every((value, index) => Object.is(value, signature[index]))
+    )
+      return;
     let live = true;
     setLoading(!loaded.current);
     setError('');
     Promise.resolve()
-      .then(() => live ? loader() : undefined)
+      .then(() => (live ? loader() : undefined))
       .then((v) => {
-        if (live) { loaded.current = true; setData(v); }
+        if (live) {
+          loaded.current = true;
+          setData(v);
+        }
       })
       .catch((e) => {
         if (live) setError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => {
-        if (live) { completed.current = signature; setLoading(false); }
+        if (live) {
+          completed.current = signature;
+          setLoading(false);
+        }
       });
     return () => {
       live = false;
@@ -75,7 +93,19 @@ export function AppProvider({ value, children }: { value: AppState; children: Re
 }
 
 /** Retained screens keep their controls and data without requesting APIs while hidden. */
-export function PageScope({ active, refresh, children }: { active: boolean; refresh: number; children: ReactNode }) {
+export function PageScope({
+  active,
+  refresh,
+  children,
+}: {
+  active: boolean;
+  refresh: number;
+  children: ReactNode;
+}) {
   const state = useApp();
-  return <AppProvider value={{ ...state, pageActive: active && state.pageActive !== false, refresh }}>{children}</AppProvider>;
+  return (
+    <AppProvider value={{ ...state, pageActive: active && state.pageActive !== false, refresh }}>
+      {children}
+    </AppProvider>
+  );
 }

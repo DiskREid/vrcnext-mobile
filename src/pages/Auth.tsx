@@ -1,3 +1,4 @@
+import { t, useI18n } from '../i18n';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
@@ -15,10 +16,10 @@ import DiagnosticsPanel from '../components/DiagnosticsPanel';
 
 const methodLabel = (method: string) =>
   method.toLowerCase() === 'totp'
-    ? 'Приложение-аутентификатор'
+    ? t('Приложение-аутентификатор')
     : method.toLowerCase() === 'emailotp'
-      ? 'Код из письма'
-      : 'Резервный код';
+      ? t('Код из письма')
+      : t('Резервный код');
 
 export default function Auth({
   onLogin,
@@ -27,6 +28,7 @@ export default function Auth({
   onLogin: (u: User) => void;
   onDemo: () => void;
 }) {
+  useI18n();
   const [username, setUsername] = useState(''),
     [password, setPassword] = useState(''),
     [code, setCode] = useState(''),
@@ -59,7 +61,7 @@ export default function Auth({
       .catch((failure) => {
         // A fresh install has no session; only unexpected restore failures need a message.
         if (live && !(failure instanceof ApiError && failure.status === 401))
-          setError(failure instanceof Error ? failure.message : 'Не удалось проверить сессию.');
+          setError(failure instanceof Error ? failure.message : t('Не удалось проверить сессию.'));
       })
       .finally(() => {
         if (live) setResuming(false);
@@ -86,7 +88,7 @@ export default function Auth({
         else onLogin(result);
       }
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Не удалось войти');
+      setError(failure instanceof Error ? failure.message : t('Не удалось войти'));
     } finally {
       setBusy(false);
     }
@@ -102,7 +104,7 @@ export default function Auth({
       setPassword('');
       setRestoredChallenge(false);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Не удалось начать вход заново.');
+      setError(failure instanceof Error ? failure.message : t('Не удалось начать вход заново.'));
     } finally {
       setBusy(false);
     }
@@ -112,7 +114,7 @@ export default function Auth({
       if (isNative) await native.openLink({ url: 'https://vrchat.com/home/login' });
       else window.open('https://vrchat.com/home/login', '_blank', 'noopener,noreferrer');
     } catch {
-      setError('Не удалось открыть браузер. Откройте https://vrchat.com/home/login вручную.');
+      setError(t('Не удалось открыть браузер. Откройте https://vrchat.com/home/login вручную.'));
     }
   };
 
@@ -136,21 +138,21 @@ export default function Auth({
           </div>
         </div>
         <span className="pill">
-          <Smartphone size={14} /> VRChat, всегда рядом
+          <Smartphone size={14} /> {t('VRChat, всегда рядом')}
         </span>
-        <h1>{methods.length ? 'Ещё один шаг.' : 'Твои миры.\nТвои люди.'}</h1>
+        <h1>{methods.length ? t('Ещё один шаг.') : t('Твои миры.\nТвои люди.')}</h1>
         <p className="auth-description">
           {methods.length
             ? method === 'emailotp'
-              ? 'Откройте последнее письмо VRChat, затем вернитесь сюда и введите код.'
+              ? t('Откройте последнее письмо VRChat, затем вернитесь сюда и введите код.')
               : method === 'otp'
-                ? 'Введите один из резервных кодов VRChat.'
-                : 'Введите код из приложения-аутентификатора.'
-            : 'Друзья, любимые миры и новые встречи — теперь в кармане.'}
+                ? t('Введите один из резервных кодов VRChat.')
+                : t('Введите код из приложения-аутентификатора.')
+            : t('Друзья, любимые миры и новые встречи — теперь в кармане.')}
         </p>
         {resuming ? (
           <div className="loading" role="status">
-            Проверяем сохранённый вход…
+            {t('Проверяем сохранённый вход…')}
           </div>
         ) : (
           <form className="form-stack" onSubmit={submit}>
@@ -158,11 +160,11 @@ export default function Auth({
               <>
                 {restoredChallenge && (
                   <p className="muted small">
-                    Предыдущий вход ожидает подтверждения. Временная сессия восстановлена.
+                    {t('Предыдущий вход ожидает подтверждения. Временная сессия восстановлена.')}
                   </p>
                 )}
                 <label className="field">
-                  Способ подтверждения
+                  {t('Способ подтверждения')}
                   <select
                     value={method}
                     disabled={busy}
@@ -181,10 +183,10 @@ export default function Auth({
                 </label>
                 <label className="field">
                   {method === 'emailotp'
-                    ? 'Код из письма'
+                    ? t('Код из письма')
                     : method === 'otp'
-                      ? 'Резервный код'
-                      : 'Код подтверждения'}
+                      ? t('Резервный код')
+                      : t('Код подтверждения')}
                   <input
                     autoFocus
                     type="text"
@@ -197,27 +199,27 @@ export default function Auth({
                     required
                     disabled={busy}
                     maxLength={method === 'otp' ? 64 : 16}
-                    placeholder={method === 'otp' ? 'Резервный код VRChat' : '6 цифр'}
+                    placeholder={method === 'otp' ? t('Резервный код VRChat') : t('6 цифр')}
                   />
                 </label>
               </>
             ) : (
               <>
                 <label className="field">
-                  Имя пользователя VRChat
+                  {t('Имя пользователя VRChat')}
                   <input
                     autoComplete="username"
                     autoCapitalize="none"
                     spellCheck={false}
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder="Имя для входа, не отображаемое имя"
+                    placeholder={t('Имя для входа, не отображаемое имя')}
                     disabled={!isNative || busy}
                     required
                   />
                 </label>
                 <label className="field">
-                  Пароль
+                  {t('Пароль')}
                   <div className="password-field">
                     <input
                       type={visible ? 'text' : 'password'}
@@ -231,7 +233,7 @@ export default function Auth({
                       type="button"
                       className="icon-button"
                       disabled={busy}
-                      aria-label={visible ? 'Скрыть пароль' : 'Показать пароль'}
+                      aria-label={visible ? t('Скрыть пароль') : t('Показать пароль')}
                       onClick={() => setVisible(!visible)}
                     >
                       {visible ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -246,7 +248,7 @@ export default function Auth({
               </p>
             )}
             <button className="button primary full" type="submit" disabled={busy || !isNative}>
-              {busy ? 'Подключаемся…' : methods.length ? 'Подтвердить' : 'Войти в VRChat'}
+              {busy ? t('Подключаемся…') : methods.length ? t('Подтвердить') : t('Войти в VRChat')}
               <ArrowRight size={18} />
             </button>
             {methods.length > 0 && (
@@ -257,7 +259,7 @@ export default function Auth({
                 onClick={() => void restart()}
               >
                 <ChevronLeft size={16} />
-                Начать вход заново
+                {t('Начать вход заново')}
               </button>
             )}
           </form>
@@ -269,54 +271,57 @@ export default function Auth({
           aria-expanded={showAccountHelp}
           onClick={() => setShowAccountHelp(!showAccountHelp)}
         >
-          Аккаунт Google или другой способ входа
+          {t('Аккаунт Google или другой способ входа')}
         </button>
         {showAccountHelp && (
           <div className="inset-panel form-stack">
             <p>
-              VRCNext Mobile входит через имя пользователя и пароль аккаунта VRChat. Прямой вход
-              через Google в этой версии не поддерживается.
+              {t(
+                'VRCNext Mobile входит через имя пользователя и пароль аккаунта VRChat. Прямой вход через Google в этой версии не поддерживается.',
+              )}
             </p>
             <p>
-              Если ваш аккаунт связан с Google или другой платформой, проверьте способы входа и
-              настройки аккаунта на официальном сайте VRChat. При наличии данных самого VRChat
-              используйте их здесь.
+              {t(
+                'Если ваш аккаунт связан с Google или другой платформой, проверьте способы входа и настройки аккаунта на официальном сайте VRChat. При наличии данных самого VRChat используйте их здесь.',
+              )}
             </p>
             <button
               type="button"
               className="button secondary"
               onClick={() => void openOfficialLogin()}
             >
-              Открыть официальный вход VRChat
+              {t('Открыть официальный вход VRChat')}
               <ExternalLink size={16} />
             </button>
             <p className="muted small">
-              Вход в браузере не переносит сессию в это приложение автоматически.
+              {t('Вход в браузере не переносит сессию в это приложение автоматически.')}
             </p>
           </div>
         )}
         <div className="auth-divider">
-          <span>или сначала осмотритесь</span>
+          <span>{t('или сначала осмотритесь')}</span>
         </div>
         <button className="button secondary full" disabled={busy || resuming} onClick={onDemo}>
-          Открыть деморежим
+          {t('Открыть деморежим')}
           <ArrowRight size={17} />
         </button>
         {!isNative && (
           <p className="muted small">
-            Это браузерный просмотр интерфейса. Вход в аккаунт доступен в Android APK.
+            {t('Это браузерный просмотр интерфейса. Вход в аккаунт доступен в Android APK.')}
           </p>
         )}
         <div className="privacy-note">
           <ShieldCheck size={20} />
           <p>
-            Прямое подключение к VRChat. Пароль не сохраняется; сессия защищена Android Keystore.
+            {t(
+              'Прямое подключение к VRChat. Пароль не сохраняется; сессия защищена Android Keystore.',
+            )}
           </p>
         </div>
         <DiagnosticsPanel />
         <p className="auth-footer">
           <LockKeyhole size={12} />
-          Неофициальный клиент · на основе VRCNext
+          {t('Неофициальный клиент · на основе VRCNext')}
         </p>
       </main>
     </div>

@@ -1,3 +1,5 @@
+import { uiMessage } from '../i18n';
+import { t, useI18n, dateLocale } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import {
@@ -61,9 +63,11 @@ const dateLabel = (
     minute: '2-digit',
   },
 ) => {
-  if (!value) return 'Дата не указана';
+  if (!value) return t('Дата не указана');
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Дата не указана' : date.toLocaleString('ru-RU', options);
+  return Number.isNaN(date.getTime())
+    ? t('Дата не указана')
+    : date.toLocaleString(dateLocale(), options);
 };
 const localDay = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -83,11 +87,21 @@ function occursOn(event: CalendarEvent, day: Date) {
 }
 
 const calendarClient = createCalendarClient(api.request);
-type CalendarWindow = { key: string; events: CalendarEvent[]; hasNext: boolean; nextOffset: number; pages: number; warning: string };
+type CalendarWindow = {
+  key: string;
+  events: CalendarEvent[];
+  hasNext: boolean;
+  nextOffset: number;
+  pages: number;
+  warning: string;
+};
 
 export function CalendarPage() {
+  useI18n();
   const ctx = useApp();
-  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [month, setMonth] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  );
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'following'>('all');
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
@@ -95,113 +109,354 @@ export function CalendarPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState<CalendarWindow>();
   const key = `${ctx.user.id}:${ctx.demo}:${month.getFullYear()}:${month.getMonth()}:${filter}`;
-  const latestKey = useRef(key); latestKey.current = ctx.pageActive === false ? '' : key;
+  const latestKey = useRef(key);
+  latestKey.current = ctx.pageActive === false ? '' : key;
   const scope = `${key}:${ctx.pageActive !== false}`;
   const observation = useRef({ scope, generation: 0 });
-  if (observation.current.scope !== scope) observation.current = { scope, generation: observation.current.generation + 1 };
-  useEffect(() => { if (ctx.pageActive === false) setSelected(null); }, [ctx.pageActive]);
+  if (observation.current.scope !== scope)
+    observation.current = { scope, generation: observation.current.generation + 1 };
+  useEffect(() => {
+    if (ctx.pageActive === false) setSelected(null);
+  }, [ctx.pageActive]);
   const window = useRef({ key: '', pages: 1 });
   const load = useLoad<CalendarWindow>(async () => {
     const generation = observation.current.generation;
-    const isCurrent = () => latestKey.current === key && observation.current.generation === generation;
+    const isCurrent = () =>
+      latestKey.current === key && observation.current.generation === generation;
     setRefreshing(true);
     try {
       const pages = window.current.key === key ? window.current.pages : 1;
-      let offset = 0, hasNext = false, completed = 0;
+      let offset = 0,
+        hasNext = false,
+        completed = 0;
       const events: CalendarEvent[] = [];
       if (ctx.demo) {
         events.push(...demoEvents.filter((event) => filter !== 'following' || event.isFollowing));
         completed = 1;
-      } else for (let index = 0; index < pages; index++) {
-        if (!isCurrent()) break;
-        const result = await calendarClient.month(month, filter, offset);
-        if (!isCurrent()) break;
-        const seen = new Set(events.map((event) => event.id));
-        const additions = result.events.filter((event) => !seen.has(event.id));
-        if (index && result.hasNext && !additions.length) throw new Error('VRChat повторил страницу календаря.');
-        events.push(...additions); completed++; offset = result.nextOffset; hasNext = result.hasNext;
-        if (!hasNext) break;
-      }
-      let groups: Group[] = [], warning = '';
-      if (!ctx.demo && isCurrent()) try { groups = await calendarClient.groups(ctx.user.id); }
-      catch (error) { warning = error instanceof Error ? error.message : 'Не удалось загрузить названия групп.'; }
-      return { key, events: withCalendarGroups(events, groups), hasNext, nextOffset: offset, pages: completed, warning };
-    } finally { if (isCurrent()) setRefreshing(false); }
+      } else
+        for (let index = 0; index < pages; index++) {
+          if (!isCurrent()) break;
+          const result = await calendarClient.month(month, filter, offset);
+          if (!isCurrent()) break;
+          const seen = new Set(events.map((event) => event.id));
+          const additions = result.events.filter((event) => !seen.has(event.id));
+          if (index && result.hasNext && !additions.length)
+            throw new Error(t('VRChat повторил страницу календаря.'));
+          events.push(...additions);
+          completed++;
+          offset = result.nextOffset;
+          hasNext = result.hasNext;
+          if (!hasNext) break;
+        }
+      let groups: Group[] = [],
+        warning = '';
+      if (!ctx.demo && isCurrent())
+        try {
+          groups = await calendarClient.groups(ctx.user.id);
+        } catch (error) {
+          warning =
+            error instanceof Error ? error.message : t('Не удалось загрузить названия групп.');
+        }
+      return {
+        key,
+        events: withCalendarGroups(events, groups),
+        hasNext,
+        nextOffset: offset,
+        pages: completed,
+        warning,
+      };
+    } finally {
+      if (isCurrent()) setRefreshing(false);
+    }
   }, [key, ctx.refresh]);
   useEffect(() => {
     if (load.data?.key !== key) return;
     const fresh = load.data;
     window.current = { key, pages: fresh.pages };
-    setPage((old) => ({ ...fresh, events: old?.key === key ? reconcilePage(old.events, fresh.events) : fresh.events }));
+    setPage((old) => ({
+      ...fresh,
+      events: old?.key === key ? reconcilePage(old.events, fresh.events) : fresh.events,
+    }));
   }, [load.data, key]);
   const current = page?.key === key ? page : undefined;
   const events = current?.events || [];
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const preceding = (month.getDay() + 6) % 7;
-  const days = Array.from({ length: daysInMonth }, (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1));
-  const visible = events.filter((event) => selectedDay
-    ? days.some((day) => localDay(day) === selectedDay && occursOn(event, day))
-    : days.some((day) => occursOn(event, day))).sort((a, b) => Date.parse(eventStart(a)) - Date.parse(eventStart(b)));
-  function moveMonth(direction: number) { setSelectedDay(null); setMonth(new Date(month.getFullYear(), month.getMonth() + direction, 1)); }
+  const days = Array.from(
+    { length: daysInMonth },
+    (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1),
+  );
+  const visible = events
+    .filter((event) =>
+      selectedDay
+        ? days.some((day) => localDay(day) === selectedDay && occursOn(event, day))
+        : days.some((day) => occursOn(event, day)),
+    )
+    .sort((a, b) => Date.parse(eventStart(a)) - Date.parse(eventStart(b)));
+  function moveMonth(direction: number) {
+    setSelectedDay(null);
+    setMonth(new Date(month.getFullYear(), month.getMonth() + direction, 1));
+  }
   async function loadMore() {
     if (!current || moreLoading || refreshing || ctx.pageActive === false) return;
     const captured = key;
     const generation = observation.current.generation;
-    const isCurrent = () => latestKey.current === captured && observation.current.generation === generation;
+    const isCurrent = () =>
+      latestKey.current === captured && observation.current.generation === generation;
     setMoreLoading(true);
     try {
       const next = await calendarClient.month(month, filter, current.nextOffset);
       if (!isCurrent()) return;
-      const names = current.events.flatMap((event) => event.group ? [event.group] : []);
+      const names = current.events.flatMap((event) => (event.group ? [event.group] : []));
       const existing = new Set(current.events.map((event) => event.id));
-      const additions = withCalendarGroups(next.events, names).filter((event) => !existing.has(event.id));
-      if (next.hasNext && !additions.length) throw new Error('VRChat повторил страницу календаря.');
+      const additions = withCalendarGroups(next.events, names).filter(
+        (event) => !existing.has(event.id),
+      );
+      if (next.hasNext && !additions.length)
+        throw new Error(t('VRChat повторил страницу календаря.'));
       window.current = { key, pages: current.pages + 1 };
-      setPage({ ...current, events: [...current.events, ...additions], nextOffset: next.nextOffset, hasNext: next.hasNext, pages: current.pages + 1 });
-    } catch (error) { if (isCurrent()) ctx.notify(error instanceof Error ? error.message : 'Не удалось загрузить события'); }
-    finally { setMoreLoading(false); }
+      setPage({
+        ...current,
+        events: [...current.events, ...additions],
+        nextOffset: next.nextOffset,
+        hasNext: next.hasNext,
+        pages: current.pages + 1,
+      });
+    } catch (error) {
+      if (isCurrent())
+        ctx.notify(error instanceof Error ? error.message : t('Не удалось загрузить события'));
+    } finally {
+      setMoreLoading(false);
+    }
   }
-  return <>
-    <PageHeader eyebrow="ВСТРЕЧАЕМСЯ В VRCHAT" title="Календарь" subtitle="События ваших групп и новые встречи."
-      actions={<button className="icon-button" aria-label="Обновить календарь" onClick={load.reload} disabled={refreshing || moreLoading} aria-busy={refreshing}><RefreshCw size={19} className={refreshing ? 'spin' : undefined} /></button>} />
-    <div className="toolbar"><Segmented items={[{ id: 'all', label: 'Все события' }, { id: 'following', label: 'Подписки' }]} value={filter} onChange={(value) => { setFilter(value as 'all' | 'following'); setSelectedDay(null); }} /></div>
-    {load.error && <ErrorState error={load.error} retry={load.reload} />}
-    {current?.warning && <ErrorState error={current.warning} retry={load.reload} />}
-    <div className="calendar-layout">
-      <section className="card calendar-card" aria-label="Календарь месяца">
-        <div className="calendar-month-row"><button className="icon-button" aria-label="Предыдущий месяц" onClick={() => moveMonth(-1)}><ArrowLeft size={19} /></button><h2>{month.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h2><button className="icon-button" aria-label="Следующий месяц" onClick={() => moveMonth(1)}><ArrowRight size={19} /></button></div>
-        <div className="calendar-weekdays" aria-hidden="true">{['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => <span key={day}>{day}</span>)}</div>
-        <div className="calendar-grid">{Array.from({ length: preceding }, (_, i) => <span key={`blank-${i}`} />)}{days.map((day) => {
-          const date = localDay(day), count = events.filter((event) => occursOn(event, day)).length, today = date === localDay(new Date());
-          return <button key={date} onClick={() => setSelectedDay(selectedDay === date ? null : date)} className={`calendar-day ${selectedDay === date ? 'selected' : ''} ${today ? 'today' : ''}`} aria-pressed={selectedDay === date} aria-label={`${day.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}, событий: ${count}${today ? ', сегодня' : ''}`}><span>{day.getDate()}</span>{count > 0 && <i aria-hidden="true" />}</button>;
-        })}</div>
-        <div className="calendar-footer"><button className="text-button" onClick={() => { setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); setSelectedDay(localDay(new Date())); }}>Сегодня</button>{selectedDay && <button className="text-button" onClick={() => setSelectedDay(null)}>Весь месяц</button>}</div>
-        <p className="calendar-timezone muted"><Clock3 size={13} />Время: {Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
-      </section>
-      <Section title={selectedDay ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'События месяца'}>
-        {!current && !load.error ? <Loading /> : !visible.length && !load.error ? <Empty title="Свободный день" text={ctx.demo ? 'Демособытие появится в календаре завтрашнего дня.' : 'Событий не найдено. Попробуйте другой день или фильтр.'} icon={<CalendarDays size={32} />} /> : <div className="event-list">{visible.map((event) => <button key={event.id} className="card event-card" onClick={() => setSelected(event)}>
-          <div className="event-date"><span>{new Date(eventStart(event)).toLocaleDateString('ru-RU', { month: 'short' })}</span><strong>{new Date(eventStart(event)).getDate()}</strong></div>
-          <div className="event-content"><div className="row"><h3>{event.title || event.name || 'Событие VRChat'}</h3>{event.isFollowing && <Bell size={15} aria-label="Вы подписаны" />}</div><p className="muted">{dateLabel(eventStart(event), { hour: '2-digit', minute: '2-digit' })}{event.group?.name && ` · ${event.group.name}`}</p>{event.description && <p className="event-excerpt">{event.description}</p>}</div>
-        </button>)}</div>}
-        {current?.hasNext && <button className="button secondary load-more" disabled={moreLoading || refreshing} onClick={() => void loadMore()}>{moreLoading ? 'Загрузка…' : 'Ещё события'}</button>}
-      </Section>
-    </div>
-    {selected && ctx.pageActive !== false && <CalendarEventDetail initial={selected} onClose={() => setSelected(null)} onChanged={(event) => { setSelected(event); setPage((old) => old ? { ...old, events: old.events.map((item) => item.id === event.id ? event : item) } : old); }} />}
-  </>;
+  return (
+    <>
+      <PageHeader
+        eyebrow={t('ВСТРЕЧАЕМСЯ В VRCHAT')}
+        title={t('Календарь')}
+        subtitle={t('События ваших групп и новые встречи.')}
+        actions={
+          <button
+            className="icon-button"
+            aria-label={t('Обновить календарь')}
+            onClick={load.reload}
+            disabled={refreshing || moreLoading}
+            aria-busy={refreshing}
+          >
+            <RefreshCw size={19} className={refreshing ? 'spin' : undefined} />
+          </button>
+        }
+      />
+      <div className="toolbar">
+        <Segmented
+          items={[
+            { id: 'all', label: t('Все события') },
+            { id: 'following', label: t('Подписки') },
+          ]}
+          value={filter}
+          onChange={(value) => {
+            setFilter(value as 'all' | 'following');
+            setSelectedDay(null);
+          }}
+        />
+      </div>
+      {load.error && <ErrorState error={load.error} retry={load.reload} />}
+      {current?.warning && <ErrorState error={current.warning} retry={load.reload} />}
+      <div className="calendar-layout">
+        <section className="card calendar-card" aria-label={t('Календарь месяца')}>
+          <div className="calendar-month-row">
+            <button
+              className="icon-button"
+              aria-label={t('Предыдущий месяц')}
+              onClick={() => moveMonth(-1)}
+            >
+              <ArrowLeft size={19} />
+            </button>
+            <h2>{month.toLocaleDateString(dateLocale(), { month: 'long', year: 'numeric' })}</h2>
+            <button
+              className="icon-button"
+              aria-label={t('Следующий месяц')}
+              onClick={() => moveMonth(1)}
+            >
+              <ArrowRight size={19} />
+            </button>
+          </div>
+          <div className="calendar-weekdays" aria-hidden="true">
+            {[t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб'), t('Вс')].map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+          <div className="calendar-grid">
+            {Array.from({ length: preceding }, (_, i) => (
+              <span key={`blank-${i}`} />
+            ))}
+            {days.map((day) => {
+              const date = localDay(day),
+                count = events.filter((event) => occursOn(event, day)).length,
+                today = date === localDay(new Date());
+              return (
+                <button
+                  key={date}
+                  onClick={() => setSelectedDay(selectedDay === date ? null : date)}
+                  className={`calendar-day ${selectedDay === date ? 'selected' : ''} ${today ? 'today' : ''}`}
+                  aria-pressed={selectedDay === date}
+                  aria-label={t('{value0}, событий: {value1}{value2}', {
+                    value0: day.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long' }),
+                    value1: count,
+                    value2: today ? t(', сегодня') : '',
+                  })}
+                >
+                  <span>{day.getDate()}</span>
+                  {count > 0 && <i aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
+          <div className="calendar-footer">
+            <button
+              className="text-button"
+              onClick={() => {
+                setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+                setSelectedDay(localDay(new Date()));
+              }}
+            >
+              {t('Сегодня')}
+            </button>
+            {selectedDay && (
+              <button className="text-button" onClick={() => setSelectedDay(null)}>
+                {t('Весь месяц')}
+              </button>
+            )}
+          </div>
+          <p className="calendar-timezone muted">
+            <Clock3 size={13} />
+            {t('Время: ')}
+            {Intl.DateTimeFormat().resolvedOptions().timeZone}
+          </p>
+        </section>
+        <Section
+          title={
+            selectedDay
+              ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString(dateLocale(), {
+                  day: 'numeric',
+                  month: 'long',
+                })
+              : t('События месяца')
+          }
+        >
+          {!current && !load.error ? (
+            <Loading />
+          ) : !visible.length && !load.error ? (
+            <Empty
+              title={t('Свободный день')}
+              text={
+                ctx.demo
+                  ? t('Демособытие появится в календаре завтрашнего дня.')
+                  : t('Событий не найдено. Попробуйте другой день или фильтр.')
+              }
+              icon={<CalendarDays size={32} />}
+            />
+          ) : (
+            <div className="event-list">
+              {visible.map((event) => (
+                <button
+                  key={event.id}
+                  className="card event-card"
+                  onClick={() => setSelected(event)}
+                >
+                  <div className="event-date">
+                    <span>
+                      {new Date(eventStart(event)).toLocaleDateString(dateLocale(), {
+                        month: 'short',
+                      })}
+                    </span>
+                    <strong>{new Date(eventStart(event)).getDate()}</strong>
+                  </div>
+                  <div className="event-content">
+                    <div className="row">
+                      <h3>{event.title || event.name || t('Событие VRChat')}</h3>
+                      {event.isFollowing && <Bell size={15} aria-label={t('Вы подписаны')} />}
+                    </div>
+                    <p className="muted">
+                      {dateLabel(eventStart(event), { hour: '2-digit', minute: '2-digit' })}
+                      {event.group?.name && ` · ${event.group.name}`}
+                    </p>
+                    {event.description && <p className="event-excerpt">{event.description}</p>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          {current?.hasNext && (
+            <button
+              className="button secondary load-more"
+              disabled={moreLoading || refreshing}
+              onClick={() => void loadMore()}
+            >
+              {moreLoading ? t('Загрузка…') : t('Ещё события')}
+            </button>
+          )}
+        </Section>
+      </div>
+      {selected && ctx.pageActive !== false && (
+        <CalendarEventDetail
+          initial={selected}
+          onClose={() => setSelected(null)}
+          onChanged={(event) => {
+            setSelected(event);
+            setPage((old) =>
+              old
+                ? {
+                    ...old,
+                    events: old.events.map((item) => (item.id === event.id ? event : item)),
+                  }
+                : old,
+            );
+          }}
+        />
+      )}
+    </>
+  );
 }
 
-export function CalendarEventDetail(props: { initial: CalendarEvent; onClose: () => void; onChanged?: (event: CalendarEvent) => void }) {
-  return <CalendarDetail key={`${props.initial.groupId || props.initial.ownerId}:${props.initial.id}`} {...props} />;
+export function CalendarEventDetail(props: {
+  initial: CalendarEvent;
+  onClose: () => void;
+  onChanged?: (event: CalendarEvent) => void;
+}) {
+  useI18n();
+  return (
+    <CalendarDetail
+      key={`${props.initial.groupId || props.initial.ownerId}:${props.initial.id}`}
+      {...props}
+    />
+  );
 }
-function CalendarDetail({ initial, onClose, onChanged }: { initial: CalendarEvent; onClose: () => void; onChanged?: (event: CalendarEvent) => void }) {
+function CalendarDetail({
+  initial,
+  onClose,
+  onChanged,
+}: {
+  initial: CalendarEvent;
+  onClose: () => void;
+  onChanged?: (event: CalendarEvent) => void;
+}) {
+  useI18n();
   const ctx = useApp();
-  const [pending, setPending] = useState(false), [event, setEvent] = useState(initial);
+  const [pending, setPending] = useState(false),
+    [event, setEvent] = useState(initial);
   const groupId = initial.groupId || initial.group?.id || initial.ownerId;
   const detail = useLoad(async () => {
     if (ctx.demo) return initial;
-    if (!groupId?.startsWith('grp_')) throw new Error('VRChat не передал группу события. Подробности недоступны.');
+    if (!groupId?.startsWith('grp_'))
+      throw new Error(t('VRChat не передал группу события. Подробности недоступны.'));
     const fresh = await calendarClient.detail(groupId, initial.id);
-    return { ...initial, ...fresh, groupId: fresh.groupId || groupId, isFollowing: fresh.isFollowing ?? initial.isFollowing };
+    return {
+      ...initial,
+      ...fresh,
+      groupId: fresh.groupId || groupId,
+      isFollowing: fresh.isFollowing ?? initial.isFollowing,
+    };
   }, [initial.id, groupId, ctx.demo]);
   const group = useLoad(async () => {
     if (ctx.demo) return initial.group;
@@ -209,38 +464,103 @@ function CalendarDetail({ initial, onClose, onChanged }: { initial: CalendarEven
     const ownGroups = await calendarClient.groups(ctx.user.id);
     return ownGroups.find((item) => item.id === groupId) || api.group(groupId);
   }, [groupId, ctx.user.id, ctx.demo]);
-  useEffect(() => { if (detail.data) setEvent(detail.data); }, [detail.data]);
+  useEffect(() => {
+    if (detail.data) setEvent(detail.data);
+  }, [detail.data]);
   async function follow() {
-    if (!groupId?.startsWith('grp_')) { ctx.notify('Группа события недоступна.'); return; }
+    if (!groupId?.startsWith('grp_')) {
+      ctx.notify(t('Группа события недоступна.'));
+      return;
+    }
     setPending(true);
-    await ctx.act(async () => {
-      const desired = !event.isFollowing;
-      let fresh = await api.followEvent(groupId, event.id, desired);
-      if (typeof fresh.isFollowing !== 'boolean') fresh = await calendarClient.detail(groupId, event.id);
-      if (fresh.isFollowing !== desired) throw new Error('VRChat не подтвердил изменение подписки. Обновите событие и попробуйте ещё раз.');
-      const next = { ...event, ...fresh, groupId: fresh.groupId || groupId };
-      setEvent(next); onChanged?.(next); ctx.calendarSync.refresh();
-    }, event.isFollowing ? 'Подписка на событие отменена' : 'Вы подписались на событие');
+    await ctx.act(
+      async () => {
+        const desired = !event.isFollowing;
+        let fresh = await api.followEvent(groupId, event.id, desired);
+        if (typeof fresh.isFollowing !== 'boolean')
+          fresh = await calendarClient.detail(groupId, event.id);
+        if (fresh.isFollowing !== desired)
+          throw new Error(
+            t('VRChat не подтвердил изменение подписки. Обновите событие и попробуйте ещё раз.'),
+          );
+        const next = { ...event, ...fresh, groupId: fresh.groupId || groupId };
+        setEvent(next);
+        onChanged?.(next);
+        ctx.calendarSync.refresh();
+      },
+      event.isFollowing
+        ? uiMessage('Подписка на событие отменена')
+        : uiMessage('Вы подписались на событие'),
+    );
     setPending(false);
   }
-  return <Modal title={event.title || event.name || 'Событие VRChat'} onClose={onClose}>
-    {detail.loading && <Loading />}{detail.error && <ErrorState error={detail.error} retry={detail.reload} />}{group.error && <ErrorState error={group.error} retry={group.reload} />}
-    {event.imageUrl && <SecureImage className="collection-detail-image" src={event.imageUrl} alt="" />}
-    <div className="form-stack"><p className="row"><CalendarDays size={18} />{dateLabel(eventStart(event))}</p>{eventEnd(event) && <p className="muted">До {dateLabel(eventEnd(event))}</p>}
-      {(group.data?.name || event.group?.name) && <Badge>{group.data?.name || event.group?.name}</Badge>}
-      <p className="collection-description">{event.description || 'Организатор не добавил описание.'}</p>
-      <div className="detail-actions"><button className="button" disabled={pending || detail.loading || !!detail.error || !groupId} onClick={() => void follow()}>{event.isFollowing ? <BellOff size={17} /> : <Bell size={17} />}{pending ? 'Сохранение…' : event.isFollowing ? 'Отписаться' : 'Подписаться'}</button>
-        {groupId && <button className="button secondary" onClick={() => { onClose(); ctx.openGroup(group.data || event.group || { id: groupId, name: groupId }); }}>Открыть группу</button>}
-        {event.worldId && <button className="button secondary" onClick={() => { onClose(); ctx.openWorld(event.worldId!); }}>Открыть мир</button>}
+  return (
+    <Modal title={event.title || event.name || t('Событие VRChat')} onClose={onClose}>
+      {detail.loading && <Loading />}
+      {detail.error && <ErrorState error={detail.error} retry={detail.reload} />}
+      {group.error && <ErrorState error={group.error} retry={group.reload} />}
+      {event.imageUrl && (
+        <SecureImage className="collection-detail-image" src={event.imageUrl} alt="" />
+      )}
+      <div className="form-stack">
+        <p className="row">
+          <CalendarDays size={18} />
+          {dateLabel(eventStart(event))}
+        </p>
+        {eventEnd(event) && (
+          <p className="muted">
+            {t('До ')}
+            {dateLabel(eventEnd(event))}
+          </p>
+        )}
+        {(group.data?.name || event.group?.name) && (
+          <Badge>{group.data?.name || event.group?.name}</Badge>
+        )}
+        <p className="collection-description">
+          {event.description || t('Организатор не добавил описание.')}
+        </p>
+        <div className="detail-actions">
+          <button
+            className="button"
+            disabled={pending || detail.loading || !!detail.error || !groupId}
+            onClick={() => void follow()}
+          >
+            {event.isFollowing ? <BellOff size={17} /> : <Bell size={17} />}
+            {pending ? t('Сохранение…') : event.isFollowing ? t('Отписаться') : t('Подписаться')}
+          </button>
+          {groupId && (
+            <button
+              className="button secondary"
+              onClick={() => {
+                onClose();
+                ctx.openGroup(group.data || event.group || { id: groupId, name: groupId });
+              }}
+            >
+              {t('Открыть группу')}
+            </button>
+          )}
+          {event.worldId && (
+            <button
+              className="button secondary"
+              onClick={() => {
+                onClose();
+                ctx.openWorld(event.worldId!);
+              }}
+            >
+              {t('Открыть мир')}
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  </Modal>;
+    </Modal>
+  );
 }
 
 type InventoryTab = UploadTag | 'prints' | 'inventory';
 type CollectionItem = {
   id: string;
   name: string;
+  nameFallback?: string;
   image: string;
   sourceUrl?: string;
   createdAt?: string;
@@ -259,6 +579,9 @@ const inventoryTabs: { id: InventoryTab; label: string }[] = [
   { id: 'prints', label: 'Принты' },
   { id: 'inventory', label: 'Предметы' },
 ];
+// Keep API names unchanged; translate only our fallback when the row renders.
+const collectionName = (item: CollectionItem) =>
+  item.name || t(item.nameFallback || 'Без названия');
 function fileItem(file: VrcFile, kind: InventoryTab): CollectionItem {
   const versions = [...(file.versions || [])].reverse();
   const version =
@@ -271,7 +594,8 @@ function fileItem(file: VrcFile, kind: InventoryTab): CollectionItem {
   return {
     id: file.id,
     sourceUrl,
-    name: file.note || file.name || (kind === 'prints' ? 'Принт VRChat' : 'Без названия'),
+    name: file.note || file.name || '',
+    nameFallback: kind === 'prints' ? 'Принт VRChat' : 'Без названия',
     image:
       file.fileUrl ||
       file.imageUrl ||
@@ -291,7 +615,8 @@ function fileItem(file: VrcFile, kind: InventoryTab): CollectionItem {
 function inventoryItem(item: InventoryItem): CollectionItem {
   return {
     id: item.id,
-    name: item.name || item.template?.name || 'Предмет VRChat',
+    name: item.name || item.template?.name || '',
+    nameFallback: 'Предмет VRChat',
     image: item.imageUrl || item.template?.imageUrl || '',
     tags: [item.itemType || item.template?.itemType || ''].filter(Boolean),
     kind: 'inventory',
@@ -301,7 +626,8 @@ function printItem(print: Print): CollectionItem {
   const media = printMedia(print);
   return {
     id: print.id,
-    name: print.note || 'Принт VRChat',
+    name: print.note || '',
+    nameFallback: 'Принт VRChat',
     image: media.thumbnail,
     sourceUrl: media.original,
     createdAt: printDate(print),
@@ -326,10 +652,11 @@ function CollectionPreview({
   interactive?: boolean;
   onOpen?: () => void;
 }) {
+  useI18n();
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => setFailed(false), [src, refreshKey]);
-  if (!src) return <span className="collection-media-status">Изображение недоступно</span>;
+  if (!src) return <span className="collection-media-status">{t('Изображение недоступно')}</span>;
   return (
     <>
       <SecureImage
@@ -341,14 +668,19 @@ function CollectionPreview({
         onLoad={() => setFailed(false)}
         role={onOpen ? 'button' : undefined}
         tabIndex={onOpen ? 0 : undefined}
-        aria-label={onOpen ? `На весь экран: ${alt}` : undefined}
+        aria-label={onOpen ? t('На весь экран: {value0}', { value0: alt }) : undefined}
         onClick={onOpen}
-        onKeyDown={(event) => { if (onOpen && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }}
+        onKeyDown={(event) => {
+          if (onOpen && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            onOpen();
+          }
+        }}
         style={failed ? { visibility: 'hidden' } : undefined}
       />
       {failed && (
         <span className="collection-media-status" role="status">
-          Не удалось загрузить изображение.
+          {t('Не удалось загрузить изображение.')}
           {interactive ? (
             <button
               className="button secondary"
@@ -357,10 +689,11 @@ function CollectionPreview({
                 setAttempt((value) => value + 1);
               }}
             >
-              <RefreshCw size={16} /> Повторить
+              <RefreshCw size={16} />
+              {t(' Повторить')}
             </button>
           ) : (
-            <span>Откройте карточку, чтобы повторить.</span>
+            <span>{t('Откройте карточку, чтобы повторить.')}</span>
           )}
         </span>
       )}
@@ -392,16 +725,22 @@ function fileSize(size?: number) {
   return size === undefined
     ? ''
     : size < 1024 * 1024
-      ? `${Math.round(size / 1024)} КБ`
-      : `${(size / 1024 / 1024).toFixed(1)} МБ`;
+      ? t('{value0} КБ', { value0: Math.round(size / 1024) })
+      : t('{value0} МБ', { value0: (size / 1024 / 1024).toFixed(1) });
 }
 
 export function InventoryPage() {
+  useI18n();
   const { user, demo, act, notify, refresh, openWorld, onUserUpdated } = useApp();
   const [tab, setTab] = useState<InventoryTab>('gallery');
   const [items, setItems] = useState<CollectionItem[]>([]);
   const [selected, setSelected] = useState<CollectionItem | null>(null);
-  const [viewer, setViewer] = useState<{ id: string; src: string; originalUrl?: string; title: string } | null>(null);
+  const [viewer, setViewer] = useState<{
+    id: string;
+    src: string;
+    originalUrl?: string;
+    title: string;
+  } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [appearanceAction, setAppearanceAction] = useState<'icon' | 'banner' | null>(null);
   const [busy, setBusy] = useState(false);
@@ -468,7 +807,7 @@ export function InventoryPage() {
         setNextOffset((offset) => offset + 100);
       }
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Не удалось загрузить следующую страницу');
+      notify(error instanceof Error ? error.message : t('Не удалось загрузить следующую страницу'));
     } finally {
       setBusy(false);
     }
@@ -480,7 +819,7 @@ export function InventoryPage() {
       if (selected.kind === 'prints') await api.deletePrint(selected.id);
       else await api.deleteFile(selected.id);
       return true;
-    }, 'Файл удалён');
+    }, uiMessage('Файл удалён'));
     if (success) {
       setItems((previous) => previous.filter((item) => item.id !== selected.id));
       setSelected(null);
@@ -491,13 +830,24 @@ export function InventoryPage() {
   async function original() {
     if (!selected?.image) return;
     const item = selected;
-    setViewer({ id: item.id, src: item.image, originalUrl: item.sourceUrl || undefined, title: item.name });
+    setViewer({
+      id: item.id,
+      src: item.image,
+      originalUrl: item.sourceUrl || undefined,
+      title: collectionName(item),
+    });
     // A paged File can omit versions. Resolve real metadata rather than guessing /1/file.
     if (!demo && !item.sourceUrl && item.id.startsWith('file_')) {
       try {
         const file = fileItem(await api.file(item.id), item.kind);
-        setViewer(previous => previous?.id === item.id ? { ...previous, originalUrl: file.sourceUrl || undefined } : previous);
-      } catch { /* Keep the available preview; do not pretend it is an original. */ }
+        setViewer((previous) =>
+          previous?.id === item.id
+            ? { ...previous, originalUrl: file.sourceUrl || undefined }
+            : previous,
+        );
+      } catch {
+        /* Keep the available preview; do not pretend it is an original. */
+      }
     }
   }
   async function applyAppearance() {
@@ -516,14 +866,16 @@ export function InventoryPage() {
           );
           return true;
         },
-        action === 'icon' ? 'Иконка профиля обновлена' : 'Баннер профиля обновлён',
+        action === 'icon'
+          ? uiMessage('Иконка профиля обновлена')
+          : uiMessage('Баннер профиля обновлён'),
       );
       if (success) {
         setAppearanceAction(null);
         try {
           onUserUpdated(await api.resume());
         } catch {
-          notify('Оформление сохранено в VRChat. Обновить локальный профиль пока не удалось.');
+          notify(t('Оформление сохранено в VRChat. Обновить локальный профиль пока не удалось.'));
         }
       }
     } finally {
@@ -533,13 +885,13 @@ export function InventoryPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ВАШИ КОЛЛЕКЦИИ"
-        title="Инвентарь"
-        subtitle="Фото, иконки и небольшие вещи с большой историей."
+        eyebrow={t('ВАШИ КОЛЛЕКЦИИ')}
+        title={t('Инвентарь')}
+        subtitle={t('Фото, иконки и небольшие вещи с большой историей.')}
         actions={
           <button
             className="icon-button"
-            aria-label="Обновить инвентарь"
+            aria-label={t('Обновить инвентарь')}
             onClick={reload}
             disabled={load.loading}
           >
@@ -549,7 +901,7 @@ export function InventoryPage() {
       />
       <div className="toolbar inventory-toolbar">
         <Segmented
-          items={inventoryTabs}
+          items={inventoryTabs.map((item) => ({ ...item, label: t(item.label) }))}
           value={tab}
           onChange={(value) => setTab(value as InventoryTab)}
         />
@@ -559,21 +911,25 @@ export function InventoryPage() {
             onClick={() => setUpload(true)}
             disabled={!demo && plusRequired && !hasPlus}
           >
-            <Upload size={17} /> Загрузить
+            <Upload size={17} />
+            {t(' Загрузить')}
           </button>
         )}
       </div>
       {plusRequired && (
         <p className="collection-note">
           <Info size={16} />
-          {tab === 'icon' ? 'Иконки профиля' : 'Эмодзи и стикеры'} загружаются с подпиской VRC+.
-          {(tab === 'emoji' || tab === 'sticker') && ' Не больше 18 в коллекции.'}
+          {tab === 'icon' ? t('Иконки профиля') : t('Эмодзи и стикеры')}
+          {t(' загружаются с подпиской VRC+.')}
+          {(tab === 'emoji' || tab === 'sticker') && t(' Не больше 18 в коллекции.')}
         </p>
       )}
       {tab === 'prints' && (
         <p className="collection-note">
           <Info size={16} />
-          Принты, созданные и собранные в VRChat. Фото с телефона можно загрузить во вкладке «Фото».
+          {t(
+            'Принты, созданные и собранные в VRChat. Фото с телефона можно загрузить во вкладке «Фото».',
+          )}
         </p>
       )}
       {load.loading ? (
@@ -582,13 +938,13 @@ export function InventoryPage() {
         <ErrorState error={load.error} retry={reload} />
       ) : items.length === 0 ? (
         <Empty
-          title="Здесь пока пусто"
+          title={t('Здесь пока пусто')}
           text={
             demo
-              ? 'В деморежиме примеры находятся во вкладке «Фото».'
+              ? t('В деморежиме примеры находятся во вкладке «Фото».')
               : tab === 'inventory'
-                ? 'Предметы, полученные в VRChat, появятся здесь.'
-                : 'Загрузите изображение или добавьте его в VRChat.'
+                ? t('Предметы, полученные в VRChat, появятся здесь.')
+                : t('Загрузите изображение или добавьте его в VRChat.')
           }
           icon={<ImageIcon size={32} />}
         />
@@ -614,18 +970,18 @@ export function InventoryPage() {
                   refreshKey={`${pageKey}:${mediaRevision}`}
                 />
                 <div className="inventory-image-badges">
-                  {item.tags.includes('emojianimated') && <Badge>АНИМ.</Badge>}
+                  {item.tags.includes('emojianimated') && <Badge>{t('АНИМ.')}</Badge>}
                   {tab === 'inventory' && item.tags[0] && <Badge>{item.tags[0]}</Badge>}
                 </div>
               </div>
               <div className="card-body">
-                <h3>{item.name}</h3>
+                <h3>{collectionName(item)}</h3>
                 <p className="muted">
                   {item.createdAt
                     ? dateLabel(item.createdAt, { day: 'numeric', month: 'short', year: 'numeric' })
                     : item.kind === 'inventory'
-                      ? 'Предмет VRChat'
-                      : 'Изображение'}
+                      ? t('Предмет VRChat')
+                      : t('Изображение')}
                   {item.size ? ` · ${fileSize(item.size)}` : ''}
                 </p>
               </div>
@@ -635,19 +991,19 @@ export function InventoryPage() {
       )}
       {!load.loading && hasMore && (
         <button className="button secondary load-more" onClick={more} disabled={busy}>
-          {busy ? 'Загрузка…' : 'Загрузить ещё'}
+          {busy ? t('Загрузка…') : t('Загрузить ещё')}
         </button>
       )}
       {selected && (
         <Modal
           title={
             deleteConfirm
-              ? 'Удалить файл?'
+              ? t('Удалить файл?')
               : appearanceAction === 'icon'
-                ? 'Изменить иконку профиля?'
+                ? t('Изменить иконку профиля?')
                 : appearanceAction === 'banner'
-                  ? 'Изменить баннер профиля?'
-                  : selected.name
+                  ? t('Изменить баннер профиля?')
+                  : collectionName(selected)
           }
           onClose={() => {
             if (!busy) {
@@ -659,45 +1015,56 @@ export function InventoryPage() {
         >
           {deleteConfirm ? (
             <div className="form-stack">
-              <p>«{selected.name}» будет удалён из VRChat. Это действие нельзя отменить.</p>
+              <p>
+                {t('«{name}» будет удалён из VRChat. Это действие нельзя отменить.', {
+                  name: collectionName(selected),
+                })}
+              </p>
               <div className="detail-actions">
                 <button className="button danger" onClick={remove} disabled={busy}>
                   <Trash2 size={17} />
-                  {busy ? 'Удаление…' : 'Удалить навсегда'}
+                  {busy ? t('Удаление…') : t('Удалить навсегда')}
                 </button>
                 <button
                   className="button secondary"
                   onClick={() => setDeleteConfirm(false)}
                   disabled={busy}
                 >
-                  Отмена
+                  {t('Отмена')}
                 </button>
               </div>
             </div>
           ) : appearanceAction ? (
             <div className="form-stack">
               <div className={`appearance-preview ${appearanceAction}`}>
-                <SecureImage src={selected.image} alt={selected.name} />
+                <SecureImage src={selected.image} alt={collectionName(selected)} />
               </div>
               <p>
-                Использовать «{selected.name}» как{' '}
-                {appearanceAction === 'icon' ? 'иконку' : 'баннер'} вашего профиля VRChat?
+                {appearanceAction === 'icon'
+                  ? t('Использовать «{name}» как иконку профиля VRChat?', {
+                      name: collectionName(selected),
+                    })
+                  : t('Использовать «{name}» как баннер профиля VRChat?', {
+                      name: collectionName(selected),
+                    })}
               </p>
-              <p className="muted">Изменение увидят другие пользователи. Функция требует VRC+.</p>
+              <p className="muted">
+                {t('Изменение увидят другие пользователи. Функция требует VRC+.')}
+              </p>
               <div className="detail-actions">
                 <button
                   className="button"
                   disabled={busy || (!demo && !hasPlus)}
                   onClick={applyAppearance}
                 >
-                  {busy ? 'Сохранение…' : 'Применить'}
+                  {busy ? t('Сохранение…') : t('Применить')}
                 </button>
                 <button
                   className="button secondary"
                   disabled={busy}
                   onClick={() => setAppearanceAction(null)}
                 >
-                  Отмена
+                  {t('Отмена')}
                 </button>
               </div>
             </div>
@@ -707,23 +1074,28 @@ export function InventoryPage() {
                 {selected.image ? (
                   <CollectionPreview
                     src={selected.sourceUrl || selected.image}
-                    alt={selected.name}
+                    alt={collectionName(selected)}
                     refreshKey={`${pageKey}:${mediaRevision}`}
                     interactive
                     onOpen={() => void original()}
                   />
                 ) : (
-                  <Empty title="Нет изображения" />
+                  <Empty title={t('Нет изображения')} />
                 )}
               </div>
               <div className="form-stack">
                 {selected.createdAt && <p className="muted">{dateLabel(selected.createdAt)}</p>}
-                {selected.authorName && <p className="muted">Автор: {selected.authorName}</p>}
+                {selected.authorName && (
+                  <p className="muted">
+                    {t('Автор: ')}
+                    {selected.authorName}
+                  </p>
+                )}
                 {selected.worldName && <p>{selected.worldName}</p>}
                 {(selected.kind === 'icon' || selected.kind === 'gallery') &&
                   validProfileImage(selected) && (
                     <div className="appearance-actions">
-                      <p className="muted">Оформление профиля · VRC+</p>
+                      <p className="muted">{t('Оформление профиля · VRC+')}</p>
                       <div className="detail-actions">
                         {selected.kind === 'icon' && (
                           <button
@@ -731,7 +1103,7 @@ export function InventoryPage() {
                             disabled={!demo && !hasPlus}
                             onClick={() => setAppearanceAction('icon')}
                           >
-                            Сделать иконкой профиля
+                            {t('Сделать иконкой профиля')}
                           </button>
                         )}
                         {selected.kind === 'gallery' && (
@@ -740,7 +1112,7 @@ export function InventoryPage() {
                             disabled={!demo && !hasPlus}
                             onClick={() => setAppearanceAction('banner')}
                           >
-                            Сделать баннером профиля
+                            {t('Сделать баннером профиля')}
                           </button>
                         )}
                       </div>
@@ -750,7 +1122,7 @@ export function InventoryPage() {
                   {selected.image && (
                     <button className="button secondary" onClick={original}>
                       <ExternalLink size={16} />
-                      На весь экран
+                      {t('На весь экран')}
                     </button>
                   )}
                   {selected.worldId && (
@@ -761,13 +1133,13 @@ export function InventoryPage() {
                         openWorld(selected.worldId!);
                       }}
                     >
-                      Мир на фото
+                      {t('Мир на фото')}
                     </button>
                   )}
                   {selected.kind !== 'inventory' && (
                     <button className="button danger" onClick={() => setDeleteConfirm(true)}>
                       <Trash2 size={16} />
-                      Удалить
+                      {t('Удалить')}
                     </button>
                   )}
                 </div>
@@ -776,14 +1148,24 @@ export function InventoryPage() {
           )}
         </Modal>
       )}
-      {viewer && <FullscreenImageViewer src={viewer.src} originalUrl={viewer.originalUrl} title={viewer.title} onClose={() => setViewer(null)} />}
+      {viewer && (
+        <FullscreenImageViewer
+          src={viewer.src}
+          originalUrl={viewer.originalUrl}
+          title={viewer.title}
+          onClose={() => setViewer(null)}
+        />
+      )}
       {upload && canUpload && (
         <UploadDialog
           tag={tab as UploadTag}
           onClose={() => setUpload(false)}
           onUpload={async (file) => {
             const kind = tab as UploadTag;
-            const uploaded = await act(() => api.uploadImage(file, kind), 'Изображение загружено');
+            const uploaded = await act(
+              () => api.uploadImage(file, kind),
+              uiMessage('Изображение загружено'),
+            );
             if (uploaded) {
               setUpload(false);
               load.reload();
@@ -795,7 +1177,7 @@ export function InventoryPage() {
                 try {
                   setSelected(fileItem(await api.file(uploaded.id), kind));
                 } catch {
-                  notify('Изображение загружено. Обновите список, чтобы открыть его свойства.');
+                  notify(t('Изображение загружено. Обновите список, чтобы открыть его свойства.'));
                 }
               }
             }
@@ -808,18 +1190,18 @@ export function InventoryPage() {
 
 async function normalizeImage(file: File, tag: UploadTag): Promise<File> {
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
-    throw new Error('Выберите PNG, JPEG или WebP.');
-  if (file.size > 10 * 1024 * 1024) throw new Error('Исходный файл должен быть меньше 10 МБ.');
+    throw new Error(t('Выберите PNG, JPEG или WebP.'));
+  if (file.size > 10 * 1024 * 1024) throw new Error(t('Исходный файл должен быть меньше 10 МБ.'));
   const url = URL.createObjectURL(file);
   try {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Не удалось прочитать изображение.'));
+      img.onerror = () => reject(new Error(t('Не удалось прочитать изображение.')));
       img.src = url;
     });
     if (image.naturalWidth < 64 || image.naturalHeight < 64)
-      throw new Error('Изображение должно быть не меньше 64 × 64 пикселей.');
+      throw new Error(t('Изображение должно быть не меньше 64 × 64 пикселей.'));
     const square = tag !== 'gallery',
       target = tag === 'emoji' || tag === 'sticker' ? 1024 : 2048;
     const sourceWidth = square
@@ -836,10 +1218,12 @@ async function normalizeImage(file: File, tag: UploadTag): Promise<File> {
     }
     if (canvas.width < 64 || canvas.height < 64)
       throw new Error(
-        'Изображение слишком вытянутое. После уменьшения каждая сторона должна быть не меньше 64 пикселей.',
+        t(
+          'Изображение слишком вытянутое. После уменьшения каждая сторона должна быть не меньше 64 пикселей.',
+        ),
       );
     const context = canvas.getContext('2d');
-    if (!context) throw new Error('Не удалось подготовить изображение.');
+    if (!context) throw new Error(t('Не удалось подготовить изображение.'));
     context.drawImage(
       image,
       (image.naturalWidth - sourceWidth) / 2,
@@ -853,12 +1237,14 @@ async function normalizeImage(file: File, tag: UploadTag): Promise<File> {
     );
     const blob = await new Promise<Blob>((resolve, reject) =>
       canvas.toBlob(
-        (value) => (value ? resolve(value) : reject(new Error('Не удалось сохранить PNG.'))),
+        (value) => (value ? resolve(value) : reject(new Error(t('Не удалось сохранить PNG.')))),
         'image/png',
       ),
     );
     if (blob.size > 8 * 1024 * 1024)
-      throw new Error('PNG после обработки превышает 8 МБ. Выберите изображение меньшего размера.');
+      throw new Error(
+        t('PNG после обработки превышает 8 МБ. Выберите изображение меньшего размера.'),
+      );
     return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.png`, { type: 'image/png' });
   } finally {
     URL.revokeObjectURL(url);
@@ -873,6 +1259,7 @@ function UploadDialog({
   onClose: () => void;
   onUpload: (file: File) => Promise<void>;
 }) {
+  useI18n();
   const [file, setFile] = useState<File | null>(null),
     [preview, setPreview] = useState(''),
     [error, setError] = useState(''),
@@ -895,7 +1282,7 @@ function UploadDialog({
       setFile(result);
       setPreview(URL.createObjectURL(result));
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Не удалось обработать изображение');
+      setError(error instanceof Error ? error.message : t('Не удалось обработать изображение'));
     } finally {
       setBusy(false);
     }
@@ -912,7 +1299,7 @@ function UploadDialog({
   }
   return (
     <Modal
-      title="Загрузить изображение"
+      title={t('Загрузить изображение')}
       onClose={() => {
         if (!busy) onClose();
       }}
@@ -920,15 +1307,15 @@ function UploadDialog({
       <form className="form-stack" onSubmit={submit}>
         <p className="muted">
           {tag === 'gallery'
-            ? 'До 2048 × 2048, в формате PNG.'
+            ? t('До 2048 × 2048, в формате PNG.')
             : tag === 'emoji'
-              ? 'Изображение будет обрезано по центру до квадрата 1024 × 1024.'
-              : 'Изображение будет обрезано по центру до квадрата.'}{' '}
-          Подготовленный файл можно проверить перед загрузкой.
+              ? t('Изображение будет обрезано по центру до квадрата 1024 × 1024.')
+              : t('Изображение будет обрезано по центру до квадрата.')}{' '}
+          {t('Подготовленный файл можно проверить перед загрузкой.')}
         </p>
         <label className="upload-picker">
           <Upload size={24} />
-          <span>{busy ? 'Подготовка…' : 'Выбрать изображение'}</span>
+          <span>{busy ? t('Подготовка…') : t('Выбрать изображение')}</span>
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp"
@@ -941,7 +1328,7 @@ function UploadDialog({
             <SecureImage
               className="upload-preview"
               src={preview}
-              alt="Предпросмотр подготовленного изображения"
+              alt={t('Предпросмотр подготовленного изображения')}
             />
             <p className="muted">PNG · {fileSize(file?.size)}</p>
           </>
@@ -954,10 +1341,10 @@ function UploadDialog({
         <div className="detail-actions">
           <button className="button" type="submit" disabled={!file || busy}>
             <Upload size={17} />
-            {busy ? 'Обработка…' : 'Загрузить в VRChat'}
+            {busy ? t('Обработка…') : t('Загрузить в VRChat')}
           </button>
           <button className="button secondary" type="button" onClick={onClose} disabled={busy}>
-            Отмена
+            {t('Отмена')}
           </button>
         </div>
       </form>
@@ -966,6 +1353,7 @@ function UploadDialog({
 }
 
 export function MessengerPage() {
+  useI18n();
   const { user, demo, act, notify, refresh, openUser } = useApp();
   const [search, setSearch] = useState(''),
     [recipient, setRecipient] = useState<User | null>(null),
@@ -1018,17 +1406,24 @@ export function MessengerPage() {
     setReceipt('');
     try {
       const name = recipient.displayName;
-      const success = await act(async () => {
-        await api.sendMessage(user.id, recipient.id, message.trim());
-        return true;
-      }, `Сообщение для ${name} отправлено`);
+      const success = await act(
+        async () => {
+          await api.sendMessage(user.id, recipient.id, message.trim());
+          return true;
+        },
+        uiMessage('Сообщение для {value0} отправлено', { value0: name }),
+      );
       if (success) {
-        setReceipt(`VRChat принял сообщение для ${name}. Оно придёт как приглашение с текстом.`);
+        setReceipt(
+          t('VRChat принял сообщение для {value0}. Оно придёт как приглашение с текстом.', {
+            value0: name,
+          }),
+        );
         setMessage('');
         slotsLoad.reload();
       }
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Не удалось отправить сообщение');
+      notify(error instanceof Error ? error.message : t('Не удалось отправить сообщение'));
     } finally {
       setSending(false);
     }
@@ -1036,22 +1431,23 @@ export function MessengerPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ОСТАВАЙТЕСЬ НА СВЯЗИ"
-        title="Сообщения"
-        subtitle="Короткое сообщение другу через приглашение VRChat."
+        eyebrow={t('ОСТАВАЙТЕСЬ НА СВЯЗИ')}
+        title={t('Сообщения')}
+        subtitle={t('Короткое сообщение другу через приглашение VRChat.')}
       />
       <div className="collection-note messenger-info">
         <Info size={19} />
         <p>
-          Как и в ПК-версии, текст отправляется через шаблон приглашения VRChat. Это не обычный чат.
-          VRChat ограничивает изменение шаблонов; отправка возможна только в доступный слот.
+          {t(
+            'Как и в ПК-версии, текст отправляется через шаблон приглашения VRChat. Это не обычный чат. VRChat ограничивает изменение шаблонов; отправка возможна только в доступный слот.',
+          )}
         </p>
       </div>
       <div className="messenger-layout">
         <section className="card messenger-friends">
           <div className="messenger-friends-heading">
-            <h2>Кому написать</h2>
-            <SearchField value={search} onChange={setSearch} placeholder="Найти друга" />
+            <h2>{t('Кому написать')}</h2>
+            <SearchField value={search} onChange={setSearch} placeholder={t('Найти друга')} />
           </div>
           {friendsLoad.loading ? (
             <Loading />
@@ -1059,8 +1455,8 @@ export function MessengerPage() {
             <ErrorState error={friendsLoad.error} retry={friendsLoad.reload} />
           ) : friends.length === 0 ? (
             <Empty
-              title="Друзья не найдены"
-              text="Попробуйте другое имя."
+              title={t('Друзья не найдены')}
+              text={t('Попробуйте другое имя.')}
               icon={<Users size={28} />}
             />
           ) : (
@@ -1079,11 +1475,14 @@ export function MessengerPage() {
                     name={friend.displayName}
                     src={imageOf(friend)}
                     size={42}
-                    user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl}
+                    user={friend}
+                    fallbackSrc={
+                      friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl
+                    }
                   />
                   <div>
                     <strong>{friend.displayName}</strong>
-                    <p className="muted">{friend.statusDescription || 'Друг в VRChat'}</p>
+                    <p className="muted">{friend.statusDescription || t('Друг в VRChat')}</p>
                   </div>
                   {recipient?.id === friend.id && <Check size={18} />}
                 </button>
@@ -1099,32 +1498,36 @@ export function MessengerPage() {
                 <div>
                   <h2>{recipient.displayName}</h2>
                   <button className="text-button" onClick={() => openUser(recipient)}>
-                    Открыть профиль
+                    {t('Открыть профиль')}
                   </button>
                 </div>
               </div>
               <form className="form-stack" onSubmit={send}>
                 <label className="field">
-                  Сообщение
+                  {t('Сообщение')}
                   <textarea
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     maxLength={60}
-                    placeholder="Привет! Исследуем новые миры вечером?"
+                    placeholder={t('Привет! Исследуем новые миры вечером?')}
                     rows={4}
                     disabled={sending}
                   />
                 </label>
                 <div className="composer-meta">
                   <span>{message.length}/60</span>
-                  <span>Изменяемых слотов: {slotsLoad.loading ? '…' : freeSlots}</span>
+                  <span>
+                    {t('Изменяемых слотов: ')}
+                    {slotsLoad.loading ? '…' : freeSlots}
+                  </span>
                 </div>
                 {slotsLoad.error && <ErrorState error={slotsLoad.error} retry={slotsLoad.reload} />}{' '}
                 {noSlots && (
                   <p className="collection-note">
                     <Clock3 size={17} />
-                    Все слоты на паузе. Дождитесь окончания ограничения VRChat или используйте уже
-                    сохранённый текст.
+                    {t(
+                      'Все слоты на паузе. Дождитесь окончания ограничения VRChat или используйте уже сохранённый текст.',
+                    )}
                   </p>
                 )}
                 {receipt && (
@@ -1141,32 +1544,35 @@ export function MessengerPage() {
                   }
                 >
                   <Send size={17} />
-                  {sending ? 'Отправка…' : 'Отправить'}
+                  {sending ? t('Отправка…') : t('Отправить')}
                 </button>
                 <p className="muted messenger-cooldown">
-                  Не повторяйте отправку часто. Доступность слотов и время ожидания определяет
-                  VRChat.
+                  {t(
+                    'Не повторяйте отправку часто. Доступность слотов и время ожидания определяет VRChat.',
+                  )}
                 </p>
               </form>
             </>
           ) : (
             <Empty
-              title="Выберите друга"
-              text="Одного короткого сообщения бывает достаточно, чтобы собраться вместе."
+              title={t('Выберите друга')}
+              text={t('Одного короткого сообщения бывает достаточно, чтобы собраться вместе.')}
               icon={<Mail size={34} />}
             />
           )}
         </section>
       </div>
-      <Section title="Полученные сообщения">
+      <Section title={t('Полученные сообщения')}>
         {incomingLoad.loading ? (
           <Loading />
         ) : incomingLoad.error ? (
           <ErrorState error={incomingLoad.error} retry={incomingLoad.reload} />
         ) : incoming.length === 0 ? (
           <Empty
-            title="Новых сообщений нет"
-            text="Здесь появятся приглашения с сообщениями VRCNext. Остальные приглашения находятся в уведомлениях."
+            title={t('Новых сообщений нет')}
+            text={t(
+              'Здесь появятся приглашения с сообщениями VRCNext. Остальные приглашения находятся в уведомлениях.',
+            )}
             icon={<Mail size={26} />}
           />
         ) : (
@@ -1177,7 +1583,7 @@ export function MessengerPage() {
                   <strong>
                     {notification.senderDisplayName ||
                       notification.senderUsername ||
-                      'Пользователь VRChat'}
+                      t('Пользователь VRChat')}
                   </strong>
                   <small className="muted">
                     {dateLabel(notification.created_at || notification.createdAt)}
@@ -1189,7 +1595,7 @@ export function MessengerPage() {
                     className="text-button"
                     onClick={() => openUser(notification.senderUserId!)}
                   >
-                    Открыть профиль
+                    {t('Открыть профиль')}
                   </button>
                 )}
               </article>
@@ -1197,7 +1603,7 @@ export function MessengerPage() {
           </div>
         )}
       </Section>
-      <Section title="Шаблоны приглашений">
+      <Section title={t('Шаблоны приглашений')}>
         <div className="card message-templates">
           {slotsLoad.loading ? (
             <Loading />
@@ -1206,8 +1612,9 @@ export function MessengerPage() {
           ) : (
             <>
               <p className="muted">
-                Сохранённые тексты принадлежат вашему аккаунту VRChat. Изменение при отправке может
-                заменить один из доступных шаблонов.
+                {t(
+                  'Сохранённые тексты принадлежат вашему аккаунту VRChat. Изменение при отправке может заменить один из доступных шаблонов.',
+                )}
               </p>
               <div className="template-grid">
                 {(slotsLoad.data || []).map((slot) => (
@@ -1218,7 +1625,7 @@ export function MessengerPage() {
                       if (slot.message.startsWith('msg ')) setMessage(slot.message.slice(4));
                       else
                         notify(
-                          'Этот шаблон не создан мессенджером и не будет выбран автоматически.',
+                          t('Этот шаблон не создан мессенджером и не будет выбран автоматически.'),
                         );
                     }}
                     disabled={!slot.message.startsWith('msg ')}
@@ -1227,14 +1634,14 @@ export function MessengerPage() {
                       <Badge>#{slot.slot + 1}</Badge>
                       <small className="muted">
                         {slot.canBeUpdated && (slot.remainingCooldownMinutes || 0) <= 0
-                          ? 'Доступен'
-                          : `${slot.remainingCooldownMinutes || '—'} мин.`}
+                          ? t('Доступен')
+                          : t('{value0} мин.', { value0: slot.remainingCooldownMinutes || '—' })}
                       </small>
                     </span>
                     <span>
                       {slot.message.startsWith('msg ')
                         ? slot.message.slice(4)
-                        : slot.message || 'Пустой шаблон'}
+                        : slot.message || t('Пустой шаблон')}
                     </span>
                   </button>
                 ))}

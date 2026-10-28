@@ -1,6 +1,16 @@
+import { uiMessage } from '../i18n';
 import DiagnosticsPanel from '../components/DiagnosticsPanel';
 import { useEffect, useRef, useState } from 'react';
-import { LockKeyhole, LogOut, Info, Palette, Clock, ExternalLink, Check } from 'lucide-react';
+import {
+  LockKeyhole,
+  LogOut,
+  Info,
+  Palette,
+  Clock,
+  ArrowUpRight,
+  Languages,
+  Check,
+} from 'lucide-react';
 import { api } from '../api';
 import { isNative, native } from '../api/native';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
@@ -18,7 +28,10 @@ import {
   Badge,
 } from '../components/ui';
 import { statusName, rankOf } from './Details';
+import { t, useI18n, dateLocale, SUPPORTED_LANGUAGES } from '../i18n';
+import type { Language } from '../i18n';
 export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
+  useI18n();
   const { user, demo, act } = useApp();
   const [status, setStatus] = useState(user.status || 'active'),
     [text, setText] = useState(user.statusDescription || ''),
@@ -82,13 +95,23 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
       } finally {
         setBusy(false);
       }
-    }, 'Профиль обновлён');
+    }, uiMessage('Профиль обновлён'));
   };
   return (
     <>
-      <PageHeader eyebrow="ВАШ АККАУНТ" title="Мой профиль" subtitle="Как вас видят в VRChat" />
+      <PageHeader
+        eyebrow={t('ВАШ АККАУНТ')}
+        title={t('Мой профиль')}
+        subtitle={t('Как вас видят в VRChat')}
+      />
       <div className="profile-card card">
-        <AvatarImage src={imageOf(user)} name={user.displayName} size={76} user={user} fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl} />
+        <AvatarImage
+          src={imageOf(user)}
+          name={user.displayName}
+          size={76}
+          user={user}
+          fallbackSrc={user.currentAvatarThumbnailImageUrl || user.currentAvatarImageUrl}
+        />
         <div>
           <h2>{user.displayName}</h2>
           <Badge className="rank">{rankOf(user.tags)}</Badge>
@@ -99,26 +122,47 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
         {profile.error && <ErrorState error={profile.error} retry={profile.reload} />}
         <div className="field-grid">
           <label className="field">
-            Статус
-            <select value={status} onChange={(e) => { edited.current.add('status'); setStatus(e.target.value); }}>
+            {t('Статус')}
+            <select
+              value={status}
+              onChange={(e) => {
+                edited.current.add('status');
+                setStatus(e.target.value);
+              }}
+            >
               {['join me', 'active', 'ask me', 'busy'].map((s) => (
                 <option key={s} value={s}>
-                  {statusName(s)}
+                  {t(statusName(s))}
                 </option>
               ))}
             </select>
           </label>
           <label className="field">
-            Местоимения
-            <input value={pronouns} onChange={(e) => { edited.current.add('pronouns'); setPronouns(e.target.value); }} maxLength={64} />
+            {t('Местоимения')}
+            <input
+              value={pronouns}
+              onChange={(e) => {
+                edited.current.add('pronouns');
+                setPronouns(e.target.value);
+              }}
+              maxLength={64}
+            />
           </label>
         </div>
         <label className="field">
-          Текст статуса<span className="input-hint">{text.length} / 32</span>
-          <input value={text} onChange={(e) => { edited.current.add('text'); setText(e.target.value); }} maxLength={32} />
+          {t('Текст статуса')}
+          <span className="input-hint">{text.length} / 32</span>
+          <input
+            value={text}
+            onChange={(e) => {
+              edited.current.add('text');
+              setText(e.target.value);
+            }}
+            maxLength={32}
+          />
         </label>
         <label className="field">
-          О себе
+          {t('О себе')}
           <textarea
             value={bio}
             onChange={(e) => {
@@ -130,7 +174,7 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
           />
         </label>
         <label className="field">
-          Языки
+          {t('Языки')}
           <input
             value={languages}
             onChange={(e) => {
@@ -139,10 +183,10 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
             }}
             placeholder="rus, eng, jpn"
           />
-          <span className="muted small">Коды языков VRChat через запятую.</span>
+          <span className="muted small">{t('Коды языков VRChat через запятую.')}</span>
         </label>
         <label className="field">
-          Социальные ссылки
+          {t('Социальные ссылки')}
           <textarea
             value={links}
             onChange={(e) => {
@@ -150,7 +194,7 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
               setLinks(e.target.value);
             }}
             rows={3}
-            placeholder="https://… — каждая ссылка с новой строки"
+            placeholder={t('https://… — каждая ссылка с новой строки')}
           />
         </label>
         <button
@@ -158,13 +202,14 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
           disabled={busy || profile.loading || !!profile.error || !profile.data}
           type="submit"
         >
-          {busy ? 'Сохраняем…' : 'Сохранить изменения'}
+          {busy ? t('Сохраняем…') : t('Сохранить изменения')}
         </button>
       </form>
     </>
   );
 }
-export function SettingsPage() {
+export function SettingsPage({ onAbout }: { onAbout?: () => void } = {}) {
+  const { language, setLanguage } = useI18n();
   const { logout } = useApp(),
     [accent, setAccent] = useState(localStorage.getItem('accent') || '#a398ff'),
     [confirm, setConfirm] = useState(false);
@@ -177,10 +222,16 @@ export function SettingsPage() {
     let active = true;
     setProtectionError('');
     native.screenProtection().then(
-      ({ enabled }) => { if (active) setScreenProtection(enabled); },
-      () => { if (active) setProtectionError('Не удалось прочитать настройку защиты экрана.'); },
+      ({ enabled }) => {
+        if (active) setScreenProtection(enabled);
+      },
+      () => {
+        if (active) setProtectionError(t('Не удалось прочитать настройку защиты экрана.'));
+      },
     );
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [protectionReadRevision]);
   const changeScreenProtection = async (enabled: boolean) => {
     if (!isNative || protectionBusy || screenProtection === null) return;
@@ -190,7 +241,7 @@ export function SettingsPage() {
       const result = await native.setScreenProtection({ enabled });
       setScreenProtection(result.enabled);
     } catch {
-      setProtectionError('Не удалось изменить защиту экрана. Повторите попытку.');
+      setProtectionError(t('Не удалось изменить защиту экрана. Повторите попытку.'));
     } finally {
       setProtectionBusy(false);
     }
@@ -202,16 +253,37 @@ export function SettingsPage() {
   };
   return (
     <>
-      <PageHeader eyebrow="ПОД ВАС" title="Настройки" />
+      <PageHeader eyebrow={t('ПОД ВАС')} title={t('Настройки')} />
       <div className="settings-grid">
         <section className="card settings-section">
+          <Languages />
+          <h2>{t('Язык приложения')}</h2>
+          <label className="field">
+            {t('Язык интерфейса')}
+            <select
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as Language)}
+            >
+              <option value="system">{t('Как на устройстве')}</option>
+              {SUPPORTED_LANGUAGES.map(({ code, label }) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="muted small">
+            {t('Применяется сразу. Друзья, история и сессия сохраняются.')}
+          </p>
+        </section>
+        <section className="card settings-section">
           <Palette />
-          <h2>Внешний вид</h2>
-          <p className="muted">Цвет акцента</p>
+          <h2>{t('Внешний вид')}</h2>
+          <p className="muted">{t('Цвет акцента')}</p>
           <div className="color-options">
             {['#a398ff', '#82c9b3', '#e6ae85', '#e4a3c0', '#83bbef'].map((c) => (
               <button
-                aria-label={`Цвет ${c}`}
+                aria-label={t('Цвет {color}', { color: c })}
                 aria-pressed={c === accent}
                 key={c}
                 style={{ background: c }}
@@ -222,137 +294,120 @@ export function SettingsPage() {
             ))}
           </div>
           <p className="muted small">
-            Ориентация следует повороту устройства. Навигация и карточки автоматически
-            подстраиваются под экран.
+            {t(
+              'Ориентация следует повороту устройства. Навигация и карточки автоматически подстраиваются под экран.',
+            )}
           </p>
         </section>
         <section className="card settings-section">
           <LockKeyhole />
-          <h2>Конфиденциальность</h2>
+          <h2>{t('Конфиденциальность')}</h2>
           <label className="screen-protection-setting">
             <span>
-              <strong>Защита от снимка экрана</strong>
+              <strong>{t('Защита от снимка экрана')}</strong>
               <span className="muted small">
                 {isNative
-                  ? 'Включите, чтобы запретить скриншоты и скрывать содержимое приложения при записи экрана. По умолчанию выключена.'
-                  : 'Доступна в Android-приложении. Браузер не позволяет управлять снимками экрана.'}
+                  ? t(
+                      'Включите, чтобы запретить скриншоты и скрывать содержимое приложения при записи экрана. По умолчанию выключена.',
+                    )
+                  : t(
+                      'Доступна в Android-приложении. Браузер не позволяет управлять снимками экрана.',
+                    )}
               </span>
             </span>
             <input
               type="checkbox"
               role="switch"
-              aria-label="Защита от снимка экрана"
+              aria-label={t('Защита от снимка экрана')}
               checked={screenProtection === true}
               disabled={!isNative || protectionBusy || screenProtection === null}
               onChange={(event) => void changeScreenProtection(event.target.checked)}
             />
           </label>
-          {protectionError && <div role="alert">
-            <p>{protectionError}</p>
-            {screenProtection === null && <button className="button secondary compact" onClick={() => setProtectionReadRevision((value) => value + 1)}>Повторить чтение настройки</button>}
-          </div>}
+          {protectionError && (
+            <div role="alert">
+              <p>{t(protectionError)}</p>
+              {screenProtection === null && (
+                <button
+                  className="button secondary compact"
+                  onClick={() => setProtectionReadRevision((value) => value + 1)}
+                >
+                  {t('Повторить чтение настройки')}
+                </button>
+              )}
+            </div>
+          )}
           <DiagnosticsPanel />
           <p className="muted">
-            Пароль не сохраняется. Cookie сессии шифруются ключом Android Keystore. Резервное
-            копирование отключено. Защитой от снимков экрана можно управлять выше. Нет аналитики и промежуточного сервера.
+            {t(
+              'Пароль не сохраняется. Cookie сессии шифруются ключом Android Keystore. Резервное копирование отключено. Защитой от снимков экрана можно управлять выше. Нет аналитики и промежуточного сервера.',
+            )}
           </p>
           <p className="muted small">
-            Для защиты сессии приложение не показывает cookie и токены. Выход удаляет сохранённую
-            сессию на устройстве.
+            {t(
+              'Для защиты сессии приложение не показывает cookie и токены. Выход удаляет сохранённую сессию на устройстве.',
+            )}
           </p>
           <button className="button danger" onClick={() => setConfirm(true)}>
             <LogOut size={17} />
-            Выйти из аккаунта
+            {t('Выйти из аккаунта')}
           </button>
           {confirm && (
             <div className="confirm-panel">
-              <p>Завершить сессию и удалить её с этого устройства?</p>
+              <p>{t('Завершить сессию и удалить её с этого устройства?')}</p>
               <div className="row">
                 <button className="button secondary" onClick={() => setConfirm(false)}>
-                  Отмена
+                  {t('Отмена')}
                 </button>
                 <button className="button danger" onClick={logout}>
-                  Выйти
+                  {t('Выйти')}
                 </button>
               </div>
             </div>
           )}
         </section>
-        <section className="card settings-section">
-          <Info />
-          <h2>
-            VRCNext Mobile <Badge>0.2.13</Badge>
-          </h2>
-          <p className="muted">
-            Неофициальная Android-адаптация VRCNext от shinyflvre и участников VRCNext. Не связана с
-            VRChat Inc.
-          </p>
-          <p className="muted small">
-            Исходный проект: shinyflvre/VRCNext, коммит 0bfb467f. Лицензия VNCOL, некоммерческое
-            использование. Все уведомления об авторских правах сохранены.
-          </p>
-          <a
-            href="https://github.com/shinyflvre/VRCNext"
-            target="_blank"
-            rel="noreferrer"
-            className="text-button"
-          >
-            Оригинальный проект <ExternalLink size={14} />
-          </a>
-          <a
-            href="https://github.com/DiskREid/vrcnext-mobile"
-            target="_blank"
-            rel="noreferrer"
-            className="text-button"
-          >
-            Исходный код Mobile <ExternalLink size={14} />
-          </a>
-          <details>
-            <summary>Лицензия VNCOL</summary>
-            <License />
-          </details>
-        </section>
+        {onAbout && (
+          <section className="card settings-section">
+            <Info />
+            <h2>{t('О проекте')}</h2>
+            <p className="muted">
+              {t('VRCNext Mobile — ваши друзья, миры и встречи VRChat с телефона.')}
+            </p>
+            <p className="muted small">
+              {t('История проекта, автор, исходный код и поддержка на Boosty.')}
+            </p>
+            <button className="button secondary" onClick={onAbout}>
+              {t('Открыть страницу проекта')}
+              <ArrowUpRight size={17} />
+            </button>
+          </section>
+        )}
       </div>
     </>
   );
 }
-function License() {
-  const data = useLoad(
-    () =>
-      fetch('/LICENSE.txt').then((r) => {
-        if (!r.ok) throw Error('Не удалось загрузить лицензию');
-        return r.text();
-      }),
-    [],
-  );
-  return data.data ? (
-    <pre className="license-text">{data.data}</pre>
-  ) : data.error ? (
-    <p>{data.error}</p>
-  ) : (
-    <Loading />
-  );
-}
 export function TimelinePage() {
+  useI18n();
   const { activity, openUser } = useApp();
   return (
     <>
       <PageHeader
-        eyebrow="ЭТО УСТРОЙСТВО"
-        title="Активность"
-        subtitle="События текущей сессии приложения"
+        eyebrow={t('ЭТО УСТРОЙСТВО')}
+        title={t('Активность')}
+        subtitle={t('События текущей сессии приложения')}
       />
       <div className="inset-panel">
         <Clock size={21} />
         <p>
-          Действия в приложении и события друзей за текущую мобильную сессию. Журнал очищается после
-          выхода из аккаунта.
+          {t(
+            'Действия в приложении и события друзей за текущую мобильную сессию. Журнал очищается после выхода из аккаунта.',
+          )}
         </p>
       </div>
       {!activity.length ? (
         <Empty
-          title="Начало новой истории"
-          text="Здесь появятся действия в приложении и события друзей, полученные от VRChat."
+          title={t('Начало новой истории')}
+          text={t('Здесь появятся действия в приложении и события друзей, полученные от VRChat.')}
         />
       ) : (
         <div className="timeline">
@@ -360,13 +415,27 @@ export function TimelinePage() {
             <article key={a.id} className="timeline-entry">
               <span className="timeline-point" />
               <div>
-                <strong>{a.title}</strong>
-                {a.userId && <button className="text-button" aria-label={`Открыть профиль ${a.displayName || a.userId}`} onClick={() => openUser(a.userId!)}>{a.displayName || a.userId}</button>}
-                {a.location !== undefined || a.beforeLocation !== undefined || a.worldId
-                  ? <ActivityWorldChange before={a.beforeLocation} after={a.location} worldId={a.worldId}/>
-                  : a.detail && a.detail !== a.displayName && <p className="muted">{a.detail}</p>}
+                <strong>{t(a.title, a.titleParams)}</strong>
+                {a.userId && (
+                  <button
+                    className="text-button"
+                    aria-label={t('Открыть профиль {name}', { name: a.displayName || a.userId })}
+                    onClick={() => openUser(a.userId!)}
+                  >
+                    {a.displayName || a.userId}
+                  </button>
+                )}
+                {a.location !== undefined || a.beforeLocation !== undefined || a.worldId ? (
+                  <ActivityWorldChange
+                    before={a.beforeLocation}
+                    after={a.location}
+                    worldId={a.worldId}
+                  />
+                ) : (
+                  a.detail && a.detail !== a.displayName && <p className="muted">{a.detail}</p>
+                )}
                 <time>
-                  {new Date(a.time).toLocaleTimeString('ru', {
+                  {new Date(a.time).toLocaleTimeString(dateLocale(), {
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
@@ -380,18 +449,22 @@ export function TimelinePage() {
   );
 }
 export function ModerationPage() {
+  useI18n();
   const { demo, act, refresh, openUser, history } = useApp();
   const [type, setType] = useState<'block' | 'mute'>('block');
   const load = useLoad(() => (demo ? Promise.resolve([]) : api.moderations(type)), [type, refresh]);
   return (
     <>
-      <PageHeader title="Блокировки и mute" subtitle="Управление модерацией вашего аккаунта" />
+      <PageHeader
+        title={t('Блокировки и mute')}
+        subtitle={t('Управление модерацией вашего аккаунта')}
+      />
       <Segmented
         value={type}
         onChange={(v) => setType(v as typeof type)}
         items={[
-          { id: 'block', label: 'Заблокированные' },
-          { id: 'mute', label: 'Заглушённые' },
+          { id: 'block', label: t('Заблокированные') },
+          { id: 'mute', label: t('Заглушённые') },
         ]}
       />
       {load.loading ? (
@@ -412,12 +485,16 @@ export function ModerationPage() {
               onClick={() =>
                 void act(async () => {
                   await api.unmoderate(m.targetUserId!, type);
-                  history.recordModeration(m.targetUserId!, m.targetDisplayName || m.targetUserId!, `Снято ограничение ${type}`);
+                  history.recordModeration(
+                    m.targetUserId!,
+                    m.targetDisplayName || m.targetUserId!,
+                    `Снято ограничение ${type}`,
+                  );
                   load.reload();
-                }, 'Ограничение снято')
+                }, uiMessage('Ограничение снято'))
               }
             >
-              Отменить {type}
+              {t('Отменить {type}', { type })}
             </button>
           </div>
         ))

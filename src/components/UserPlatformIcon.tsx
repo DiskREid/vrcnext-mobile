@@ -1,3 +1,4 @@
+import { t, useI18n } from '../i18n';
 import { CircleHelp, Globe2, Monitor, Smartphone } from 'lucide-react';
 import { userPlatformInfo } from '../data/user-platform';
 import './UserPlatformIcon.css';
@@ -9,9 +10,10 @@ export function UserPlatformIcon({
   value: unknown;
   context: 'current' | 'last';
 }) {
+  useI18n();
   const platform = userPlatformInfo(value);
   if (!platform) return null;
-  const label = `${context === 'last' ? 'Последняя платформа' : 'Текущая платформа'}: ${platform.label}`;
+  const label = `${context === 'last' ? t('Последняя платформа') : t('Текущая платформа')}: ${t(platform.label)}`;
   const title = platform.id === 'unknown' ? `${label} (${platform.raw.slice(0, 80)})` : label;
   const common = {
     width: 20,

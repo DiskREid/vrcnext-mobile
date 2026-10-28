@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -19,10 +20,12 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   render() {
     return this.state.error ? (
       <div className="fatal-error">
-        <h1>Не удалось открыть экран</h1>
-        <p>Перезапустите интерфейс. Если ошибка повторится, скопируйте технический отчёт ниже.</p>
+        <h1>{t('Не удалось открыть экран')}</h1>
+        <p>
+          {t('Перезапустите интерфейс. Если ошибка повторится, скопируйте технический отчёт ниже.')}
+        </p>
         <button className="button primary" onClick={() => location.reload()}>
-          Перезапустить
+          {t('Перезапустить')}
         </button>
         <DiagnosticsPanel />
       </div>

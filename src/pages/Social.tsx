@@ -1,3 +1,5 @@
+import { uiMessage } from '../i18n';
+import { t, dateLocale, useI18n } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
@@ -32,8 +34,8 @@ import { rankOf, statusName } from './Details';
 import './Social.css';
 
 function date(value?: string) {
-  if (!value || !Number.isFinite(Date.parse(value))) return 'Не предоставлено API';
-  return new Date(value).toLocaleString('ru', { dateStyle: 'medium', timeStyle: 'short' });
+  if (!value || !Number.isFinite(Date.parse(value))) return t('Не предоставлено API');
+  return new Date(value).toLocaleString(dateLocale(), { dateStyle: 'medium', timeStyle: 'short' });
 }
 function rank(user: User) {
   return user.tags ? rankOf(user.tags) : 'Неизвестен';
@@ -80,7 +82,7 @@ function FriendDetail({ friend, onClose }: { friend: User; onClose: () => void }
       } finally {
         setBusy(false);
       }
-    }, 'Пользователь удалён из друзей');
+    }, uiMessage('Пользователь удалён из друзей'));
   }
   return (
     <div className="social-expanded">
@@ -88,7 +90,9 @@ function FriendDetail({ friend, onClose }: { friend: User; onClose: () => void }
       {load.error && <ErrorState error={load.error} retry={load.reload} />}
       {load.data?.profileError && (
         <ErrorState
-          error={`Не удалось загрузить публичный профиль: ${load.data.profileError}`}
+          error={t('Не удалось загрузить публичный профиль: {value0}', {
+            value0: String(load.data.profileError),
+          })}
           retry={load.reload}
         />
       )}
@@ -99,78 +103,79 @@ function FriendDetail({ friend, onClose }: { friend: User; onClose: () => void }
         </div>
         <div>
           <dt>Trust Rank</dt>
-          <dd>{rank(user)}</dd>
+          <dd>{t(rank(user))}</dd>
         </div>
         <div>
-          <dt>Статус</dt>
+          <dt>{t('Статус')}</dt>
           <dd>
-            {statusName(user.status)}
+            {t(statusName(user.status))}
             {user.statusDescription && ` · ${user.statusDescription}`}
           </dd>
         </div>
         <div>
-          <dt>Местоположение</dt>
+          <dt>{t('Местоположение')}</dt>
           <dd>
-            {presenceLabel(user)}
+            {t(presenceLabel(user))}
             {accessibleLocation(user.location) && (
               <button
                 className="text-button"
                 onClick={() => ctx.openWorld(user.location!.split(':')[0])}
               >
-                Открыть мир
+                {t('Открыть мир')}
               </button>
             )}
           </dd>
         </div>
         <div>
-          <dt>Последняя активность</dt>
+          <dt>{t('Последняя активность')}</dt>
           <dd>{date(user.last_activity)}</dd>
         </div>
         <div>
-          <dt>Последний вход</dt>
+          <dt>{t('Последний вход')}</dt>
           <dd>{date(user.last_login)}</dd>
         </div>
         <div>
-          <dt>Регистрация</dt>
+          <dt>{t('Регистрация')}</dt>
           <dd>{date(user.date_joined)}</dd>
         </div>
         <div>
-          <dt>Языки</dt>
+          <dt>{t('Языки')}</dt>
           <dd>
             {user.languages?.length
               ? user.languages.join(', ')
               : load.loading
-                ? 'Загрузка…'
-                : 'Не предоставлены'}
+                ? t('Загрузка…')
+                : t('Не предоставлены')}
           </dd>
         </div>
         <div>
-          <dt>Совместные встречи</dt>
-          <dd>{stats?.encounters ? stats.encounters : 'Нет наблюдений'}</dd>
+          <dt>{t('Совместные встречи')}</dt>
+          <dd>{stats?.encounters ? stats.encounters : t('Нет наблюдений')}</dd>
         </div>
         <div>
-          <dt>Время вместе</dt>
+          <dt>{t('Время вместе')}</dt>
           <dd>
             {stats?.totalMs
-              ? `${Math.floor(stats.totalMs / 60_000)} мин наблюдений`
+              ? t('{value0} мин наблюдений', { value0: String(Math.floor(stats.totalMs / 60_000)) })
               : stats.encounters
-                ? 'Недостаточно наблюдений для оценки времени'
-                : 'Нет наблюдений'}
+                ? t('Недостаточно наблюдений для оценки времени')
+                : t('Нет наблюдений')}
           </dd>
         </div>
         <div>
-          <dt>Последняя встреча</dt>
-          <dd>{stats?.lastMeeting ? date(stats.lastMeeting) : 'Нет наблюдений'}</dd>
+          <dt>{t('Последняя встреча')}</dt>
+          <dd>{stats?.lastMeeting ? date(stats.lastMeeting) : t('Нет наблюдений')}</dd>
         </div>
       </dl>
       {(user.currentAvatarImageUrl || user.currentAvatarThumbnailImageUrl) && (
         <div className="social-current-avatar">
           <SecureImage
             src={user.currentAvatarImageUrl || user.currentAvatarThumbnailImageUrl}
-            alt="Текущий доступный аватар"
+            alt={t('Текущий доступный аватар')}
           />
           <span className="muted small">
-            Доступное изображение аватара{user.currentAvatar && ` · ${user.currentAvatar}`}
+            {t('Доступное изображение аватара')}
+            {user.currentAvatar && ` · ${user.currentAvatar}`}
           </span>
         </div>
       )}
@@ -178,12 +183,12 @@ function FriendDetail({ friend, onClose }: { friend: User; onClose: () => void }
         <h3>Bio</h3>
         <p className="preserve-lines">
           {user.bio !== undefined
-            ? user.bio || 'Биография пустая'
+            ? user.bio || t('Биография пустая')
             : load.loading
-              ? 'Загрузка…'
+              ? t('Загрузка…')
               : load.error || load.data?.profileError
-                ? 'Не удалось загрузить Bio. Повторите запрос.'
-                : 'API не предоставил биографию.'}
+                ? t('Не удалось загрузить Bio. Повторите запрос.')
+                : t('API не предоставил биографию.')}
         </p>
         {user.bioLinks?.filter(safeLink).map((link) => (
           <button
@@ -199,22 +204,22 @@ function FriendDetail({ friend, onClose }: { friend: User; onClose: () => void }
       <div className="social-detail-actions">
         <button className="button secondary compact" onClick={() => ctx.openUser(user)}>
           <UserRound size={16} />
-          Полный профиль
+          {t('Полный профиль')}
         </button>
         <button className="button danger compact" onClick={() => setConfirm(true)}>
           <Trash2 size={16} />
-          Удалить из друзей
+          {t('Удалить из друзей')}
         </button>
       </div>
       {confirm && (
-        <Modal title="Удалить из друзей?" onClose={() => !busy && setConfirm(false)}>
-          <p>Удалить {user.displayName} из списка друзей VRChat?</p>
+        <Modal title={t('Удалить из друзей?')} onClose={() => !busy && setConfirm(false)}>
+          <p>{t('Удалить {name} из списка друзей VRChat?', { name: user.displayName })}</p>
           <div className="social-detail-actions">
             <button className="button secondary" disabled={busy} onClick={() => setConfirm(false)}>
-              Отмена
+              {t('Отмена')}
             </button>
             <button className="button danger" disabled={busy} onClick={() => void remove()}>
-              {busy ? 'Удаляем…' : 'Удалить'}
+              {busy ? t('Удаляем…') : t('Удалить')}
             </button>
           </div>
         </Modal>
@@ -235,12 +240,12 @@ function FriendsList() {
   const friends = ctx.friends.data;
   const byId = new Map(friends.map((friend) => [friend.id, friend]));
   const compare = (a: User, b: User) => {
-    if (sort === 'name') return a.displayName.localeCompare(b.displayName, 'ru');
+    if (sort === 'name') return a.displayName.localeCompare(b.displayName, dateLocale());
     if (sort === 'rank') {
       const ranks = ['Trusted', 'Known', 'User', 'New User', 'Visitor', 'Неизвестен'];
       return (
         ranks.indexOf(rank(a)) - ranks.indexOf(rank(b)) ||
-        a.displayName.localeCompare(b.displayName, 'ru')
+        a.displayName.localeCompare(b.displayName, dateLocale())
       );
     }
     if (sort === 'last')
@@ -249,7 +254,7 @@ function FriendsList() {
       );
     return 0;
   };
-  const key = `${sort}:${ctx.refresh}:${sortRevision}`;
+  const key = `${sort}:${dateLocale()}:${ctx.refresh}:${sortRevision}`;
   // Sort only after a deliberate user choice/refresh. New friends append without moving existing rows.
   if (order.current.key !== key) {
     order.current = { key, ids: [...friends].sort(compare).map((friend) => friend.id) };
@@ -281,10 +286,14 @@ function FriendsList() {
   return (
     <>
       <div className="toolbar">
-        <SearchField value={query} onChange={setQuery} placeholder="Поиск друзей по имени или ID" />
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder={t('Поиск друзей по имени или ID')}
+        />
         <button
           className="icon-button"
-          aria-label="Обновить список Social"
+          aria-label={t('Обновить список Social')}
           onClick={() => {
             ctx.friends.reload();
             setSortRevision((revision) => revision + 1);
@@ -297,28 +306,30 @@ function FriendsList() {
         value={filter}
         onChange={setFilter}
         items={[
-          { id: 'all', label: 'Все' },
-          { id: 'online', label: 'В VRChat' },
-          { id: 'web', label: 'На сайте' },
-          { id: 'offline', label: 'Не в сети' },
+          { id: 'all', label: t('Все') },
+          { id: 'online', label: t('В VRChat') },
+          { id: 'web', label: t('На сайте') },
+          { id: 'offline', label: t('Не в сети') },
         ]}
       />
       <div className="social-filters">
         <label className="field">
-          Сортировка
+          {t('Сортировка')}
           <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="original">Порядок списка</option>
-            <option value="name">По имени</option>
-            <option value="rank">По Trust Rank</option>
-            <option value="last">Последняя активность</option>
+            <option value="original">{t('Порядок списка')}</option>
+            <option value="name">{t('По имени')}</option>
+            <option value="rank">{t('По Trust Rank')}</option>
+            <option value="last">{t('Последняя активность')}</option>
           </select>
         </label>
         <label className="field">
           Trust Rank
           <select value={rankFilter} onChange={(e) => setRankFilter(e.target.value)}>
-            <option value="all">Все ранги</option>
+            <option value="all">{t('Все ранги')}</option>
             {['Trusted', 'Known', 'User', 'New User', 'Visitor', 'Неизвестен'].map((value) => (
-              <option key={value}>{value}</option>
+              <option key={value} value={value}>
+                {t(value)}
+              </option>
             ))}
           </select>
         </label>
@@ -339,21 +350,24 @@ function FriendsList() {
                   <AvatarImage
                     name={friend.displayName}
                     src={imageOf(friend)}
-                    user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl}
+                    user={friend}
+                    fallbackSrc={
+                      friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl
+                    }
                     size={48}
                   />
                   <div>
                     <h3>{friend.displayName}</h3>
-                    <p>{friend.statusDescription || presenceLabel(friend)}</p>
+                    <p>{friend.statusDescription || t(presenceLabel(friend))}</p>
                     <span className="muted small">
-                      {rank(friend)} · {presenceLabel(friend)}
+                      {t(rank(friend))} · {t(presenceLabel(friend))}
                     </span>
                   </div>
                 </button>
                 <button
                   className="icon-button"
                   aria-expanded={expanded === friend.id}
-                  aria-label={`Подробности ${friend.displayName}`}
+                  aria-label={t('Подробности {value0}', { value0: String(friend.displayName) })}
                   onClick={() => setExpanded(expanded === friend.id ? undefined : friend.id)}
                 >
                   <ChevronDown
@@ -373,7 +387,7 @@ function FriendsList() {
           ))}
         </div>
       ) : (
-        <Empty title="Друзья не найдены" text="Попробуйте другой фильтр или запрос." />
+        <Empty title={t('Друзья не найдены')} text={t('Попробуйте другой фильтр или запрос.')} />
       )}
     </>
   );
@@ -401,7 +415,7 @@ function FriendLog() {
           setQuery(value);
           setLimit(100);
         }}
-        placeholder="Поиск в журнале друзей"
+        placeholder={t('Поиск в журнале друзей')}
       />
       <Segmented
         value={filter}
@@ -410,18 +424,19 @@ function FriendLog() {
           setLimit(100);
         }}
         items={[
-          { id: 'all', label: 'Все' },
-          { id: 'friend-add', label: 'Добавлены' },
-          { id: 'friend-remove', label: 'Удалены' },
-          { id: 'name', label: 'Имена' },
+          { id: 'all', label: t('Все') },
+          { id: 'friend-add', label: t('Добавлены') },
+          { id: 'friend-remove', label: t('Удалены') },
+          { id: 'name', label: t('Имена') },
           { id: 'trust', label: 'Trust Rank' },
-          { id: 'profile', label: 'Профиль' },
+          { id: 'profile', label: t('Профиль') },
           { id: 'bio', label: 'Bio' },
         ]}
       />
       <p className="muted small">
-        Сохраняются только изменения, наблюдавшиеся приложением. История до начала наблюдения и
-        точное время изменений вне подключения неизвестны.
+        {t(
+          'Сохраняются только изменения, наблюдавшиеся приложением. История до начала наблюдения и точное время изменений вне подключения неизвестны.',
+        )}
       </p>
       {ctx.history.error && <ErrorState error={ctx.history.error} retry={ctx.history.retry} />}
       {ctx.history.loading ? (
@@ -435,22 +450,22 @@ function FriendLog() {
                 <button className="text-button" onClick={() => ctx.openUser(event.userId)}>
                   {event.displayName}
                 </button>
-                <h3>{historyLabels[event.kind]}</h3>
+                <h3>{t(historyLabels[event.kind])}</h3>
                 <p>{event.detail}</p>
                 {event.before !== undefined && (
                   <p className="muted small">
-                    Было:{' '}
+                    {t('Было:')}{' '}
                     {event.kind === 'trust'
                       ? rankOf(event.before.split(','))
-                      : event.before || '(пусто)'}
+                      : event.before || t('(пусто)')}
                   </p>
                 )}
                 {event.after !== undefined && (
                   <p className="muted small">
-                    Стало:{' '}
+                    {t('Стало:')}{' '}
                     {event.kind === 'trust'
                       ? rankOf(event.after.split(','))
-                      : event.after || '(пусто)'}
+                      : event.after || t('(пусто)')}
                   </p>
                 )}
                 <time dateTime={event.time}>{date(event.time)}</time>
@@ -459,14 +474,14 @@ function FriendLog() {
           ))}
           {entries.length > limit && (
             <button className="button secondary load-more" onClick={() => setLimit((n) => n + 100)}>
-              Показать ещё
+              {t('Показать ещё')}
             </button>
           )}
         </div>
       ) : (
         <Empty
-          title="Журнал друзей пока пуст"
-          text="Новые наблюдаемые изменения появятся здесь и сохранятся после перезапуска."
+          title={t('Журнал друзей пока пуст')}
+          text={t('Новые наблюдаемые изменения появятся здесь и сохранятся после перезапуска.')}
         />
       )}
     </>
@@ -507,12 +522,12 @@ function Moderations({ type }: { type: 'block' | 'mute' }) {
           setBusy(false);
         }
       },
-      type === 'block' ? 'Блокировка снята' : 'Заглушение снято',
+      type === 'block' ? uiMessage('Блокировка снята') : uiMessage('Заглушение снято'),
     );
   };
   return (
     <>
-      <SearchField value={query} onChange={setQuery} placeholder="Поиск в списке модерации" />
+      <SearchField value={query} onChange={setQuery} placeholder={t('Поиск в списке модерации')} />
       {load.loading ? (
         <Loading />
       ) : load.error ? (
@@ -529,7 +544,7 @@ function Moderations({ type }: { type: 'block' | 'mute' }) {
                 <ShieldCheck size={20} />
                 <span>
                   <strong>
-                    {m.targetDisplayName || m.targetUserId || 'Неизвестный пользователь'}
+                    {m.targetDisplayName || m.targetUserId || t('Неизвестный пользователь')}
                   </strong>
                   <small>{m.targetUserId}</small>
                   {typeof (m as Moderation & { created?: string }).created === 'string' && (
@@ -542,19 +557,21 @@ function Moderations({ type }: { type: 'block' | 'mute' }) {
                 disabled={!m.targetUserId}
                 onClick={() => setConfirm(m)}
               >
-                {type === 'block' ? 'Разблокировать' : 'Снять mute'}
+                {type === 'block' ? t('Разблокировать') : t('Снять mute')}
               </button>
             </article>
           ))}
         </div>
       ) : (
         <Empty
-          title={type === 'block' ? 'Заблокированных нет' : 'Заглушённых нет'}
-          text={query ? 'Попробуйте другой запрос.' : undefined}
+          title={type === 'block' ? t('Заблокированных нет') : t('Заглушённых нет')}
+          text={query ? t('Попробуйте другой запрос.') : undefined}
         />
       )}
       <details className="social-moderation-history">
-        <summary>Локальная история модерации · {history.length}</summary>
+        <summary>
+          {t('Локальная история модерации ·')} {history.length}
+        </summary>
         {history.length ? (
           history.slice(0, 100).map((e) => (
             <div className="list-row" key={e.id}>
@@ -568,12 +585,14 @@ function Moderations({ type }: { type: 'block' | 'mute' }) {
             </div>
           ))
         ) : (
-          <p className="muted small">История действий появится после их выполнения в приложении.</p>
+          <p className="muted small">
+            {t('История действий появится после их выполнения в приложении.')}
+          </p>
         )}
       </details>
       {confirm && (
         <Modal
-          title={type === 'block' ? 'Снять блокировку?' : 'Снять заглушение?'}
+          title={type === 'block' ? t('Снять блокировку?') : t('Снять заглушение?')}
           onClose={() => !busy && setConfirm(undefined)}
         >
           <p>{confirm.targetDisplayName || confirm.targetUserId}</p>
@@ -583,10 +602,10 @@ function Moderations({ type }: { type: 'block' | 'mute' }) {
               disabled={busy}
               onClick={() => setConfirm(undefined)}
             >
-              Отмена
+              {t('Отмена')}
             </button>
             <button className="button primary" disabled={busy} onClick={() => void remove()}>
-              {busy ? 'Выполняем…' : 'Подтвердить'}
+              {busy ? t('Выполняем…') : t('Подтвердить')}
             </button>
           </div>
         </Modal>
@@ -602,8 +621,8 @@ function ModerationTab() {
         value={type}
         onChange={(v) => setType(v as typeof type)}
         items={[
-          { id: 'block', label: 'Заблокированные' },
-          { id: 'mute', label: 'Заглушённые' },
+          { id: 'block', label: t('Заблокированные') },
+          { id: 'mute', label: t('Заглушённые') },
         ]}
       />
       <Moderations key={type} type={type} />
@@ -611,13 +630,14 @@ function ModerationTab() {
   );
 }
 export default function SocialPage() {
+  useI18n();
   const [tab, setTab] = useState('friends');
   return (
     <>
       <PageHeader
-        eyebrow="ВАШ КРУГ"
+        eyebrow={t('ВАШ КРУГ')}
         title="Social"
-        subtitle="Друзья, наблюдаемые изменения и модерация"
+        subtitle={t('Друзья, наблюдаемые изменения и модерация')}
       />
       <Segmented
         value={tab}

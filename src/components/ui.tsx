@@ -1,3 +1,4 @@
+import { t, useI18n } from '../i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { User } from '../api/types';
 import { presenceIndicator } from '../data/presence';
@@ -59,7 +60,7 @@ export function Section({
 export function SearchField({
   value,
   onChange,
-  placeholder = 'Поиск…',
+  placeholder = t('Поиск…'),
 }: {
   value: string;
   onChange: (s: string) => void;
@@ -103,7 +104,7 @@ export function Segmented({
   );
 }
 export function Empty({
-  title = 'Пока ничего нет',
+  title = t('Пока ничего нет'),
   text,
   icon,
 }: {
@@ -123,7 +124,7 @@ export function Loading() {
   return (
     <div className="loading" role="status">
       <LoaderCircle className="spin" size={24} />
-      <span>Загрузка…</span>
+      <span>{t('Загрузка…')}</span>
     </div>
   );
 }
@@ -131,11 +132,11 @@ export function ErrorState({ error, retry }: { error: string; retry?: () => void
   return (
     <div className="error-state" role="alert">
       <AlertCircle size={22} />
-      <p>{error}</p>
+      <p>{t(error)}</p>
       {retry && (
         <button className="button secondary" onClick={retry}>
           <RefreshCw size={16} />
-          Повторить
+          {t('Повторить')}
         </button>
       )}
     </div>
@@ -148,7 +149,7 @@ export function Modal({
   wide = false,
   className = '',
   closeOnBackdrop = true,
-  closeLabel = 'Закрыть',
+  closeLabel = t('Закрыть'),
 }: {
   title: string;
   children: ReactNode;
@@ -174,7 +175,10 @@ export function Modal({
     root?.focus();
     const handler = (e: KeyboardEvent) => {
       if (modalStack.at(-1) !== root) return;
-      if (e.key === 'Escape') { e.preventDefault(); close.current(); }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close.current();
+      }
       if (e.key === 'Tab' && root) {
         const nodes = Array.from(
           root.querySelectorAll<HTMLElement>(
@@ -261,17 +265,30 @@ export function AvatarImage({
           maxDimension={256}
           style={{ opacity: hidden === shown ? 0 : 1 }}
           onLoad={() => setHidden('')}
-          onLoadError={() => { if (shown === src) setFailed(shown); setHidden(shown); }}
+          onLoadError={() => {
+            if (shown === src) setFailed(shown);
+            setHidden(shown);
+          }}
         />
       )}
       <span className="avatar-initial">{name.slice(0, 2).toUpperCase()}</span>
-      {(user || status) && <PresenceIndicator user={user || { id: '', displayName: name, status }} />}
+      {(user || status) && (
+        <PresenceIndicator user={user || { id: '', displayName: name, status }} />
+      )}
     </span>
   );
 }
 export function PresenceIndicator({ user }: { user: User }) {
   const presence = presenceIndicator(user);
-  return <i className={`status-dot presence-${presence.color} presence-${presence.mode}`} role="img" aria-label={presence.label} title={presence.label} data-presence={presence.mode} />;
+  return (
+    <i
+      className={`status-dot presence-${presence.color} presence-${presence.mode}`}
+      role="img"
+      aria-label={t(presence.label)}
+      title={t(presence.label)}
+      data-presence={presence.mode}
+    />
+  );
 }
 export function Badge({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <span className={`badge ${className}`}>{children}</span>;
@@ -300,7 +317,7 @@ export function imageOf(user: {
 }
 export function MoreButton({
   onClick,
-  children = 'Показать все',
+  children = t('Показать все'),
 }: {
   onClick: () => void;
   children?: ReactNode;

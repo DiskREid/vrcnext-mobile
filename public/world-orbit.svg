@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="56" y1="0" x2="1186" y2="650" gradientUnits="userSpaceOnUse"><stop stop-color="#16182f"/><stop offset=".52" stop-color="#29244d"/><stop offset="1" stop-color="#0e3448"/></linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(900 220) rotate(90) scale(370 440)" gradientUnits="userSpaceOnUse"><stop stop-color="#806bc8" stop-opacity=".45"/><stop offset="1" stop-color="#806bc8" stop-opacity="0"/></radialGradient>
+    <linearGradient id="planet" x1="822" y1="98" x2="1040" y2="290" gradientUnits="userSpaceOnUse"><stop stop-color="#e7d5fa"/><stop offset=".48" stop-color="#ab9ce8"/><stop offset="1" stop-color="#635d9b"/></linearGradient>
+    <linearGradient id="land" x1="632" y1="365" x2="1060" y2="457" gradientUnits="userSpaceOnUse"><stop stop-color="#7678b2"/><stop offset=".45" stop-color="#a291c9"/><stop offset="1" stop-color="#417b91"/></linearGradient>
+    <linearGradient id="cliff" x1="721" y1="426" x2="977" y2="579" gradientUnits="userSpaceOnUse"><stop stop-color="#454467"/><stop offset="1" stop-color="#1a2a42"/></linearGradient>
+    <linearGradient id="portal" x1="810" y1="299" x2="922" y2="411" gradientUnits="userSpaceOnUse"><stop stop-color="#c8b7ff"/><stop offset="1" stop-color="#8cbbd9"/></linearGradient>
+    <linearGradient id="mist" x1="0" y1="530" x2="1200" y2="680" gradientUnits="userSpaceOnUse"><stop stop-color="#34264d"/><stop offset="1" stop-color="#1a4352"/></linearGradient>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1200v660H0z"/>
+  <path fill="url(#glow)" d="M0 0h1200v660H0z"/>
+  <g fill="#ded7ff">
+    <circle cx="544" cy="79" r="1.5" opacity=".7"/><circle cx="638" cy="185" r="2" opacity=".55"/><circle cx="733" cy="87" r="1.6" opacity=".65"/>
+    <circle cx="1059" cy="62" r="1.6" opacity=".7"/><circle cx="1123" cy="194" r="2" opacity=".6"/><circle cx="1090" cy="329" r="1.5" opacity=".6"/>
+    <circle cx="470" cy="273" r="1.5" opacity=".5"/><circle cx="119" cy="101" r="1.5" opacity=".4"/><circle cx="305" cy="54" r="1.5" opacity=".4"/>
+    <circle cx="383" cy="191" r="1.2" opacity=".4"/><circle cx="1030" cy="365" r="1.5" opacity=".5"/><circle cx="1170" cy="451" r="1.2" opacity=".6"/>
+  </g>
+  <g stroke="#c2b9ee" stroke-opacity=".16"><path d="m540 126 61-29 48 51 75-21"/><path d="m1080 269 58-40 39 33"/></g>
+  <g fill="#cfc5fc"><circle cx="540" cy="126" r="2.5" opacity=".7"/><circle cx="601" cy="97" r="2.5" opacity=".5"/><circle cx="649" cy="148" r="2.5" opacity=".7"/><circle cx="724" cy="127" r="2.5" opacity=".5"/></g>
+  <circle cx="916" cy="192" r="101" fill="url(#planet)"/>
+  <path d="M826 148c63 41 118 61 183 58M815 186c62 44 118 65 181 64" stroke="#e5d7ff" stroke-opacity=".18" stroke-width="13"/>
+  <ellipse cx="916" cy="206" rx="172" ry="39" transform="rotate(-24 916 206)" stroke="#baa5ed" stroke-opacity=".52" stroke-width="2"/>
+  <path d="m721 412 157 70 170-61-91 121-100 36-86-70z" fill="url(#cliff)"/>
+  <path d="m626 406 182-78 258 84-188 87z" fill="url(#land)"/>
+  <path d="m626 406 252 93 188-87" stroke="#c3b4e2" stroke-opacity=".3" stroke-width="2"/>
+  <path d="m771 445 86 133 21-79m0 0 79 43" stroke="#8b80ad" stroke-opacity=".18" stroke-width="2"/>
+  <path d="M832 403V342a39 39 0 0 1 78 0v61" stroke="#a4a4d3" stroke-width="16"/>
+  <path d="M832 403V342a39 39 0 0 1 78 0v61" stroke="url(#portal)" stroke-width="7"/>
+  <path d="M842 400v-57a29 29 0 0 1 58 0v57l-29 11z" fill="#c1adff" fill-opacity=".1"/>
+  <path d="m862 406-38 32 42 16 40-28" stroke="#d4c5ff" stroke-opacity=".35" stroke-width="3"/>
+  <path d="m733 391 22-10 24 9-21 10zM962 406l24-11 23 8-23 11z" fill="#e5d7ff" fill-opacity=".3"/>
+  <path d="M756 385v-38m-13 18 13-19 14 19m-22-10 8-16 9 16" stroke="#8db0b7" stroke-width="5" stroke-linecap="round"/>
+  <path d="M985 398v-36m-13 18 13-20 14 20m-22-11 8-15 9 15" stroke="#77a4ac" stroke-width="5" stroke-linecap="round"/>
+  <path d="m1089 429 53-24 46 18-50 25z" fill="#466679"/>
+  <path d="m1089 429 49 19 50-25-44 63z" fill="#233b52"/>
+  <path d="M0 588c228-66 339 15 530-8s314-45 670-7v87H0z" fill="url(#mist)" fill-opacity=".8"/>
+  <path d="M0 631c235-44 423-8 585-15s346-51 615-5v49H0z" fill="#18263e" fill-opacity=".65"/>
+</svg>

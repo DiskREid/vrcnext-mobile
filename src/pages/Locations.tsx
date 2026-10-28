@@ -1,3 +1,5 @@
+import { uiMessage } from '../i18n';
+import { t, useI18n } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Globe2, MapPin, RefreshCw, Send, Users } from 'lucide-react';
 import { api } from '../api';
@@ -107,10 +109,14 @@ function LocationCard({ group }: { group: FriendLocation }) {
         <div>
           <h2>
             {world?.name ||
-              (group.private ? 'Местоположение скрыто' : busy ? 'Загружаем мир…' : 'Мир друга')}
+              (group.private
+                ? t('Местоположение скрыто')
+                : busy
+                  ? t('Загружаем мир…')
+                  : t('Мир друга'))}
           </h2>
           <span className="muted small">
-            {group.worldId || 'Доступен только запрос приглашения'}
+            {group.worldId || t('Доступен только запрос приглашения')}
           </span>
         </div>
         {group.worldId && <ArrowUpRight size={18} />}
@@ -119,7 +125,7 @@ function LocationCard({ group }: { group: FriendLocation }) {
         <Badge>{instanceType(group.location)}</Badge>
         <span>
           <Users size={14} />
-          {group.friends.length} {group.friends.length === 1 ? 'друг' : 'друзей'}
+          {group.friends.length} {group.friends.length === 1 ? t('друг') : t('друзей')}
         </span>
       </div>
       {group.location && (
@@ -131,7 +137,7 @@ function LocationCard({ group }: { group: FriendLocation }) {
         <div className="location-error" role="alert">
           <span>{error}</span>
           <button className="text-button" onClick={() => setRetry((v) => v + 1)}>
-            Повторить загрузку мира
+            {t('Повторить загрузку мира')}
           </button>
         </div>
       )}
@@ -142,17 +148,20 @@ function LocationCard({ group }: { group: FriendLocation }) {
               <AvatarImage
                 src={imageOf(friend)}
                 name={friend.displayName}
-                user={friend} fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl}
+                user={friend}
+                fallbackSrc={friend.currentAvatarThumbnailImageUrl || friend.currentAvatarImageUrl}
                 size={38}
               />
               <span>{friend.displayName}</span>
             </button>
             <button
               className="icon-button"
-              aria-label={`Запросить приглашение у ${friend.displayName}`}
-              title="Запросить приглашение"
+              aria-label={t('Запросить приглашение у {value0}', {
+                value0: String(friend.displayName),
+              })}
+              title={t('Запросить приглашение')}
               onClick={() =>
-                void ctx.act(() => api.requestInvite(friend.id), 'Запрос приглашения отправлен')
+                void ctx.act(() => api.requestInvite(friend.id), uiMessage('Запрос приглашения отправлен'))
               }
             >
               <Send size={17} />
@@ -166,12 +175,12 @@ function LocationCard({ group }: { group: FriendLocation }) {
           onClick={() =>
             void ctx.act(
               () => api.inviteSelf(group.location!),
-              'Приглашение отправлено вашему клиенту VRChat',
+              uiMessage('Приглашение отправлено вашему клиенту VRChat'),
             )
           }
         >
           <MapPin size={16} />
-          Присоединиться
+          {t('Присоединиться')}
         </button>
       )}
     </article>
@@ -179,6 +188,7 @@ function LocationCard({ group }: { group: FriendLocation }) {
 }
 
 export default function LocationsPage() {
+  useI18n();
   const ctx = useApp();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
@@ -202,32 +212,33 @@ export default function LocationsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ДРУЗЬЯ НА КАРТЕ"
+        eyebrow={t('ДРУЗЬЯ НА КАРТЕ')}
         title="Friends Locations"
-        subtitle="Только доступные местоположения и точные совпадения инстансов"
+        subtitle={t('Только доступные местоположения и точные совпадения инстансов')}
         actions={
           <button
             className="icon-button"
-            aria-label="Обновить местоположения"
+            aria-label={t('Обновить местоположения')}
             onClick={ctx.friends.reload}
           >
             <RefreshCw size={19} className={ctx.friends.refreshing ? 'spin' : ''} />
           </button>
         }
       />
-      <SearchField value={query} onChange={setQuery} placeholder="Имя друга или ID мира" />
+      <SearchField value={query} onChange={setQuery} placeholder={t('Имя друга или ID мира')} />
       <Segmented
         value={filter}
         onChange={setFilter}
         items={[
-          { id: 'all', label: 'Все' },
-          { id: 'visible', label: 'Доступные инстансы' },
-          { id: 'private', label: 'Скрытые' },
+          { id: 'all', label: t('Все') },
+          { id: 'visible', label: t('Доступные инстансы') },
+          { id: 'private', label: t('Скрытые') },
         ]}
       />
       <p className="muted small">
-        «Присоединиться» отправляет приглашение вашему официальному клиенту VRChat. Закрытый инстанс
-        может потребовать приглашение хозяина.
+        {t(
+          '«Присоединиться» отправляет приглашение вашему официальному клиенту VRChat. Закрытый инстанс может потребовать приглашение хозяина.',
+        )}
       </p>
       {ctx.friends.error && <ErrorState error={ctx.friends.error} retry={ctx.friends.reload} />}
       {ctx.friends.loading ? (
@@ -240,11 +251,11 @@ export default function LocationsPage() {
         </div>
       ) : (
         <Empty
-          title="Доступных местоположений нет"
+          title={t('Доступных местоположений нет')}
           text={
             query
-              ? 'Попробуйте другой запрос.'
-              : 'Здесь появятся друзья в VRChat, когда API предоставит их местоположение.'
+              ? t('Попробуйте другой запрос.')
+              : t('Здесь появятся друзья в VRChat, когда API предоставит их местоположение.')
           }
         />
       )}

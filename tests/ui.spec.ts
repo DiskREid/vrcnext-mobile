@@ -633,6 +633,8 @@ test('saved and session activity open real profiles and named source and destina
     await expect(change.getByText('Было', { exact: true })).toBeVisible();
     await expect(change.getByText('Стало', { exact: true })).toBeVisible();
     await change.getByRole('button', { name: 'Открыть мир Fixture Moon', exact: true }).click();
+    // Reveal the destination in a short landscape viewport before its lazy world-name lookup.
+    await change.locator('.activity-location-value').last().scrollIntoViewIfNeeded();
     await change.getByRole('button', { name: 'Открыть мир Fixture Forest', exact: true }).click();
     await page.getByRole('button', { name: 'Открыть профиль Fixture Friend', exact: true }).click();
     const recorded = await regressionState(page);
