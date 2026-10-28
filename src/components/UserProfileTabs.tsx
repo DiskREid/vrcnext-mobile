@@ -1,3 +1,4 @@
+import { profileBadgeCopy } from '../data/profile-badges';
 import { uiMessage } from '../i18n';
 import { t, useI18n, dateLocale } from '../i18n';
 import { useEffect, useState } from 'react';
@@ -88,6 +89,7 @@ function Metadata({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function ProfileInformation({ user, profile }: { user: User; profile?: JsonRecord }) {
+  const { locale } = useI18n();
   const ctx = useApp(),
     raw = asRecord(user),
     publicData = profile || {};
@@ -135,15 +137,24 @@ export function ProfileInformation({ user, profile }: { user: User; profile?: Js
       </dl>
       {badges.length > 0 && (
         <section className="user-badges" aria-label={t('Бейджи пользователя')}>
-          {badges.map((badge, index) => (
-            <div className="user-badge" key={asString(badge.badgeId) || index}>
-              <SecureImage src={asString(badge.badgeImageUrl)} alt="" />
-              <div>
-                <strong>{asString(badge.badgeName) || t('Бейдж')}</strong>
-                <p className="muted small">{asString(badge.badgeDescription)}</p>
+          {badges.map((badge, index) => {
+            const copy = profileBadgeCopy(badge, locale);
+            return (
+              <div
+                className="user-badge"
+                key={asString(badge.badgeId) || asString(badge.id) || index}
+              >
+                <SecureImage
+                  src={asString(badge.badgeImageUrl) || asString(badge.imageUrl)}
+                  alt=""
+                />
+                <div>
+                  <strong>{copy.name || t('Бейдж')}</strong>
+                  <p className="muted small">{copy.description}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
       )}
       {(avatarName || user.currentAvatarImageUrl || user.currentAvatarThumbnailImageUrl) && (
@@ -380,7 +391,10 @@ function ProfileLocationContent({ user }: { user: User }) {
           <button
             className="button secondary compact"
             onClick={() =>
-              void ctx.act(() => api.requestInvite(user.id), uiMessage('Запрос приглашения отправлен'))
+              void ctx.act(
+                () => api.requestInvite(user.id),
+                uiMessage('Запрос приглашения отправлен'),
+              )
             }
           >
             {t('Попросить инвайт')}

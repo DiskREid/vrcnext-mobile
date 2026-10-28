@@ -6,12 +6,19 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import '/src/styles.css';
+import { setLanguage } from '/src/i18n/index.ts';
 const image = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 const self = {id:'usr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',displayName:'Настройки',state:'offline',location:'offline',status:'active',currentAvatarThumbnailImageUrl:image,friends:['usr_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb']};
 // Deliberately equal to UI translation keys: user content must remain untouched.
 const friend = {id:'usr_bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb',displayName:'Миры',state:'active',location:'offline',status:'busy',statusDescription:'На сайте',bio:'Настройки',isFriend:true,tags:[],currentAvatarThumbnailImageUrl:image};
+const badgeFixture = new URLSearchParams(location.search).has('badges') ? [
+ {badgeId:'bdg_fixture_early',badgeName:'Early Supporter',badgeDescription:'Thank you for your support!',badgeImageUrl:image},
+ {badgeId:'bdg_fixture_plus',badgeName:'VRC+ Supporter',badgeDescription:'Awarded after 37 gifts; tier 4.',badgeImageUrl:image},
+ {badgeId:'bdg_fixture_unknown',badgeName:'Настройки',badgeDescription:'Миры',badgeImageUrl:image},
+ {badgeId:'bdg_fixture_hidden',badgeName:'VRChat Team',badgeDescription:'Hidden award',badgeImageUrl:image,hidden:true},
+] : undefined;
 const listeners = new Map();
-window.__languageSettingsTest = {requests:[],unexpected:[],links:[],clearedSessions:0,selfId:self.id,friendId:friend.id};
+window.__languageSettingsTest = {requests:[],unexpected:[],links:[],copiedText:[],badges:badgeFixture,chooseLanguage:setLanguage,clearedSessions:0,selfId:self.id,friendId:friend.id};
 const bridge = {
  async sessionState(){return{hasAuth:true};},
  async request(options){
@@ -20,7 +27,7 @@ const bridge = {
   if(url.pathname==='/auth/user'||url.pathname===`/users/${self.id}`)return{status:200,data:self};
   if(url.pathname==='/auth/user/friends')return{status:200,data:url.searchParams.get('offline')==='false'?[friend]:[]};
   if(url.pathname===`/users/${friend.id}`)return{status:200,data:friend};
-  if(url.pathname===`/profile/${friend.id}`)return{status:200,data:{id:friend.id,bio:friend.bio}};
+  if(url.pathname===`/profile/${friend.id}`)return{status:200,data:{id:friend.id,bio:friend.bio,...(badgeFixture?{badges:badgeFixture}:{})}};
   if(url.pathname===`/profile/${self.id}`)return{status:200,data:{id:self.id,bio:'Original self biography',languages:['eng'],bioLinks:[]}};
   if(url.pathname==='/favorites'||url.pathname==='/calendar'||url.pathname===`/users/${self.id}/groups`)return{status:200,data:[]};
   window.__languageSettingsTest.unexpected.push(options.path);
@@ -30,7 +37,7 @@ const bridge = {
  async addListener(name,listener){listeners.set(name,listener);return{remove:async()=>{if(listeners.get(name)===listener)listeners.delete(name);}};},
  async connectPipeline(){listeners.get('connection')?.({state:'connected'});}, async disconnectPipeline(){},
  async clearSession(){window.__languageSettingsTest.clearedSessions++;}, async loadImage(){return{dataUrl:image};},
- async openLink({url}){window.__languageSettingsTest.links.push(url);}, async copyText(){}, async exportJson(){return{saved:true};},
+ async openLink({url}){window.__languageSettingsTest.links.push(url);}, async copyText({text}){window.__languageSettingsTest.copiedText.push(text);}, async exportJson(){return{saved:true};},
 };
 registerPlugin('VrcNative',{web:()=>bridge});
 registerPlugin('App',{web:()=>({getState:async()=>({isActive:true}),addListener:async()=>({remove:async()=>{}}),exitApp:async()=>{}})});
