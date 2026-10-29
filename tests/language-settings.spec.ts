@@ -166,6 +166,7 @@ test('switching the interface language preserves unsaved profile edits without w
   await openSettings(page);
   await page.locator('.avatar-button').click();
   const profile = activeScreen(page, 'profile');
+  await profile.getByRole('button', { name: 'Редактировать профиль', exact: true }).click();
   await expect(profile.getByRole('textbox', { name: 'О себе', exact: true })).toHaveValue(
     'Original self biography',
   );
@@ -190,7 +191,7 @@ test('switching the interface language preserves unsaved profile edits without w
     state.requests.filter(
       (request) => request.path.startsWith('/profile/') && request.path.endsWith('aaaaaaaaaaaa'),
     ),
-  ).toHaveLength(1);
+  ).toHaveLength(2); // The full profile and lazily opened editor each load their public fields.
   expect(state.requests.some((request) => request.method !== 'GET')).toBe(false);
   expect(state.clearedSessions).toBe(0);
   expect(state.unexpected).toEqual([]);

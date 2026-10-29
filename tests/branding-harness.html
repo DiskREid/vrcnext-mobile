@@ -132,6 +132,7 @@
         appListeners.get('appStateChange')?.size || 0;
       const { default: App } = await import('/src/App.tsx');
       createRoot(document.getElementById('root')).render(React.createElement(App));
+      window.__brandingTest.ready = true;
     </script>
   </body>
 </html>

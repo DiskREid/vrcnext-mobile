@@ -7,6 +7,7 @@ import type { GameData, GameSession, GameVisit, ObservationSource } from './game
 import { presenceMode } from './presence';
 import { observedTrustRank } from './trust-rank';
 import { fileIdOfAvatarImage } from './avatar-history-resolver';
+import { normalizeSelfUser, selfUserUpdate } from './self-user';
 
 export type HistoryKind = 'online' | 'offline' | 'world' | 'instance' | 'status' | 'avatar' | 'bio'
   | 'friend-add' | 'friend-remove' | 'name' | 'trust' | 'profile' | 'moderation';
@@ -122,6 +123,67 @@ export class HistoryObserver {
   }
   observeUsers(users: User[], source: HistoryEvent['source'] = 'refresh'): HistoryEvent[] {
     return users.flatMap((user) => this.observeProfile(user, source));
+  }
+  /** Observe our own actual API/pipeline snapshot, without scanning any friend profiles. */
+  observeSelf(
+    user: User,
+    source: HistoryEvent['source'] = 'sync',
+    baseline = false,
+  ): HistoryEvent[] {
+    const fresh = normalizeSelfUser(user);
+    if (baseline) {
+      // Resume starts a new observation period. Do not date unobserved changes
+      // from a suspended app as if they had just happened on this device.
+      this.known.delete(fresh.id);
+      this.avatars.delete(fresh.id);
+      this.trustRanks.delete(fresh.id);
+    }
+    const old = this.known.get(fresh.id);
+    const events: HistoryEvent[] = [];
+    if (old && typeof fresh.location === 'string' && old.location !== fresh.location) {
+      const next = { ...old, ...snapshot(fresh) };
+      const wasGame = presenceMode(old) === 'game',
+        inGame = presenceMode(fresh) === 'game';
+      if (old.location !== undefined && wasGame !== inGame)
+        events.push(
+          this.event(
+            inGame ? 'online' : 'offline',
+            fresh.id,
+            next,
+            source,
+            inGame
+              ? 'Получено текущее местоположение в VRChat'
+              : 'Получено событие выхода из VRChat',
+          ),
+        );
+      const oldWorld = old.location?.split(':')[0],
+        newWorld = fresh.location.split(':')[0];
+      // Offline is represented by its own event. A hidden location is still a
+      // real disclosed transition, but must never become a fabricated visit.
+      if (fresh.location !== 'offline' && fresh.location !== '') {
+        const instance =
+          !!oldWorld?.startsWith('wrld_') && oldWorld === newWorld && fresh.location.includes(':');
+        events.push(
+          this.event(
+            instance ? 'instance' : 'world',
+            fresh.id,
+            next,
+            source,
+            old.location === undefined
+              ? `Местоположение стало доступно: ${displayLocation(fresh.location)}`
+              : `${displayLocation(old.location)} → ${displayLocation(fresh.location)}`,
+            {
+              before: old.location,
+              after: fresh.location,
+              location: fresh.location,
+              ...(newWorld.startsWith('wrld_') ? { worldId: newWorld } : {}),
+            },
+          ),
+        );
+      }
+    }
+    events.push(...this.observeProfile(fresh, source));
+    return events;
   }
   private event(kind: HistoryKind, userId: string, user: Snapshot, source: HistoryEvent['source'], detail: string, extra: Partial<HistoryEvent> = {}): HistoryEvent {
     return { id:this.id(), time:this.now(), kind,userId,displayName:user.displayName || userId,detail,source,...extra };
@@ -287,7 +349,13 @@ export class HistoryObserver {
     return this.publishAvatar(pending);
   }
   observePipeline(event:PipelineEvent, friends:User[], self:User): HistoryEvent[] {
-    if (!event.type.startsWith('friend-') && event.type !== 'user-update') return [];
+    const own = selfUserUpdate(event, self);
+    if (own) {
+      if (!this.known.has(self.id)) this.seedUsers([normalizeSelfUser(self)]);
+      return this.observeSelf({ ...own.patch, id: self.id, displayName: own.patch.displayName || self.displayName }, 'pipeline');
+    }
+    if (event.type === 'user-location' || event.type === 'user-update') return [];
+    if (!event.type.startsWith('friend-')) return [];
     const content = object(event.content);
     const partial = object(content.user) as Partial<User>;
     const userId = typeof content.userId === 'string' ? content.userId : typeof content.userid === 'string' ? content.userid : typeof partial.id === 'string' ? partial.id : undefined;
@@ -484,6 +552,12 @@ export function useHistory(account:string|undefined,demo:boolean) {
   const observePipeline=useCallback((event:PipelineEvent,friends:User[],self:User) => { const events=journal?.observer.observePipeline(event,friends,self)||[];journal?.append(events);return events; },[journal]);
   const enrichAvatar=useCallback((eventId:string,fileId:string,avatar:AvatarMetadata,side:'before'|'after'='after') => { if(journal)journal.append(journal.observer.enrichAvatar(eventId,fileId,avatar,side)); },[journal]);
   const observeProfile=useCallback((user:User,source:HistoryEvent['source']='profile') => { if(journal)journal.append(journal.observer.observeProfile(user,source)); },[journal]);
+  const observeSelf = useCallback(
+    (user: User, source: HistoryEvent['source'] = 'sync', baseline = false) => {
+      if (journal) journal.append(journal.observer.observeSelf(user, source, baseline));
+    },
+    [journal],
+  );
   const observeUsers=useCallback((users:User[],source:HistoryEvent['source']='refresh') => { if(journal)journal.append(journal.observer.observeUsers(users,source)); },[journal]);
   const seedUsers=useCallback((users:User[])=>journal?.observer.seedUsers(users),[journal]);
   const recordModeration=useCallback((id:string,name:string,action:string)=>{if(journal)journal.append([journal.observer.recordModeration(id,name,action)]);},[journal]);
@@ -496,6 +570,6 @@ export function useHistory(account:string|undefined,demo:boolean) {
   const friendStats=useCallback((id:string)=>friendStatistics(journal?.state.visits||[],id),[journal,state.visits]);
   // A synchronous account render gate prevents a previous account's history flashing before effects.
   const visible = journal && state===journal.state ? state : journal?.state || {events:[],visits:[],sessions:[],loading:false,error:''};
-  return {...visible,observePipeline,enrichAvatar,observeProfile,observeUsers,seedUsers,recordModeration,recordFriendAction,retry,clear,pause,pauseSession,observeSession,friendStats};
+  return {...visible,observePipeline,enrichAvatar,observeProfile,observeSelf,observeUsers,seedUsers,recordModeration,recordFriendAction,retry,clear,pause,pauseSession,observeSession,friendStats};
 }
 export type HistoryState = ReturnType<typeof useHistory>;

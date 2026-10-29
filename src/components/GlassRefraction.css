@@ -175,3 +175,56 @@ html[data-glass-refraction='on'][data-theme][data-effects='full']
   -webkit-backdrop-filter: var(--glass-lens-filter) blur(0.35px) saturate(1.12);
   backdrop-filter: var(--glass-lens-filter) blur(0.35px) saturate(1.12);
 }
+
+html[data-glass-refraction='on'][data-theme][data-effects='full']
+  [data-glass-surface-optic][data-glass-optic] {
+  -webkit-backdrop-filter: var(--glass-lens-filter) blur(0.35px) saturate(1.12);
+  backdrop-filter: var(--glass-lens-filter) blur(0.35px) saturate(1.12);
+}
+html[data-glass-refraction='on'] .field[data-glass-surface-optic] {
+  border-radius: 14px;
+}
+html[data-glass-refraction='on'] .auth-panel[data-glass-surface-optic] {
+  --optical-tint: 0.67;
+}
+html[data-glass-refraction='on'][data-theme='liquid-light'] .auth-panel[data-glass-surface-optic] {
+  --optical-tint: 0.76;
+}
+
+/* Standalone actions may own a lens as well. Preserve their semantic accent
+   and selected state instead of replacing them with the neutral panel tint. */
+html[data-glass-refraction='on'][data-theme][data-effects='full']
+  :is(
+    .button.primary,
+    .calendar-day.selected,
+    .notification-categories > button.active
+  )[data-glass-optic] {
+  background:
+    linear-gradient(118deg, #ffffff35, transparent 30%, #ffffff05 65%, #cbe6ff26),
+    rgba(var(--accent-rgb), 0.84);
+  border-color: var(--accent);
+}
+html[data-glass-refraction='on'][data-theme][data-effects='full'] .button.danger[data-glass-optic] {
+  background: linear-gradient(118deg, #ffffff26, transparent 60%), #8f294b73;
+  border-color: #f394ae99;
+}
+html[data-glass-refraction='on'][data-theme='liquid-light'][data-effects='full']
+  .button.danger[data-glass-optic] {
+  background: linear-gradient(118deg, #ffffffa8, transparent 60%), #ffe4ecc9;
+}
+
+html[data-glass-refraction='on'][data-theme][data-effects='full']
+  :is(.calendar-day.selected, .notification-categories > button.active)[data-glass-optic] {
+  color: var(--accent-ink);
+}
+/* White ink on light-theme accents needs a dense coloured centre. A darker
+   reflection keeps the bevel visible without washing out small action labels. */
+html[data-glass-refraction='on'][data-theme='liquid-light'][data-effects='full']
+  :is(
+    .button.primary,
+    .calendar-day.selected,
+    .notification-categories > button.active
+  )[data-glass-optic] {
+  background:
+    linear-gradient(115deg, #071b2f14, transparent 45%, #071b2f0a), rgba(var(--accent-rgb), 0.96);
+}

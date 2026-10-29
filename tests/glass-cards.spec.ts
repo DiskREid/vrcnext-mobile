@@ -306,7 +306,7 @@ test('338 friend rows allocate lenses only for visible cards and release them on
     await settle(page);
     const current = await viewportState();
     expect(current.cards).toBeLessThanOrEqual(12);
-    expect(current.total).toBeLessThanOrEqual(17);
+    expect(current.total).toBeLessThanOrEqual(29);
     expect(current.filters).toBe(current.total);
     expect(current.entries.every((card) => card.visible)).toBe(true);
     return current;
@@ -381,7 +381,7 @@ test('338 friend rows allocate lenses only for visible cards and release them on
       {
         rows: 338,
         cardBudget: 12,
-        totalBudget: 17,
+        totalBudget: 29,
         before,
         middle,
         rotated,

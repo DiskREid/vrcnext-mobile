@@ -1,0 +1,28 @@
+.self-profile-mode {
+  margin-bottom: 20px;
+}
+.self-profile-mode > .segmented {
+  width: fit-content;
+  max-width: 100%;
+}
+.self-profile-view > .self-profile-details {
+  padding: clamp(16px, 3vw, 28px);
+  min-width: 0;
+}
+.self-profile-view .profile-banner {
+  border-radius: 16px;
+}
+.self-profile-view .user-profile-panel {
+  min-width: 0;
+}
+.self-profile-view .user-profile-panel p,
+.self-profile-view .user-profile-panel dd {
+  overflow-wrap: anywhere;
+}
+.self-profile-edit > .profile-card {
+  margin-bottom: 24px;
+}
+.self-profile-view[hidden],
+.self-profile-edit[hidden] {
+  display: none !important;
+}

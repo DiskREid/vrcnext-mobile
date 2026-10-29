@@ -63,6 +63,7 @@ import { useObservation } from './data/observation';
 import { useCalendarSync } from './data/calendar-sync';
 import { disclosedUserLocation, presenceLabel } from './data/locations';
 import { presenceMode } from './data/presence';
+import { normalizeSelfUser, selfUserUpdate } from './data/self-user';
 import { reconcilePage } from './hooks/paged-data';
 import { pipelineActivity } from './data/session-activity';
 import Feed from './pages/Feed';
@@ -215,7 +216,7 @@ export default function App() {
     clearFavoriteEntityCache();
     clearFriendFavoritesCache();
     setDemo(false);
-    setUser(u);
+    setUser(normalizeSelfUser(u));
     setScreen('home');
     setVisited(['home']);
     setPageRevisions({});
@@ -324,21 +325,21 @@ export default function App() {
             latest.history.observePipeline(event, latest.friends.data, latest.user),
           );
         latest.friends.apply(event);
-        if (event.type === 'user-update' && latest.user) {
-          const partial = event.content.user as Partial<User> | undefined;
-          const id = String(event.content.userId || partial?.id || '');
-          if (partial && id === latest.user.id) {
-            setUser((current) => (current ? { ...current, ...partial, id: current.id } : current));
-            if (
-              typeof partial.location === 'string' ||
-              (typeof partial.worldId === 'string' && typeof partial.instanceId === 'string')
-            )
-              latest.history.observeSession(
-                { ...partial, id, displayName: partial.displayName || latest.user.displayName },
-                latest.friends.refreshing ? [] : latest.friends.data,
-                'pipeline',
-              );
-          }
+        const ownUpdate = latest.user && selfUserUpdate(event, latest.user);
+        if (ownUpdate) {
+          // Consecutive pipeline messages can arrive before React renders again.
+          latest.user = ownUpdate.user;
+          setUser((current) =>
+            current?.id === ownUpdate.user.id
+              ? { ...current, ...ownUpdate.patch, id: current.id }
+              : current,
+          );
+          if (ownUpdate.locationChanged)
+            latest.history.observeSession(
+              ownUpdate.user,
+              latest.friends.refreshing ? [] : latest.friends.data,
+              'pipeline',
+            );
         }
         if (event.type.startsWith('notification')) {
           clearTimeout(notificationTimer.current);
@@ -410,6 +411,7 @@ export default function App() {
   if (!user)
     return (
       <>
+        <GlassRefraction />
         <Auth
           onLogin={login}
           onDemo={() => {
@@ -435,7 +437,7 @@ export default function App() {
     <AppProvider
       value={{
         user,
-        onUserUpdated: setUser,
+        onUserUpdated: (updated) => setUser(normalizeSelfUser(updated)),
         demo,
         online,
         refresh: revision,
@@ -529,7 +531,7 @@ export default function App() {
               />
               <div>
                 <strong>{user.displayName}</strong>
-                <span>{demo ? t('Деморежим') : t(statusName(user.status))}</span>
+                <span>{demo ? t('Деморежим') : t(presenceLabel(user))}</span>
               </div>
               <Settings size={17} />
             </button>
@@ -1231,9 +1233,7 @@ function MorePage({ navigate }: { navigate: (s: Screen) => void }) {
         />
         <div>
           <h2>{user.displayName}</h2>
-          <p className="muted">
-            {demo ? t('Демонстрационный аккаунт') : t(statusName(user.status))}
-          </p>
+          <p className="muted">{demo ? t('Демонстрационный аккаунт') : t(presenceLabel(user))}</p>
         </div>
         <ChevronRight size={22} />
       </button>

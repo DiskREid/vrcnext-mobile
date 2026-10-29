@@ -236,10 +236,13 @@ test('lens intensity changes the optical maps and base-theme switching cleans up
   expect(scales[2]).toBeGreaterThan(scales[1]);
   expect(new Set(maps).size).toBe(3);
   expect(
-    await page.locator('[data-glass-optic]:not([data-glass-card-optic])').count(),
+    await page
+      .locator('[data-glass-optic]:not([data-glass-card-optic]):not([data-glass-surface-optic])')
+      .count(),
   ).toBeLessThanOrEqual(5);
   expect(await page.locator('[data-glass-card-optic]').count()).toBeLessThanOrEqual(12);
-  expect(await page.locator('[data-glass-optic]').count()).toBeLessThanOrEqual(17);
+  expect(await page.locator('[data-glass-surface-optic]').count()).toBeLessThanOrEqual(12);
+  expect(await page.locator('[data-glass-optic]').count()).toBeLessThanOrEqual(29);
   await page.screenshot({
     path: `artifacts/regressions/${info.project.name}-glass-refraction-dark-synthetic-fixture.png`,
     animations: 'disabled',

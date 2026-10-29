@@ -21,9 +21,46 @@ interface Lens {
   };
 }
 let sequence = 0;
+// At most 29 visible surfaces are retained; allow a complete viewport and its
+// preceding layout to reuse maps when scrolling/rotating back.
 const imageCache = new Map<string, Pick<Lens, 'image' | 'scale'>>();
+const MAX_CACHED_MAPS = 64;
 const CARD_SELECTOR = '.friend-card, .world-card, .group-card';
 const MAX_CARD_LENSES = 12;
+// Semantic panels share the same lens instead of maintaining a list of just
+// three card types. Native form controls stay inside their non-scrolling field.
+const PANEL_SELECTOR = [
+  '.card',
+  '.media-card',
+  '.inset-panel',
+  '.confirm-panel',
+  '.confirm-inline',
+  '.search',
+  '.segmented',
+  '.explore-main-tabs',
+  '.field',
+  '.diagnostics-panel',
+  '.auth-panel',
+  '.dashboard-stats > button:nth-child(n + 3)',
+  '.network-selection',
+  '.network-toolbar',
+  '.network-person-row',
+  '.list-row',
+  '.history-avatar-result',
+  '.history-avatar-side',
+  '.history-body details',
+  '.chart-ranking-card',
+  '.chart-person',
+  '.calendar-day',
+  '.notification-categories > button',
+  '.world-instance-friend',
+  '.button',
+  '.icon-button',
+].join(', ');
+const SURFACE_SELECTOR = `${CARD_SELECTOR}, ${PANEL_SELECTOR}`;
+const EXCLUDED_SURFACES =
+  '.modal, .fullscreen-network, .fullscreen-image-viewer, .network-frame, .instance-chart-scroll';
+const MAX_PANEL_LENSES = 12;
 
 /** URL backdrop filters are a Blink feature; parsing support alone also matches WebKit. */
 export function supportsGlassRefraction(): boolean {
@@ -52,7 +89,7 @@ function mapImage(width: number, height: number, radius: number, intensity: Glas
   context.putImageData(pixels, 0, 0);
   const result = { image: canvas.toDataURL('image/png'), scale: map.scale };
   imageCache.set(key, result);
-  if (imageCache.size > 16) imageCache.delete(imageCache.keys().next().value!);
+  if (imageCache.size > MAX_CACHED_MAPS) imageCache.delete(imageCache.keys().next().value!);
   return result;
 }
 const visible = (element: HTMLElement) => {
@@ -109,7 +146,10 @@ export default function GlassRefraction() {
       if (!layoutDirty) return;
       const workspace = document.querySelector<HTMLElement>('.workspace');
       const main = workspace?.querySelector<HTMLElement>(':scope > .main-content');
-      if (!workspace || !main) return;
+      if (!workspace || !main) {
+        resetUnderlay();
+        return;
+      }
       layoutDirty = false;
       const scrollTop = main.scrollTop;
       delete workspace.dataset.glassUnderlay;
@@ -137,6 +177,7 @@ export default function GlassRefraction() {
     const clear = (element: HTMLElement) => {
       element.removeAttribute('data-glass-optic');
       element.removeAttribute('data-glass-card-optic');
+      element.removeAttribute('data-glass-surface-optic');
       element.removeAttribute('data-glass-surface-host');
       element.removeAttribute('data-glass-surface-ready');
       element.style.removeProperty('--glass-lens-filter');
@@ -167,10 +208,11 @@ export default function GlassRefraction() {
     };
     const updateCards = () => {
       const main = document.querySelector<HTMLElement>('.workspace > .main-content');
-      if (main !== cardRoot) {
+      const scope = main || document.querySelector<HTMLElement>('.auth-page');
+      if (scope !== cardRoot) {
         stopCards();
-        cardRoot = main;
-        if (main && typeof IntersectionObserver !== 'undefined') {
+        cardRoot = scope;
+        if (scope && typeof IntersectionObserver !== 'undefined') {
           cardObserver = new IntersectionObserver(
             (entries) => {
               let changed = false;
@@ -187,14 +229,17 @@ export default function GlassRefraction() {
             },
             { root: main, threshold: 0 },
           );
-          main.addEventListener('scroll', schedule, { passive: true });
+          scope.addEventListener('scroll', schedule, { passive: true });
         }
       }
       if (!cardsDirty || !cardRoot || !cardObserver) return;
       cardsDirty = false;
       const current = new Set(
-        [...cardRoot.querySelectorAll<HTMLElement>(CARD_SELECTOR)].filter(
-          (card) => !card.closest('[hidden], .modal'),
+        [...cardRoot.querySelectorAll<HTMLElement>(SURFACE_SELECTOR)].filter(
+          (card) =>
+            !card.closest(`[hidden], ${EXCLUDED_SURFACES}`) &&
+            !card.matches('.hero, .dashboard-stats > button:nth-child(-n + 2)') &&
+            !card.querySelector('.network-frame, .instance-chart-scroll'),
         ),
       );
       for (const card of observedCards) {
@@ -211,30 +256,61 @@ export default function GlassRefraction() {
     };
     const visibleCards = () => {
       if (!cardRoot) return [];
-      const bounds = cardRoot.getBoundingClientRect();
-      const prefix = parseFloat(underlay?.style.getPropertyValue('--lens-prefix') || '0') || 0;
-      const footer = parseFloat(underlay?.style.getPropertyValue('--lens-footer') || '0') || 0;
+      const workspace = cardRoot.matches('.main-content');
+      const bounds = workspace
+        ? cardRoot.getBoundingClientRect()
+        : {
+            top: 0,
+            bottom: window.innerHeight,
+            left: 0,
+            right: window.innerWidth,
+          };
+      const prefix = workspace
+        ? parseFloat(underlay?.style.getPropertyValue('--lens-prefix') || '0') || 0
+        : 0;
+      const footer = workspace
+        ? parseFloat(underlay?.style.getPropertyValue('--lens-footer') || '0') || 0
+        : 0;
       const top = Math.max(0, bounds.top + prefix);
       const bottom = Math.min(window.innerHeight, bounds.bottom - footer);
       const left = Math.max(0, bounds.left);
       const right = Math.min(window.innerWidth, bounds.right);
-      // Only intersecting entries are measured during scrolling, never the
-      // hundreds of offscreen friends in a long retained list.
-      return [...intersectingCards]
-        .filter((card) => card.isConnected && !card.closest('[hidden]'))
+      // IntersectionObserver keeps the work proportional to the viewport,
+      // including on a page containing hundreds of retained rows.
+      const visible = [...intersectingCards]
+        .filter((card) => card.isConnected && !card.closest(`[hidden], ${EXCLUDED_SURFACES}`))
         .map((card) => ({ card, rect: card.getBoundingClientRect() }))
         .filter(
           ({ rect }) =>
-            rect.width > 16 &&
-            rect.height > 16 &&
+            rect.width >= 28 &&
+            rect.height >= 24 &&
             rect.bottom > top &&
             rect.top < bottom &&
             rect.right > left &&
             rect.left < right,
         )
-        .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left)
+        .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
+      const cards = visible
+        .filter(({ card }) => card.matches(CARD_SELECTOR))
         .slice(0, MAX_CARD_LENSES)
         .map(({ card }) => card);
+      const panels: HTMLElement[] = [];
+      // Ancestors come first. A nested field/button gets the same glass finish,
+      // without cascading live SVG filters over a refractive parent panel.
+      const depth = (node: HTMLElement) => {
+        let n = 0;
+        for (let parent = node.parentElement; parent; parent = parent.parentElement) n++;
+        return n;
+      };
+      for (const { card } of visible
+        .filter(({ card }) => !card.matches(CARD_SELECTOR))
+        .sort((a, b) => depth(a.card) - depth(b.card) || a.rect.top - b.rect.top)) {
+        if ([...cards, ...panels].some((other) => other.contains(card) || card.contains(other)))
+          continue;
+        panels.push(card);
+        if (panels.length === MAX_PANEL_LENSES) break;
+      }
+      return [...cards, ...panels];
     };
     const sync = () => {
       frame = 0;
@@ -271,7 +347,7 @@ export default function GlassRefraction() {
           candidates.push(...visibleCards());
         }
       }
-      const targets = candidates.filter(visible).slice(0, 5 + MAX_CARD_LENSES);
+      const targets = candidates.filter(visible).slice(0, 5 + MAX_CARD_LENSES + MAX_PANEL_LENSES);
       const selected = new Set(targets);
       for (const element of assigned.keys()) if (!selected.has(element)) clear(element);
       const next: Lens[] = [];
@@ -328,6 +404,7 @@ export default function GlassRefraction() {
           if (!modal) {
             element.dataset.glassOptic = id;
             if (element.matches(CARD_SELECTOR)) element.dataset.glassCardOptic = 'true';
+            else if (element.matches(PANEL_SELECTOR)) element.dataset.glassSurfaceOptic = 'true';
             element.style.setProperty('--glass-lens-filter', `url("#${id}")`);
           }
           resize.observe(element);
@@ -350,13 +427,13 @@ export default function GlassRefraction() {
         records.some(
           (record) =>
             (record.type === 'attributes' &&
-              ['hidden', 'data-screen'].includes(record.attributeName || '')) ||
+              ['hidden', 'data-screen', 'class'].includes(record.attributeName || '')) ||
             (record.type === 'childList' &&
               [...record.addedNodes, ...record.removedNodes].some(
                 (node) =>
                   node instanceof Element &&
-                  (node.matches(CARD_SELECTOR + ', .main-content') ||
-                    node.querySelector(CARD_SELECTOR)),
+                  (node.matches(SURFACE_SELECTOR + ', .main-content, .auth-page') ||
+                    node.querySelector(SURFACE_SELECTOR)),
               )),
         )
       )
@@ -378,6 +455,7 @@ export default function GlassRefraction() {
       schedule();
     };
     window.addEventListener('resize', resized);
+    document.addEventListener('scroll', schedule, { passive: true, capture: true });
     const workspace = document.querySelector<HTMLElement>('.workspace');
     if (workspace) resize.observe(workspace);
     sync();
@@ -390,6 +468,7 @@ export default function GlassRefraction() {
       document.removeEventListener('visibilitychange', schedule);
       document.removeEventListener('focusin', schedule);
       window.removeEventListener('resize', resized);
+      document.removeEventListener('scroll', schedule, true);
       for (const element of assigned.keys()) clear(element);
       resetUnderlay();
       delete root.dataset.glassRefraction;

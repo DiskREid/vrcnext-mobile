@@ -7,6 +7,7 @@ import { api } from '../api';
 import { isNative, native } from '../api/native';
 import { mergePublicProfile, readPublicProfile } from '../api/profile';
 import { ActivityWorldChange } from '../components/ActivityLinks';
+import { normalizeSelfUser } from '../data/self-user';
 import type { User, ProfileUpdate } from '../api';
 import { useApp, useLoad } from '../state';
 import {
@@ -19,12 +20,58 @@ import {
   Segmented,
   Badge,
 } from '../components/ui';
-import { statusName, rankOf } from './Details';
+import { UserDetails, statusName, rankOf } from './Details';
 import { t, useI18n, dateLocale, SUPPORTED_LANGUAGES } from '../i18n';
 import type { Language } from '../i18n';
+import './SelfProfile.css';
+
 export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
   useI18n();
+  const { user } = useApp();
+  return <OwnProfile key={user.id} onUpdated={onUpdated} />;
+}
+
+function OwnProfile({ onUpdated }: { onUpdated: (u: User) => void }) {
+  const { user } = useApp();
+  const [mode, setMode] = useState('view');
+  const [editorVisited, setEditorVisited] = useState(false);
+  return (
+    <>
+      <PageHeader
+        eyebrow={t('ВАШ АККАУНТ')}
+        title={t('Мой профиль')}
+        subtitle={t('Как вас видят в VRChat')}
+      />
+      <div className="self-profile-mode" aria-label={t('Мой профиль')}>
+        <Segmented
+          value={mode}
+          onChange={(next) => {
+            if (next === 'edit') setEditorVisited(true);
+            setMode(next);
+          }}
+          items={[
+            { id: 'view', label: t('Профиль') },
+            { id: 'edit', label: t('Редактировать профиль') },
+          ]}
+        />
+      </div>
+      <div className="self-profile-view" hidden={mode !== 'view'}>
+        <UserDetails target={user.id} inline onClose={() => setMode('view')} />
+      </div>
+      {editorVisited && (
+        <div className="self-profile-edit" hidden={mode !== 'edit'}>
+          <ProfileEditor onUpdated={onUpdated} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function ProfileEditor({ onUpdated }: { onUpdated: (u: User) => void }) {
+  useI18n();
   const { user, demo, act } = useApp();
+  const latestUser = useRef(user);
+  latestUser.current = user;
   const [status, setStatus] = useState(user.status || 'active'),
     [text, setText] = useState(user.statusDescription || ''),
     [bio, setBio] = useState(user.bio || ''),
@@ -58,6 +105,7 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
     void act(async () => {
       setBusy(true);
       try {
+        const beforeSave = latestUser.current;
         const update: ProfileUpdate = {
           status,
           statusDescription: text,
@@ -80,10 +128,22 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
               }
             : {}),
         };
-        const next = await api.updateProfile(user.id, update);
+        const next = normalizeSelfUser(await api.updateProfile(user.id, update));
+        const current = latestUser.current;
+        const complete = { ...current, ...next };
+        const presenceFields = [
+          'location',
+          'currentLocation',
+          'worldId',
+          'instanceId',
+          'state',
+        ] as const;
+        // A location event received while saving is newer than the response's snapshot.
+        if (presenceFields.some((field) => current[field] !== beforeSave[field]))
+          for (const field of presenceFields) complete[field] = current[field];
         edited.current.clear();
         // The /auth/user response may omit the split public profile fields.
-        onUpdated(mergePublicProfile({ ...user, ...next }, update as Record<string, unknown>));
+        onUpdated(mergePublicProfile(complete, update as Record<string, unknown>));
       } finally {
         setBusy(false);
       }
@@ -91,11 +151,6 @@ export function ProfilePage({ onUpdated }: { onUpdated: (u: User) => void }) {
   };
   return (
     <>
-      <PageHeader
-        eyebrow={t('ВАШ АККАУНТ')}
-        title={t('Мой профиль')}
-        subtitle={t('Как вас видят в VRChat')}
-      />
       <div className="profile-card card">
         <AvatarImage
           src={imageOf(user)}

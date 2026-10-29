@@ -1,5 +1,7 @@
 import { t, useI18n } from '../i18n';
 import BrandLogo from '../components/BrandLogo';
+import HolidayDecor from '../components/HolidayDecor';
+import './AuthAppearance.css';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
@@ -9,9 +11,8 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  ExternalLink,
 } from 'lucide-react';
-import { api, ApiError, isNative, isTwoFactorChallenge, native } from '../api';
+import { api, ApiError, isNative, isTwoFactorChallenge } from '../api';
 import type { User, TwoFactorChallenge } from '../api';
 import DiagnosticsPanel from '../components/DiagnosticsPanel';
 
@@ -39,8 +40,7 @@ export default function Auth({
     [error, setError] = useState(''),
     [visible, setVisible] = useState(false),
     [resuming, setResuming] = useState(isNative),
-    [restoredChallenge, setRestoredChallenge] = useState(false),
-    [showAccountHelp, setShowAccountHelp] = useState(false);
+    [restoredChallenge, setRestoredChallenge] = useState(false);
 
   const showChallenge = (challenge: TwoFactorChallenge, restored = false) => {
     const options = challenge.requiresTwoFactorAuth.map((value) => value.toLowerCase());
@@ -110,28 +110,19 @@ export default function Auth({
       setBusy(false);
     }
   };
-  const openOfficialLogin = async () => {
-    try {
-      if (isNative) await native.openLink({ url: 'https://vrchat.com/home/login' });
-      else window.open('https://vrchat.com/home/login', '_blank', 'noopener,noreferrer');
-    } catch {
-      setError(t('Не удалось открыть браузер. Откройте https://vrchat.com/home/login вручную.'));
-    }
-  };
 
   return (
-    <div className="auth-page">
-      <div className="auth-art" aria-hidden="true">
-        <div className="orbit orbit-one" />
-        <div className="orbit orbit-two" />
-        <BrandLogo />
-        <span>
-          YOUR NEXT WORLD
-          <br />
-          IS CLOSER.
-        </span>
+    <div className="auth-page auth-scene">
+      <div className="auth-scene-bg" aria-hidden="true" />
+      <div className="auth-scene-shade" aria-hidden="true" />
+      <div className="auth-scene-decor" aria-hidden="true">
+        <HolidayDecor />
       </div>
-      <main className="auth-panel">
+      <div className="auth-art" aria-hidden="true">
+        <BrandLogo />
+        <span>{t('Хороший мир — там, где ваши друзья.')}</span>
+      </div>
+      <main className="auth-panel card">
         <div className="brand">
           <BrandLogo />
           <div>
@@ -264,40 +255,6 @@ export default function Auth({
               </button>
             )}
           </form>
-        )}
-        <button
-          type="button"
-          className="text-button"
-          disabled={busy || resuming}
-          aria-expanded={showAccountHelp}
-          onClick={() => setShowAccountHelp(!showAccountHelp)}
-        >
-          {t('Аккаунт Google или другой способ входа')}
-        </button>
-        {showAccountHelp && (
-          <div className="inset-panel form-stack">
-            <p>
-              {t(
-                'VRCNext Mobile входит через имя пользователя и пароль аккаунта VRChat. Прямой вход через Google в этой версии не поддерживается.',
-              )}
-            </p>
-            <p>
-              {t(
-                'Если ваш аккаунт связан с Google или другой платформой, проверьте способы входа и настройки аккаунта на официальном сайте VRChat. При наличии данных самого VRChat используйте их здесь.',
-              )}
-            </p>
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => void openOfficialLogin()}
-            >
-              {t('Открыть официальный вход VRChat')}
-              <ExternalLink size={16} />
-            </button>
-            <p className="muted small">
-              {t('Вход в браузере не переносит сессию в это приложение автоматически.')}
-            </p>
-          </div>
         )}
         <div className="auth-divider">
           <span>{t('или сначала осмотритесь')}</span>

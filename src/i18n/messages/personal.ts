@@ -3,6 +3,7 @@ const personal: Record<string, string> = {
   'Профиль обновлён': 'Profile updated',
   'ВАШ АККАУНТ': 'YOUR ACCOUNT',
   'Мой профиль': 'My profile',
+  'Редактировать профиль': 'Edit profile',
   'Как вас видят в VRChat': 'How you appear in VRChat',
   Статус: 'Status',
   Местоимения: 'Pronouns',

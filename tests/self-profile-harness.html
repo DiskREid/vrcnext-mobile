@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Own profile synthetic transport fixture</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { Capacitor, registerPlugin } from '@capacitor/core';
+      import '/src/styles.css';
+      const self = {
+        id: 'usr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        displayName: 'Own Profile Explorer',
+        state: 'active',
+        location: 'offline',
+        status: 'active',
+        statusDescription: 'Synthetic status',
+        pronouns: 'they / them',
+        currentAvatarThumbnailImageUrl: '/world-sakura.svg',
+        friends: [],
+      };
+      const profile = {
+        id: self.id,
+        bio: 'Original own biography',
+        languages: ['eng'],
+        bioLinks: [],
+      };
+      const group = {
+        id: 'grp_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        name: 'Own Profile Community',
+        membershipStatus: 'member',
+        iconUrl: '/world-rooftop.svg',
+        memberCount: 24,
+      };
+      const world = {
+        id: 'wrld_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        name: 'Own Private World',
+        authorId: self.id,
+        authorName: self.displayName,
+        thumbnailImageUrl: '/world-rooftop.svg',
+        releaseStatus: 'private',
+      };
+      const avatar = {
+        id: 'avtr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        name: 'Own Private Avatar',
+        authorId: self.id,
+        authorName: self.displayName,
+        thumbnailImageUrl: '/world-sakura.svg',
+        releaseStatus: 'private',
+      };
+      const listeners = new Map();
+      const appListeners = new Map();
+      let profileWasSaved = false;
+      window.__selfProfileTest = {
+        ready: false,
+        requests: [],
+        unexpected: [],
+        clearedSessions: 0,
+        selfId: self.id,
+        holdSaveResume: false,
+        saveResumePending: false,
+      };
+      window.__emitOwnLocation = (location) =>
+        listeners.get('pipeline')?.({ type: 'user-location', content: { location } });
+      const bridge = {
+        async sessionState() {
+          return { hasAuth: true };
+        },
+        async request(options) {
+          const url = new URL(options.path, 'https://synthetic.invalid'),
+            method = options.method || 'GET';
+          const body = options.body ? JSON.parse(options.body) : undefined;
+          window.__selfProfileTest.requests.push({ path: options.path, method, body });
+          if (url.pathname === `/users/${self.id}` && method === 'PUT') {
+            Object.assign(self, body);
+            return { status: 200, data: self };
+          }
+          if (url.pathname === `/profile/${self.id}` && method === 'PUT') {
+            Object.assign(profile, body);
+            profileWasSaved = true;
+            return { status: 200, data: profile };
+          }
+          if (
+            url.pathname === '/auth/user' &&
+            profileWasSaved &&
+            window.__selfProfileTest.holdSaveResume
+          ) {
+            const snapshot = { ...self };
+            profileWasSaved = false;
+            window.__selfProfileTest.saveResumePending = true;
+            await new Promise((resolve) => {
+              window.__releaseProfileSave = resolve;
+            });
+            window.__selfProfileTest.saveResumePending = false;
+            return { status: 200, data: snapshot };
+          }
+          if (url.pathname === '/auth/user' || url.pathname === `/users/${self.id}`)
+            return { status: 200, data: self };
+          if (url.pathname === `/profile/${self.id}`) return { status: 200, data: profile };
+          if (
+            url.pathname === '/auth/user/friends' ||
+            url.pathname === '/calendar' ||
+            url.pathname === '/favorites'
+          )
+            return { status: 200, data: [] };
+          if (url.pathname === `/users/${self.id}/groups`) return { status: 200, data: [group] };
+          if (url.pathname === '/worlds')
+            return { status: 200, data: url.searchParams.get('user') === 'me' ? [world] : [] };
+          if (url.pathname === '/avatars')
+            return { status: 200, data: url.searchParams.get('user') === 'me' ? [avatar] : [] };
+          if (
+            url.pathname === '/favorites/groups/world' ||
+            url.pathname === '/favorites/groups/vrcPlusWorld' ||
+            url.pathname === '/favorites/groups/friend'
+          )
+            return { status: 200, data: { favoriteGroups: [] } };
+          window.__selfProfileTest.unexpected.push(options.path);
+          return {
+            status: 500,
+            data: { error: { message: 'Unexpected own profile fixture route' } },
+          };
+        },
+        async screenProtection() {
+          return { enabled: false };
+        },
+        async setScreenProtection({ enabled }) {
+          return { enabled };
+        },
+        async addListener(name, listener) {
+          listeners.set(name, listener);
+          return {
+            remove: async () => {
+              if (listeners.get(name) === listener) listeners.delete(name);
+            },
+          };
+        },
+        async connectPipeline() {
+          listeners.get('connection')?.({ state: 'connected' });
+        },
+        async disconnectPipeline() {},
+        async clearSession() {
+          window.__selfProfileTest.clearedSessions++;
+        },
+        async loadImage() {
+          return {
+            dataUrl:
+              'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+          };
+        },
+        async openLink() {},
+        async copyText() {},
+        async exportJson() {
+          return { saved: true };
+        },
+      };
+      registerPlugin('VrcNative', { web: () => bridge });
+      registerPlugin('App', {
+        web: () => ({
+          getState: async () => ({ isActive: true }),
+          addListener: async (name, listener) => {
+            if (!appListeners.has(name)) appListeners.set(name, new Set());
+            appListeners.get(name).add(listener);
+            return {
+              remove: async () => {
+                appListeners.get(name)?.delete(listener);
+              },
+            };
+          },
+          exitApp: async () => {},
+        }),
+      });
+      Capacitor.isNativePlatform = () => true;
+      const { default: App } = await import('/src/App.tsx');
+      createRoot(document.getElementById('root')).render(React.createElement(App));
+      window.__selfProfileTest.ready = true;
+    </script>
+  </body>
+</html>

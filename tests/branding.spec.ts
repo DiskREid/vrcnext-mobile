@@ -11,6 +11,7 @@ const holidays = [
   'christmas',
 ];
 type Fixture = {
+  ready: boolean;
   requests: { path: string; method: string }[];
   unexpected: string[];
   launcherCalls: (string | null)[];
@@ -27,6 +28,10 @@ const controls = (page: Page) => active(page, 'settings').locator('.appearance-s
 
 async function open(page: Page) {
   await page.goto('/tests/branding-harness.html');
+  // The HTML load event can precede the fixture's dynamic App import.
+  await page.waitForFunction(
+    () => (window as unknown as { __brandingTest?: Fixture }).__brandingTest?.ready === true,
+  );
   await expect(
     page.getByRole('heading', { name: 'Привет, Theme Explorer ✦', exact: true }),
   ).toBeVisible();

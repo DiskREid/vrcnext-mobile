@@ -2,6 +2,7 @@ import { uiMessage } from '../i18n';
 import { t, useI18n, dateLocale } from '../i18n';
 import SecureImage, { useSecureImage } from '../components/SecureImage';
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   Users,
   Globe2,
@@ -28,6 +29,7 @@ import BoopPicker from '../components/BoopPicker';
 import type { KnownInstance } from '../data/world-instances';
 import { instanceCount } from '../data/instance-location';
 import { overlayLiveUser, presenceIndicator } from '../data/presence';
+import { normalizeSelfUser } from '../data/self-user';
 import { accessibleLocation } from '../data/locations';
 import type { User, World, FavoriteGroup } from '../api';
 import { useApp, useLoad } from '../state';
@@ -120,27 +122,70 @@ function FavoritePicker({
     </div>
   );
 }
-export function UserDetails({ target, onClose }: { target: User | string; onClose: () => void }) {
+function UserProfileFrame({
+  inline,
+  onClose,
+  children,
+}: {
+  inline: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return inline ? (
+    <section className="card user-profile-panel self-profile-details" aria-label={t('Профиль')}>
+      {children}
+    </section>
+  ) : (
+    <Modal title={t('Профиль')} onClose={onClose} wide>
+      {children}
+    </Modal>
+  );
+}
+export function UserDetails({
+  target,
+  onClose,
+  inline = false,
+}: {
+  target: User | string;
+  onClose: () => void;
+  inline?: boolean;
+}) {
   useI18n();
   const id = typeof target === 'string' ? target : target.id;
   // A different target gets a different loader and form, never retained data from the last profile.
-  return <UserDetailsContent key={id} id={id} onClose={onClose} />;
+  return <UserDetailsContent key={id} id={id} onClose={onClose} inline={inline} />;
 }
-function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }) {
+function UserDetailsContent({
+  id,
+  onClose,
+  inline,
+}: {
+  id: string;
+  onClose: () => void;
+  inline: boolean;
+}) {
   useI18n();
   const ctx = useApp(),
     isSelf = ctx.user.id === id;
-  const load = useLoad(
-    () =>
-      (ctx.demo
+  const latestSelf = useRef(ctx.user);
+  latestSelf.current = ctx.user;
+  const selfRequestBaselines = useRef(new WeakMap<User, User>());
+  const load = useLoad(() => {
+    const requestedSelf = latestSelf.current;
+    return (
+      ctx.demo
         ? Promise.resolve(demoFriends.find((x) => x.id === id) || ctx.user)
-        : api.user(id)
-      ).then((user) => {
-        if (user.id !== id) throw new Error(t('VRChat не вернул запрошенного пользователя.'));
-        return user;
-      }),
-    [id, ctx.refresh],
-  );
+        : isSelf
+          ? api.resume()
+          : api.user(id)
+    ).then((user) => {
+      if (user.id !== id) throw new Error(t('VRChat не вернул запрошенного пользователя.'));
+      if (!isSelf) return user;
+      const fresh = normalizeSelfUser(user);
+      selfRequestBaselines.current.set(fresh, requestedSelf);
+      return fresh;
+    });
+  }, [id, ctx.refresh]);
   const profile = useLoad(
     () =>
       ctx.demo
@@ -150,12 +195,15 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
             ...(id === ctx.user.id ? ctx.user : {}),
           })
         : api.userProfile(id).then((value) => readPublicProfile(value, id)),
-    [id],
+    [id, ctx.refresh],
   );
   const liveUser = isSelf ? ctx.user : ctx.friends.data.find((friend) => friend.id === id);
   const baseline = useRef<{ profile?: User; friend?: User }>({});
   if (baseline.current.profile !== load.data)
-    baseline.current = { profile: load.data, friend: liveUser };
+    baseline.current = {
+      profile: load.data,
+      friend: isSelf && load.data ? selfRequestBaselines.current.get(load.data) : liveUser,
+    };
   const u =
     load.data &&
     overlayLiveUser(mergePublicProfile(load.data, profile.data), baseline.current.friend, liveUser);
@@ -165,9 +213,19 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
     [confirm, setConfirm] = useState(''),
     [boopOpen, setBoopOpen] = useState(false);
   useEffect(() => {
-    if (!ctx.demo && load.data && profile.data && !load.error && !profile.error)
+    // Our own event baseline belongs to the live pipeline and observation sampler.
+    // An older profile-view response must not replace their newer location.
+    if (!isSelf && !ctx.demo && load.data && profile.data && !load.error && !profile.error)
       ctx.history.observeProfile(mergePublicProfile(load.data, profile.data));
-  }, [load.data, profile.data, load.error, profile.error, ctx.demo, ctx.history.observeProfile]);
+  }, [
+    load.data,
+    profile.data,
+    load.error,
+    profile.error,
+    isSelf,
+    ctx.demo,
+    ctx.history.observeProfile,
+  ]);
   useEffect(() => {
     setNote(u?.note || '');
   }, [u?.id, u?.note]);
@@ -177,7 +235,7 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
       uiMessage('Приглашение отправлено'),
     );
   return (
-    <Modal title={t('Профиль')} onClose={onClose} wide>
+    <UserProfileFrame inline={inline} onClose={onClose}>
       {load.loading && !u ? (
         <Loading />
       ) : load.error ? (
@@ -212,53 +270,57 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
               {t(presenceIndicator(u).label)} {u.pronouns && `· ${u.pronouns}`}
             </p>
             {u.statusDescription && <p className="status-description">{u.statusDescription}</p>}
-            <div className="detail-actions">
-              <button
-                className="button primary"
-                disabled={!accessibleLocation(ctx.user.location)}
-                onClick={() => invite(u)}
-              >
-                <Send size={16} />
-                {t('Пригласить друга')}
-              </button>
-              <button
-                className="button secondary"
-                onClick={() =>
-                  void ctx.act(
-                    () => api.requestInvite(u.id),
-                    uiMessage('Запрос приглашения отправлен'),
-                  )
-                }
-              >
-                <MessageSquare size={16} />
-                {t('Попросить инвайт')}
-              </button>
-              {!u.isFriend && !isSelf && (
+            {!isSelf && (
+              <div className="detail-actions">
+                <button
+                  className="button primary"
+                  disabled={!accessibleLocation(ctx.user.location)}
+                  onClick={() => invite(u)}
+                >
+                  <Send size={16} />
+                  {t('Пригласить друга')}
+                </button>
                 <button
                   className="button secondary"
                   onClick={() =>
                     void ctx.act(
-                      () => api.friendRequest(u.id),
-                      uiMessage('Заявка в друзья отправлена'),
+                      () => api.requestInvite(u.id),
+                      uiMessage('Запрос приглашения отправлен'),
                     )
                   }
                 >
-                  <UserPlus size={16} />
-                  {t('Добавить')}
+                  <MessageSquare size={16} />
+                  {t('Попросить инвайт')}
                 </button>
-              )}
-              {(u.isFriend || u.friendKey) && u.id !== ctx.user.id && (
-                <button className="button secondary" onClick={() => setBoopOpen(true)}>
-                  Boop
-                </button>
-              )}
-              {!isSelf && <FriendFavoriteButton user={u} />}
-            </div>
+                {!u.isFriend && !isSelf && (
+                  <button
+                    className="button secondary"
+                    onClick={() =>
+                      void ctx.act(
+                        () => api.friendRequest(u.id),
+                        uiMessage('Заявка в друзья отправлена'),
+                      )
+                    }
+                  >
+                    <UserPlus size={16} />
+                    {t('Добавить')}
+                  </button>
+                )}
+                {(u.isFriend || u.friendKey) && u.id !== ctx.user.id && (
+                  <button className="button secondary" onClick={() => setBoopOpen(true)}>
+                    Boop
+                  </button>
+                )}
+                {!isSelf && <FriendFavoriteButton user={u} />}
+              </div>
+            )}
             {boopOpen && <BoopPicker target={u} onClose={() => setBoopOpen(false)} />}
             <Segmented
               value={tab}
               onChange={setTab}
-              items={userProfileTabs.map((item) => ({ ...item, label: t(item.label) }))}
+              items={userProfileTabs
+                .filter((item) => !isSelf || item.id !== 'mutual')
+                .map((item) => ({ ...item, label: t(item.label) }))}
             />
             <div className="form-stack user-profile-panel" hidden={tab !== 'profile'}>
               {profile.loading && typeof u.bio !== 'string' ? (
@@ -287,41 +349,45 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
               ))}
               <div className="chips">{u.languages?.map((l) => <Badge key={l}>{l}</Badge>)}</div>
               <ProfileInformation user={u} profile={profile.data} />
-              <label className="field">
-                {t('Личная заметка')}
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  maxLength={256}
-                  placeholder={t('Видна только вам')}
-                />
-              </label>
-              <button
-                className="button secondary"
-                onClick={() =>
-                  void ctx.act(() => api.note(id, note), uiMessage('Заметка сохранена'))
-                }
-              >
-                {t('Сохранить заметку')}
-              </button>
-              <div className="divider" />
-              <h3>{t('Управление')}</h3>
-              <div className="detail-actions">
-                <button className="button secondary" onClick={() => setConfirm('mute')}>
-                  {t('Заглушить')}
-                </button>
-                <button className="button danger" onClick={() => setConfirm('block')}>
-                  {t('Заблокировать')}
-                </button>
-                {u.isFriend && (
-                  <button className="button danger" onClick={() => setConfirm('unfriend')}>
-                    {t('Удалить из друзей')}
+              {!isSelf && (
+                <>
+                  <label className="field">
+                    {t('Личная заметка')}
+                    <textarea
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      maxLength={256}
+                      placeholder={t('Видна только вам')}
+                    />
+                  </label>
+                  <button
+                    className="button secondary"
+                    onClick={() =>
+                      void ctx.act(() => api.note(id, note), uiMessage('Заметка сохранена'))
+                    }
+                  >
+                    {t('Сохранить заметку')}
                   </button>
-                )}
-              </div>
+                  <div className="divider" />
+                  <h3>{t('Управление')}</h3>
+                  <div className="detail-actions">
+                    <button className="button secondary" onClick={() => setConfirm('mute')}>
+                      {t('Заглушить')}
+                    </button>
+                    <button className="button danger" onClick={() => setConfirm('block')}>
+                      {t('Заблокировать')}
+                    </button>
+                    {u.isFriend && (
+                      <button className="button danger" onClick={() => setConfirm('unfriend')}>
+                        {t('Удалить из друзей')}
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             <UserProfileTabs tab={tab} user={u} profile={profile.data} />
-            {confirm && (
+            {confirm && !isSelf && (
               <div className="confirm-panel" role="alert">
                 <Shield size={22} />
                 <p>
@@ -360,7 +426,7 @@ function UserDetailsContent({ id, onClose }: { id: string; onClose: () => void }
           </>
         )
       )}
-    </Modal>
+    </UserProfileFrame>
   );
 }
 export function WorldDetails({

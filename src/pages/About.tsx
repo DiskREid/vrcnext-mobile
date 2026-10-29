@@ -86,7 +86,7 @@ export default function AboutPage() {
         </div>
         <div className="about-hero-copy">
           <div className="about-kicker">
-            <BrandLogo /> VRCNext Mobile <Badge>0.4.4</Badge>
+            <BrandLogo /> VRCNext Mobile <Badge>0.4.5</Badge>
           </div>
           <h2>
             {t('Оставайтесь рядом.')}

@@ -12,6 +12,8 @@ export interface User {
   languages?: string[];
   tags?: string[];
   location?: string;
+  /** /auth/user reports the signed-in account's game location separately. */
+  currentLocation?: string;
   worldId?: string;
   instanceId?: string;
   state?: string;

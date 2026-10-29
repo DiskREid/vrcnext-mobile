@@ -5,6 +5,7 @@ import type { PluginListenerHandle } from '@capacitor/core';
 import type { User } from '../api';
 import type { FriendState } from './friends';
 import type { HistoryState } from './history';
+import { normalizeSelfUser, sameSelfPresence } from './self-user';
 
 export function useObservation(user: User | null, demo: boolean, online: boolean, connected: boolean,
   friends: FriendState, history: HistoryState, updateUser: (user: User) => void) {
@@ -31,7 +32,7 @@ export function useObservation(user: User | null, demo: boolean, online: boolean
     return () => { cancelled = true; void handle?.remove(); };
   }, []);
   useEffect(() => {
-    let live = true, busy = false, expired = false, visibilityEpoch = 0;
+    let live = true, busy = false, expired = false, visibilityEpoch = 0, needsBaseline = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const visible = () => nativeActive.current && document.visibilityState === 'visible';
     const schedule = (delay = 120_000) => { clearTimeout(timer); if (live && visible() && !expired) timer = setTimeout(() => void sample(), delay); };
@@ -39,19 +40,26 @@ export function useObservation(user: User | null, demo: boolean, online: boolean
       if (!live || busy || !visible() || !online || !latest.current.user || demo) return;
       busy = true; setStatus('syncing');
       const epoch = visibilityEpoch;
+      const requestedUser = latest.current.user;
       let delay = 120_000;
       try {
-        const fresh = await api.resume();
+        const fresh = normalizeSelfUser(await api.resume());
         if (!live || !visible() || epoch !== visibilityEpoch) return;
         const current = latest.current;
         if (fresh.id !== current.user?.id) throw new Error('Аккаунт наблюдения изменился. Войдите снова.');
+        // A user-location event can arrive while /auth/user is in flight. The
+        // response then describes an older instant, not a move back to it.
+        if (!sameSelfPresence(requestedUser, current.user)) { setStatus('observing'); return; }
         // Only the actual response can prove location. Never fill an absent location from old UI data.
         current.history.observeSession(fresh, current.connected && !current.friends.refreshing ? current.friends.data : [], 'api');
+        current.history.observeSelf(fresh, 'sync', needsBaseline);
+        needsBaseline = false;
         current.updateUser({ ...current.user, ...fresh });
         setLastSync(new Date().toISOString()); setStatus('observing'); setError('');
       } catch (failure) {
         if (!live || epoch !== visibilityEpoch) return;
         latest.current.history.pauseSession();
+        needsBaseline = true;
         expired = failure instanceof ApiError && failure.status === 401;
         if (failure instanceof ApiError && failure.status === 429) delay = Math.max(delay, (failure.retryAfter || 60) * 1000);
         setStatus('error'); setError(failure instanceof Error ? failure.message : 'Не удалось получить текущее местоположение.');
@@ -60,7 +68,7 @@ export function useObservation(user: User | null, demo: boolean, online: boolean
     refreshAction.current = () => { expired = false; clearTimeout(timer); void sample(); };
     const visibility = () => {
       if (visible()) { if (!expired) void sample(); }
-      else { visibilityEpoch++; clearTimeout(timer); latest.current.history.pauseSession(); setStatus('paused'); }
+      else { visibilityEpoch++; needsBaseline = true; clearTimeout(timer); latest.current.history.pauseSession(); setStatus('paused'); }
     };
     if (!user) { initialAccount.current = undefined; setLastSync(undefined); setError(''); setStatus('paused'); }
     else if (demo) { setLastSync(undefined); setError(''); setStatus('demo'); }
@@ -68,12 +76,15 @@ export function useObservation(user: User | null, demo: boolean, online: boolean
     else if (initialAccount.current !== user.id) {
       // Auth just returned this real snapshot; avoid a duplicate /auth/user request on login.
       initialAccount.current = user.id;
-      history.observeSession(user, connected && !friends.refreshing ? friends.data : [], 'api');
+      const fresh = normalizeSelfUser(user);
+      history.observeSelf(fresh, 'sync', true);
+      needsBaseline = false;
+      history.observeSession(fresh, connected && !friends.refreshing ? friends.data : [], 'api');
       setLastSync(new Date().toISOString()); setStatus('observing'); schedule();
     } else void sample();
     document.addEventListener('visibilitychange', visibility);
     return () => { live = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visibility); history.pauseSession(); refreshAction.current = () => {}; };
-  }, [user?.id, demo, online, foreground, history.observeSession, history.pauseSession]);
+  }, [user?.id, demo, online, foreground, history.observeSelf, history.observeSession, history.pauseSession]);
   const refresh = useCallback(() => refreshAction.current(), []);
   return { status, error, lastSync, refresh };
 }

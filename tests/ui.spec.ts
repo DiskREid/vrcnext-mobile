@@ -165,16 +165,8 @@ test.describe('VRCNext Mobile browser demo', () => {
     await expect(page.getByLabel('Имя пользователя VRChat')).toBeDisabled();
     await expect(page.getByLabel('Пароль', { exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Войти в VRChat', exact: true })).toBeDisabled();
-    await page
-      .getByRole('button', { name: 'Аккаунт Google или другой способ входа', exact: true })
-      .click();
-    await expect(
-      page.getByText('Вход в браузере не переносит сессию в это приложение автоматически.'),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /Google|официальный вход/ })).toHaveCount(0);
     await noHorizontalOverflow(page);
-    await page
-      .getByRole('button', { name: 'Аккаунт Google или другой способ входа', exact: true })
-      .click();
     await screenshot(page, testInfo, 'auth');
     await page.getByRole('button', { name: 'Открыть деморежим' }).click();
     await expect(

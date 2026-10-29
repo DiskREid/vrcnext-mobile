@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Own activity synthetic transport fixture</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { Capacitor, registerPlugin } from '@capacitor/core';
+      import '/src/styles.css';
+      const self = {
+        id: 'usr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        displayName: 'Activity Explorer',
+        state: 'offline',
+        location: 'offline',
+        currentLocation: 'wrld_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa:12345~region(eu)',
+        status: 'active',
+        statusDescription: 'Synthetic status',
+        pronouns: 'they / them',
+        currentAvatarThumbnailImageUrl: '/world-sakura.svg',
+        friends: ['usr_bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb'],
+      };
+      const friend = {
+        id: self.friends[0],
+        displayName: 'Observed Friend',
+        state: 'online',
+        status: 'active',
+        location: self.currentLocation,
+        isFriend: true,
+      };
+      const secondWorld = {
+        id: 'wrld_bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb',
+        name: 'Observed Rooftop',
+        thumbnailImageUrl: '/world-rooftop.svg',
+        authorName: 'Fixture Creator',
+      };
+      const profile = {
+        id: self.id,
+        bio: 'Original own biography',
+        languages: ['eng'],
+        bioLinks: [],
+      };
+      const group = {
+        id: 'grp_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        name: 'Own Profile Community',
+        membershipStatus: 'member',
+        iconUrl: '/world-rooftop.svg',
+        memberCount: 24,
+      };
+      const world = {
+        id: 'wrld_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        name: 'Observed Sakura',
+        authorId: self.id,
+        authorName: self.displayName,
+        thumbnailImageUrl: '/world-rooftop.svg',
+        releaseStatus: 'private',
+      };
+      const avatar = {
+        id: 'avtr_aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        name: 'Own Private Avatar',
+        authorId: self.id,
+        authorName: self.displayName,
+        thumbnailImageUrl: '/world-sakura.svg',
+        releaseStatus: 'private',
+      };
+      const listeners = new Map();
+      const appListeners = new Map();
+      window.__selfActivityTest = {
+        ready: false,
+        requests: [],
+        unexpected: [],
+        clearedSessions: 0,
+        selfId: self.id,
+        locations: { a: self.currentLocation, b: secondWorld.id + ':67890~region(eu)' },
+        pipelineReady: () => listeners.has('pipeline'),
+        emit: (event) => {
+          if (event.type === 'user-location' && typeof event.content.location === 'string')
+            self.currentLocation = event.content.location;
+          if (event.type === 'user-update')
+            Object.assign(self, event.content.user || event.content);
+          listeners.get('pipeline')?.(event);
+        },
+        emitAppState: (isActive) => {
+          for (const listener of appListeners.get('appStateChange') || []) listener({ isActive });
+        },
+        async readHistory() {
+          const { IndexedHistoryStore } = await import('/src/data/history-storage.ts');
+          const store = new IndexedHistoryStore();
+          return { events: await store.read(self.id), ...(await store.readGame(self.id)) };
+        },
+        holdNextResume: false,
+        resumePending: false,
+      };
+      window.__emitOwnLocation = (location) =>
+        listeners.get('pipeline')?.({ type: 'user-location', content: { location } });
+      const bridge = {
+        async sessionState() {
+          return { hasAuth: true };
+        },
+        async request(options) {
+          const url = new URL(options.path, 'https://synthetic.invalid'),
+            method = options.method || 'GET';
+          const body = options.body ? JSON.parse(options.body) : undefined;
+          window.__selfActivityTest.requests.push({ path: options.path, method, body });
+          if (url.pathname === `/users/${self.id}` && method === 'PUT') {
+            Object.assign(self, body);
+            return { status: 200, data: self };
+          }
+          if (url.pathname === `/profile/${self.id}` && method === 'PUT') {
+            Object.assign(profile, body);
+            return { status: 200, data: profile };
+          }
+          if (url.pathname === '/auth/user' && window.__selfActivityTest.holdNextResume) {
+            const snapshot = { ...self };
+            window.__selfActivityTest.holdNextResume = false;
+            window.__selfActivityTest.resumePending = true;
+            await new Promise((resolve) => {
+              window.__releaseSelfResume = resolve;
+            });
+            window.__selfActivityTest.resumePending = false;
+            return { status: 200, data: snapshot };
+          }
+          if (url.pathname === '/auth/user' || url.pathname === `/users/${self.id}`)
+            return { status: 200, data: self };
+          if (url.pathname === `/profile/${self.id}`) return { status: 200, data: profile };
+          if (url.pathname === '/auth/user/friends')
+            return {
+              status: 200,
+              data: url.searchParams.get('offline') === 'true' ? [] : [friend],
+            };
+          if (url.pathname.startsWith('/instances/'))
+            return {
+              status: 200,
+              data: {
+                id: '12345',
+                location: self.currentLocation,
+                worldId: world.id,
+                instanceId: '12345~region(eu)',
+                userCount: 2,
+                capacity: 40,
+                type: 'public',
+              },
+            };
+          if (url.pathname === '/worlds/' + world.id) return { status: 200, data: world };
+          if (url.pathname === '/worlds/' + secondWorld.id)
+            return { status: 200, data: secondWorld };
+          if (url.pathname === `/users/${friend.id}`) return { status: 200, data: friend };
+          if (url.pathname === '/calendar' || url.pathname === '/favorites')
+            return { status: 200, data: [] };
+          if (url.pathname === `/users/${self.id}/groups`) return { status: 200, data: [group] };
+          if (url.pathname === '/worlds')
+            return { status: 200, data: url.searchParams.get('user') === 'me' ? [world] : [] };
+          if (url.pathname === '/avatars')
+            return { status: 200, data: url.searchParams.get('user') === 'me' ? [avatar] : [] };
+          if (
+            url.pathname === '/favorites/groups/world' ||
+            url.pathname === '/favorites/groups/vrcPlusWorld' ||
+            url.pathname === '/favorites/groups/friend'
+          )
+            return { status: 200, data: { favoriteGroups: [] } };
+          window.__selfActivityTest.unexpected.push(options.path);
+          return {
+            status: 500,
+            data: { error: { message: 'Unexpected own profile fixture route' } },
+          };
+        },
+        async screenProtection() {
+          return { enabled: false };
+        },
+        async setScreenProtection({ enabled }) {
+          return { enabled };
+        },
+        async addListener(name, listener) {
+          listeners.set(name, listener);
+          return {
+            remove: async () => {
+              if (listeners.get(name) === listener) listeners.delete(name);
+            },
+          };
+        },
+        async connectPipeline() {
+          listeners.get('connection')?.({ state: 'connected' });
+        },
+        async disconnectPipeline() {},
+        async clearSession() {
+          window.__selfActivityTest.clearedSessions++;
+        },
+        async loadImage() {
+          return {
+            dataUrl:
+              'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+          };
+        },
+        async openLink() {},
+        async copyText() {},
+        async exportJson() {
+          return { saved: true };
+        },
+      };
+      registerPlugin('VrcNative', { web: () => bridge });
+      registerPlugin('App', {
+        web: () => ({
+          getState: async () => ({ isActive: true }),
+          addListener: async (name, listener) => {
+            if (!appListeners.has(name)) appListeners.set(name, new Set());
+            appListeners.get(name).add(listener);
+            return {
+              remove: async () => {
+                appListeners.get(name)?.delete(listener);
+              },
+            };
+          },
+          exitApp: async () => {},
+        }),
+      });
+      Capacitor.isNativePlatform = () => true;
+      const { default: App } = await import('/src/App.tsx');
+      createRoot(document.getElementById('root')).render(React.createElement(App));
+      window.__selfActivityTest.ready = true;
+    </script>
+  </body>
+</html>

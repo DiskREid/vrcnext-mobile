@@ -1,5 +1,5 @@
 /* Shared material for interactive controls and detail cards. Refraction for a
-   bounded set of visible cards is assigned separately by GlassRefraction. */
+   bounded set of visible surfaces is assigned separately by GlassRefraction. */
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
   --control-glass-fill: rgba(var(--glass-chrome-rgb), 0.34);
   --control-glass-edge: rgba(213, 234, 255, 0.29);
@@ -167,4 +167,159 @@ html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .friend-favorit
 html[data-effects='reduced']:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
   --detail-glass-fill: rgba(var(--glass-surface-rgb), 0.7);
   --control-glass-fill: rgba(var(--glass-chrome-rgb), 0.68);
+}
+
+/* One material vocabulary across pages. Inner controls keep a glass finish
+   even when a refractive ancestor already owns their live backdrop sample. */
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .card:not(.auth-panel),
+    .media-card,
+    .inset-panel,
+    .confirm-panel,
+    .confirm-inline,
+    .search,
+    .segmented,
+    .explore-main-tabs,
+    .diagnostics-panel,
+    .history-avatar-side,
+    .history-body details,
+    .instance-chart-scroll,
+    .list-row,
+    .user-content-card,
+    .appearance-current-holiday,
+    .network-person-row,
+    .network-frame,
+    .group-instance,
+    .group-post,
+    .history-avatar-result,
+    .chart-ranking-card,
+    .chart-person,
+    .calendar-day:not(.selected),
+    .notification-categories > button:not(.active),
+    .world-instance-friend,
+    .network-toolbar,
+    .network-selection
+  ) {
+  background:
+    radial-gradient(ellipse at 0 0, rgba(255, 255, 255, var(--glass-reflection)), transparent 58%),
+    linear-gradient(125deg, #ffffff09, transparent 42%, rgba(var(--holiday-rgb), 0.055)),
+    var(--detail-glass-fill);
+  border-color: var(--control-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 1px 0 0 #ffffff16,
+    inset 0 -1px 0 var(--control-glass-bottom),
+    0 5px 16px var(--detail-glass-shadow);
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.search, .explore-main-tabs, .confirm-panel, .diagnostics-panel) {
+  border: 1px solid var(--control-glass-edge);
+  border-radius: 15px;
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(
+    .field input:not([type='checkbox']):not([type='range']):not([type='color']),
+    .field select,
+    .field textarea
+  ) {
+  background:
+    linear-gradient(115deg, #ffffff1c, transparent 35%, #ffffff04 70%, #c5e5ff0c),
+    var(--control-glass-fill);
+  border: 1px solid var(--control-glass-edge);
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 0 -1px 0 var(--control-glass-bottom),
+    0 3px 9px var(--detail-glass-shadow);
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .search > input {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  color: var(--text);
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.field input::placeholder, .field textarea::placeholder, .search > input::placeholder) {
+  color: var(--muted);
+  opacity: 0.82;
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.field input, .field select, .field textarea, .search):focus-within {
+  border-color: var(--accent);
+  outline-color: var(--accent);
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.icon-button, .copy-id, .calendar-day:not(.selected), .explore-main-tabs > button) {
+  background:
+    linear-gradient(115deg, #ffffff17, transparent 48%, #c5e5ff08), var(--control-glass-fill);
+  border: 1px solid var(--control-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 0 -1px 0 var(--control-glass-bottom);
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.explore-main-tabs > button, .list-row, .network-person-row) {
+  border-radius: 12px;
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  .explore-main-tabs
+  > button.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: linear-gradient(115deg, #ffffff29, transparent 58%), var(--accent-soft);
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.field select option, .field select optgroup) {
+  /* Native popup menus need an opaque platform surface to keep text legible. */
+  color: var(--text);
+  background: rgb(var(--glass-chrome-rgb));
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .sidebar {
+  background:
+    linear-gradient(125deg, #ffffff1a, transparent 40%, #c5e5ff09),
+    rgba(var(--glass-chrome-rgb), 0.72);
+  border-color: var(--control-glass-edge);
+  box-shadow: inset -1px 0 0 var(--control-glass-glint);
+}
+
+/* Compact surfaces use the same bevel and reflected light as large panels.
+   The shared semantic controller gives standalone visible controls a lens;
+   controls inside a lens retain this finish without recursively sampling it. */
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.notification-categories > button, .chart-person, .calendar-day, .world-instance-friend) {
+  border: 1px solid var(--control-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 0 -1px 0 var(--control-glass-bottom),
+    0 3px 9px var(--detail-glass-shadow);
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.notification-categories > button.active, .calendar-day.selected) {
+  background: linear-gradient(115deg, #ffffff35, transparent 60%), var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+/* Selected dates use the readable ink chosen for the accent; general text ink
+   is deliberately darker in the light theme and cannot be used on this fill. */
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  button.calendar-day.selected {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.network-toolbar, .network-selection) {
+  border: 1px solid var(--control-glass-edge);
+  border-radius: 16px;
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .network-toolbar {
+  padding: 8px;
+}
+html[data-theme]:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
+  :is(.count-label, .stat-icon, .notification-icon) {
+  background: linear-gradient(115deg, #ffffff29, transparent 60%), var(--accent-soft);
+  border: 1px solid var(--control-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-glint),
+    inset 0 -1px 0 var(--control-glass-bottom);
 }
