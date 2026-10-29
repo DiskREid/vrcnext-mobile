@@ -995,6 +995,49 @@
           "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.4/release-files.zip"
         }
       ]
+    },
+    {
+      "tag": "v0.4.5",
+      "targetCommit": "b9c46ead6fc5d7fa822c1aa54c3023d84369c2b6",
+      "url": "https://github.com/DiskREid/vrcnext-mobile/releases/tag/v0.4.5",
+      "assets": [
+        {
+          "name": "README.md",
+          "bytes": 4947,
+          "sha256": "50be283fbc30ac8ddcfc5fc9a9363ac8acb3e4784478f9f7effa091e730ee68d",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.5/README.md"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 14313,
+          "sha256": "24c8b6b01b2ff3260c303628a1d8059480da0dff9b70a44b2444a6f1754f8454",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.5/SHA256SUMS.txt"
+        },
+        {
+          "name": "VRCNext-Mobile-0.4.5-source.zip",
+          "bytes": 29913908,
+          "sha256": "5a5cc6b13671ba1782396a4abc05feb4e34bfa882fcfa7be1c5e526fa82104aa",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.5/VRCNext-Mobile-0.4.5-source.zip"
+        },
+        {
+          "name": "VRCNext-Mobile-0.4.5.apk",
+          "bytes": 36210225,
+          "sha256": "797232b39ebf2c05c3d5dd1e0fdbe5b3ef448250fa489b340cbc8c2719137e95",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.5/VRCNext-Mobile-0.4.5.apk"
+        },
+        {
+          "name": "validation.json",
+          "bytes": 142873,
+          "sha256": "76fca9edb84e647fc6a2e33aa1ca53d528966c752fd3ae8e4fdd798d3c035eac",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.5/validation.json"
+        },
+        {
+          "name": "release-files.zip",
+          "bytes": 71126773,
+          "sha256": "66727d63ea5ff4c6c39cbfc077ce0f638d3985443e0b77f628c8c0ed9d6951fa",
+          "url": "https://github.com/DiskREid/vrcnext-mobile/releases/download/v0.4.5/release-files.zip"
+        }
+      ]
     }
   ]
 }
