@@ -1,0 +1,61 @@
+{
+  "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'",
+  "state": "on",
+  "filters": 5,
+  "mapIsPngDataUri": true,
+  "mapWidth": 256,
+  "mapHeight": 217,
+  "renderedImageChangesWhenRefractionDisabled": true,
+  "cards": {
+    "friend": {
+      "mapIsPngDataUri": true,
+      "mapWidth": 256,
+      "mapHeight": 81,
+      "foregroundFilter": "none",
+      "backdropFilter": "url(\"#vrc-glass-6\") blur(0.35px) saturate(1.12)",
+      "displacementScale": 40,
+      "renderedImageChangesWhenRefractionDisabled": true,
+      "foreground": [
+        {
+          "tag": "avatar",
+          "filter": "none"
+        },
+        {
+          "tag": "H3",
+          "filter": "none"
+        }
+      ],
+      "cards": 3,
+      "total": 5,
+      "filters": 5
+    },
+    "world": {
+      "mapIsPngDataUri": true,
+      "mapWidth": 166,
+      "mapHeight": 247,
+      "foregroundFilter": "none",
+      "backdropFilter": "url(\"#vrc-glass-9\") blur(0.35px) saturate(1.12)",
+      "displacementScale": 40,
+      "renderedImageChangesWhenRefractionDisabled": true,
+      "foreground": [
+        {
+          "tag": "media-cover",
+          "filter": "none"
+        },
+        {
+          "tag": "H3",
+          "filter": "none"
+        }
+      ],
+      "cards": 3,
+      "total": 5,
+      "filters": 5
+    }
+  },
+  "friendAndWorldCardMapsDecoded": true,
+  "friendAndWorldCardBackdropsReallyChange": true,
+  "friendAndWorldCardForegroundHasNoFilter": true,
+  "violations": [],
+  "pageErrors": [],
+  "credentialRequests": []
+}

@@ -1,0 +1,35 @@
+{
+  "apkSha256": "56deaa0283f13612c0e17e86135aeee0a68be44c0db2ba66dde908342e19639b",
+  "launchActivityTheme": "@0x7f0e0007",
+  "compiledLaunchStyleConfigurations": {
+    "default": {
+      "id": "0x7f0e0007",
+      "parent": "0x7f0e0114",
+      "items": {
+        "0x7f0300ce": "(reference) 0x7f0e0006",
+        "0x7f03012d": "(reference) 0x7f070075",
+        "0x7f03012f": "(reference) 0x7f05005d"
+      }
+    },
+    "v31": {
+      "id": "0x7f0e0007",
+      "parent": "0x7f0e0114",
+      "items": {
+        "0x0101062d": "(reference) 0x00000000",
+        "0x7f0300ce": "(reference) 0x7f0e0006",
+        "0x7f03012d": "(reference) 0x00000000",
+        "0x7f03012f": "(reference) 0x7f05005d"
+      }
+    }
+  },
+  "api26To30Fallback": "drawable/splash_brand -> drawable/launcher_standard PNG",
+  "api31PlusRequestsSystemActivityIconFallback": true,
+  "coreAndAndroidAnimatedIconAreNullOnApi31Plus": true,
+  "oldVrcnMarkNotSelectedByAnyLaunchStyleConfiguration": true,
+  "fallbackDrawable": {
+    "{http://schemas.android.com/apk/res/android}drawable": "@0x7f070065",
+    "{http://schemas.android.com/apk/res/android}inset": "357985584"
+  },
+  "physicalOemSplashRenderTested": false,
+  "physicalHolidayAliasSplashTested": false
+}
