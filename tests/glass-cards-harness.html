@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Viewport glass synthetic transport fixture only</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { Capacitor, registerPlugin } from '@capacitor/core';
+      import '/src/styles.css';
+      const id = (type, index) =>
+        `${type}_00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
+      const friends = Array.from({ length: 338 }, (_, i) => ({
+        id: id('usr', i + 1),
+        displayName: `Card Friend ${String(i).padStart(3, '0')}`,
+        state: 'active',
+        location: 'offline',
+        status: 'active',
+        statusDescription: 'Synthetic glass foreground',
+        bio: 'Synthetic profile',
+        isFriend: true,
+        tags: ['system_trust_veteran'],
+        currentAvatarThumbnailImageUrl: '/world-sakura.svg',
+      }));
+      const self = {
+        id: id('usr', 9999),
+        displayName: 'Glass Explorer',
+        state: 'offline',
+        location: 'offline',
+        status: 'active',
+        friends: friends.map((friend) => friend.id),
+      };
+      const worlds = Array.from({ length: 60 }, (_, i) => ({
+        id: id('wrld', i + 1),
+        name: `Card World ${String(i).padStart(3, '0')}`,
+        authorName: 'Synthetic Author',
+        authorId: self.id,
+        imageUrl: '/world-rooftop.svg',
+        thumbnailImageUrl: '/world-rooftop.svg',
+        description: 'Synthetic world',
+        occupants: 40,
+        capacity: 40,
+        favorites: 1000,
+        visits: 5000,
+        tags: [],
+        instances: [],
+        unityPackages: [{ platform: 'android' }],
+      }));
+      const groups = Array.from({ length: 24 }, (_, i) => ({
+        id: id('grp', i + 1),
+        name: `Card Group ${String(i).padStart(3, '0')}`,
+        description: 'Synthetic group',
+        iconUrl: '/world-sakura.svg',
+        bannerUrl: '/world-rooftop.svg',
+        memberCount: 42,
+        membershipStatus: 'member',
+        shortCode: 'GLASS',
+        discriminator: '001',
+      }));
+      const appListeners = new Map(),
+        listeners = new Map();
+      window.__cardGlassTest = {
+        ready: false,
+        requests: [],
+        unexpected: [],
+        friends: friends.length,
+        worlds: worlds.length,
+      };
+      const pageOf = (items, url) =>
+        items.slice(
+          Number(url.searchParams.get('offset') || 0),
+          Number(url.searchParams.get('offset') || 0) + Number(url.searchParams.get('n') || 100),
+        );
+      const bridge = {
+        async sessionState() {
+          return { hasAuth: true };
+        },
+        async request(options) {
+          const url = new URL(options.path, 'https://synthetic.invalid');
+          window.__cardGlassTest.requests.push({
+            path: options.path,
+            method: options.method || 'GET',
+          });
+          if (url.pathname === '/auth/user' || url.pathname === `/users/${self.id}`)
+            return { status: 200, data: self };
+          if (url.pathname === '/auth/user/friends')
+            return {
+              status: 200,
+              data: url.searchParams.get('offline') === 'false' ? pageOf(friends, url) : [],
+            };
+          const friend = friends.find(
+            (user) =>
+              url.pathname === `/users/${user.id}` || url.pathname === `/profile/${user.id}`,
+          );
+          if (friend) return { status: 200, data: friend };
+          if (url.pathname === '/worlds') return { status: 200, data: pageOf(worlds, url) };
+          const world = worlds.find((world) => url.pathname === `/worlds/${world.id}`);
+          if (world) return { status: 200, data: world };
+          if (url.pathname === '/groups') return { status: 200, data: pageOf(groups, url) };
+          if (url.pathname === `/users/${self.id}/groups`) return { status: 200, data: groups };
+          const group = groups.find((group) => url.pathname === `/groups/${group.id}`);
+          if (group) return { status: 200, data: group };
+          if (url.pathname === '/favorites/groups/friend')
+            return { status: 200, data: { favoriteGroups: [] } };
+          if (url.pathname === '/favorites' || url.pathname === '/calendar')
+            return { status: 200, data: [] };
+          window.__cardGlassTest.unexpected.push(options.path);
+          return { status: 500, data: { error: { message: 'Unexpected glass fixture route' } } };
+        },
+        async screenProtection() {
+          return { enabled: false };
+        },
+        async setScreenProtection({ enabled }) {
+          return { enabled };
+        },
+        async addListener(name, listener) {
+          listeners.set(name, listener);
+          return {
+            remove: async () => {
+              listeners.delete(name);
+            },
+          };
+        },
+        async connectPipeline() {
+          listeners.get('connection')?.({ state: 'connected' });
+        },
+        async disconnectPipeline() {},
+        async clearSession() {},
+        async loadImage() {
+          return {
+            dataUrl:
+              'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+          };
+        },
+      };
+      registerPlugin('VrcNative', { web: () => bridge });
+      registerPlugin('App', {
+        web: () => ({
+          getState: async () => ({ isActive: true }),
+          addListener: async (name, listener) => {
+            if (!appListeners.has(name)) appListeners.set(name, new Set());
+            appListeners.get(name).add(listener);
+            return { remove: async () => appListeners.get(name)?.delete(listener) };
+          },
+          exitApp: async () => {},
+        }),
+      });
+      Capacitor.isNativePlatform = () => true;
+      const { appearanceStore } = await import('/src/data/appearance.ts');
+      window.__cardGlassTest.setAppearance = appearanceStore.updateSettings;
+      window.__cardGlassTest.emitAppState = (isActive) => {
+        for (const listener of appListeners.get('appStateChange') || []) listener({ isActive });
+      };
+      const { default: App } = await import('/src/App.tsx');
+      createRoot(document.getElementById('root')).render(React.createElement(App));
+      window.__cardGlassTest.ready = true;
+    </script>
+  </body>
+</html>

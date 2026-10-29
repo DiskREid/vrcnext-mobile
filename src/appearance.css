@@ -1,4 +1,4 @@
-/* Appearance is a token layer over the existing layout. List cards never own live blur. */
+/* Appearance is a token layer over the existing layout. Visible card lenses are budgeted separately. */
 html[data-theme] {
   --glass-blur: 16px;
   --glass-alpha: 0.59;
@@ -188,7 +188,7 @@ html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .sidebar {
   border-color: var(--glass-line);
 }
 
-/* Only the two small navigation surfaces and ordinary dialog panels blur content. */
+/* Base chrome and dialogs frost content; visible card lenses are assigned by GlassRefraction. */
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
   :is(.topbar, .bottom-nav, .modal:not(.fullscreen-network):not(.fullscreen-image-viewer)) {
   background:
@@ -207,8 +207,8 @@ html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) .modal-backdrop
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-/* Just two small dashboard tiles frost the decorative layer behind them.
-   Long lists and graphs still use static translucent surfaces without blur. */
+/* Two dashboard tiles frost the decorative layer. Card lenses are viewport-budgeted
+   separately; graph content remains outside all backdrop filters. */
 html[data-effects='full']:is([data-theme='liquid-dark'], [data-theme='liquid-light'])
   .dashboard-stats
   > button:nth-child(-n + 2) {

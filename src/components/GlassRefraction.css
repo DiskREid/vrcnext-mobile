@@ -167,3 +167,11 @@ html[data-glass-refraction='on'][data-theme='liquid-light'] .hero[data-glass-opt
     inset 0 -3px 8px #466b8c26,
     0 3px 9px #0819321a;
 }
+
+/* Cards keep their own foreground sharp: only the scene behind the rounded
+   panel is displaced. The controller limits these surfaces to the viewport. */
+html[data-glass-refraction='on'][data-theme][data-effects='full']
+  [data-glass-card-optic][data-glass-optic] {
+  -webkit-backdrop-filter: var(--glass-lens-filter) blur(0.35px) saturate(1.12);
+  backdrop-filter: var(--glass-lens-filter) blur(0.35px) saturate(1.12);
+}

@@ -1,5 +1,5 @@
-/* Shared material for interactive controls and detail cards. These surfaces are
-   static: lists and buttons do not allocate their own blur or SVG filter. */
+/* Shared material for interactive controls and detail cards. Refraction for a
+   bounded set of visible cards is assigned separately by GlassRefraction. */
 html:is([data-theme='liquid-dark'], [data-theme='liquid-light']) {
   --control-glass-fill: rgba(var(--glass-chrome-rgb), 0.34);
   --control-glass-edge: rgba(213, 234, 255, 0.29);

@@ -47,13 +47,17 @@ function alpha(color: string) {
 
 async function checkCard(card: Locator) {
   await expect(card).toBeVisible();
+  await card.scrollIntoViewIfNeeded();
+  await expect(card).toHaveAttribute('data-glass-card-optic', 'true');
   const style = await material(card);
   expect(style.image).toContain('gradient');
   expect(alpha(style.fill)).toBeLessThan(0.8);
   expect(style.shadow).toContain('inset');
-  // Repeated list entries must not allocate blur or individual SVG lenses.
-  expect(style.blur).toBe('none');
-  await expect(card).not.toHaveAttribute('data-glass-optic');
+  // Only viewport cards receive backdrop-only refraction, keeping their foreground sharp.
+  await expect(card).toHaveAttribute('data-glass-card-optic', 'true');
+  await expect(card).toHaveAttribute('data-glass-optic', /vrc-glass-/);
+  expect(style.blur).toContain('url(');
+  expect(style.blur).not.toContain('blur(10px)');
 }
 
 async function checkDialog(page: Page, dialog: Locator) {
