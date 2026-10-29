@@ -1,0 +1,16 @@
+{
+  "kind": "world",
+  "theme": "liquid-light",
+  "title": "Card World 000",
+  "bentPixels": 1588,
+  "glyphPixels": 88,
+  "changedGlyph": 0,
+  "imagePixels": 23954,
+  "changedImage": 0,
+  "foregroundPixels": 24042,
+  "changedForeground": 0,
+  "displacementScale": 40,
+  "width": 230,
+  "height": 266,
+  "foregroundMask": "Exact RGB ink with an eroded three-pixel stroke neighborhood; opaque image interior"
+}

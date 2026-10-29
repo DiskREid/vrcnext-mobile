@@ -1,0 +1,90 @@
+{
+  "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'",
+  "state": "on",
+  "filters": 6,
+  "mapIsPngDataUri": true,
+  "mapWidth": 256,
+  "mapHeight": 217,
+  "renderedImageChangesWhenRefractionDisabled": true,
+  "cards": {
+    "friend": {
+      "mapIsPngDataUri": true,
+      "mapWidth": 256,
+      "mapHeight": 81,
+      "foregroundFilter": "none",
+      "backdropFilter": "url(\"#vrc-glass-8\") blur(0.35px) saturate(1.12)",
+      "displacementScale": 40,
+      "renderedImageChangesWhenRefractionDisabled": true,
+      "foreground": [
+        {
+          "tag": "avatar",
+          "filter": "none"
+        },
+        {
+          "tag": "H3",
+          "filter": "none"
+        }
+      ],
+      "cards": 3,
+      "total": 8,
+      "filters": 8
+    },
+    "world": {
+      "mapIsPngDataUri": true,
+      "mapWidth": 166,
+      "mapHeight": 247,
+      "foregroundFilter": "none",
+      "backdropFilter": "url(\"#vrc-glass-14\") blur(0.35px) saturate(1.12)",
+      "displacementScale": 40,
+      "renderedImageChangesWhenRefractionDisabled": true,
+      "foreground": [
+        {
+          "tag": "media-cover",
+          "filter": "none"
+        },
+        {
+          "tag": "H3",
+          "filter": "none"
+        }
+      ],
+      "cards": 3,
+      "total": 9,
+      "filters": 9
+    }
+  },
+  "auth": {
+    "mapIsPngDataUri": true,
+    "mapWidth": 108,
+    "mapHeight": 256,
+    "foregroundFilter": "none",
+    "backdropFilter": "url(\"#vrc-glass-1\") blur(0.35px) saturate(1.12)",
+    "displacementScale": 40,
+    "renderedImageChangesWhenRefractionDisabled": true
+  },
+  "surfaces": {
+    "more-profile": {
+      "mapIsPngDataUri": true,
+      "mapWidth": 256,
+      "mapHeight": 69,
+      "foregroundFilter": "none",
+      "backdropFilter": "url(\"#vrc-glass-21\") blur(0.35px) saturate(1.12)",
+      "displacementScale": 40,
+      "renderedImageChangesWhenRefractionDisabled": true
+    },
+    "more-card": {
+      "mapIsPngDataUri": true,
+      "mapWidth": 169,
+      "mapHeight": 168,
+      "foregroundFilter": "none",
+      "backdropFilter": "url(\"#vrc-glass-22\") blur(0.35px) saturate(1.12)",
+      "displacementScale": 40,
+      "renderedImageChangesWhenRefractionDisabled": true
+    }
+  },
+  "friendAndWorldCardMapsDecoded": true,
+  "friendAndWorldCardBackdropsReallyChange": true,
+  "friendAndWorldCardForegroundHasNoFilter": true,
+  "violations": [],
+  "pageErrors": [],
+  "credentialRequests": []
+}

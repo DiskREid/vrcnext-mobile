@@ -1,0 +1,16 @@
+{
+  "kind": "friend",
+  "theme": "liquid-dark",
+  "title": "Card Friend 000",
+  "bentPixels": 2215,
+  "glyphPixels": 92,
+  "changedGlyph": 0,
+  "imagePixels": 342,
+  "changedImage": 0,
+  "foregroundPixels": 434,
+  "changedForeground": 0,
+  "displacementScale": 40,
+  "width": 350,
+  "height": 112,
+  "foregroundMask": "Exact RGB ink with an eroded three-pixel stroke neighborhood; opaque image interior"
+}

@@ -1,0 +1,170 @@
+{
+  "apkSha256": "797232b39ebf2c05c3d5dd1e0fdbe5b3ef448250fa489b340cbc8c2719137e95",
+  "package": "com.diskreid.vrcnextmobile",
+  "mainActivity": {
+    "{http://schemas.android.com/apk/res/android}theme": "@0x7f0e0007",
+    "{http://schemas.android.com/apk/res/android}label": "@0x7f0d0029",
+    "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.MainActivity",
+    "{http://schemas.android.com/apk/res/android}enabled": "true",
+    "{http://schemas.android.com/apk/res/android}exported": "true",
+    "{http://schemas.android.com/apk/res/android}launchMode": "2",
+    "{http://schemas.android.com/apk/res/android}configChanges": "4084"
+  },
+  "aliases": [
+    {
+      "{http://schemas.android.com/apk/res/android}label": "@0x7f0d001c",
+      "{http://schemas.android.com/apk/res/android}icon": "@0x7f0c0001",
+      "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.launcher.Christmas",
+      "{http://schemas.android.com/apk/res/android}enabled": "false",
+      "{http://schemas.android.com/apk/res/android}exported": "true",
+      "{http://schemas.android.com/apk/res/android}targetActivity": "com.diskreid.vrcnextmobile.MainActivity"
+    },
+    {
+      "{http://schemas.android.com/apk/res/android}label": "@0x7f0d001c",
+      "{http://schemas.android.com/apk/res/android}icon": "@0x7f0c0004",
+      "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.launcher.Halloween",
+      "{http://schemas.android.com/apk/res/android}enabled": "false",
+      "{http://schemas.android.com/apk/res/android}exported": "true",
+      "{http://schemas.android.com/apk/res/android}targetActivity": "com.diskreid.vrcnextmobile.MainActivity"
+    },
+    {
+      "{http://schemas.android.com/apk/res/android}label": "@0x7f0d001c",
+      "{http://schemas.android.com/apk/res/android}icon": "@0x7f0c0002",
+      "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.launcher.EarthDay",
+      "{http://schemas.android.com/apk/res/android}enabled": "false",
+      "{http://schemas.android.com/apk/res/android}exported": "true",
+      "{http://schemas.android.com/apk/res/android}targetActivity": "com.diskreid.vrcnextmobile.MainActivity"
+    },
+    {
+      "{http://schemas.android.com/apk/res/android}label": "@0x7f0d001c",
+      "{http://schemas.android.com/apk/res/android}icon": "@0x7f0c0003",
+      "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.launcher.Easter",
+      "{http://schemas.android.com/apk/res/android}enabled": "false",
+      "{http://schemas.android.com/apk/res/android}exported": "true",
+      "{http://schemas.android.com/apk/res/android}targetActivity": "com.diskreid.vrcnextmobile.MainActivity"
+    },
+    {
+      "{http://schemas.android.com/apk/res/android}label": "@0x7f0d001c",
+      "{http://schemas.android.com/apk/res/android}icon": "@0x7f0c0005",
+      "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.launcher.StPatrick",
+      "{http://schemas.android.com/apk/res/android}enabled": "false",
+      "{http://schemas.android.com/apk/res/android}exported": "true",
+      "{http://schemas.android.com/apk/res/android}targetActivity": "com.diskreid.vrcnextmobile.MainActivity"
+    },
+    {
+      "{http://schemas.android.com/apk/res/android}label": "@0x7f0d001c",
+      "{http://schemas.android.com/apk/res/android}icon": "@0x7f0c0007",
+      "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.launcher.WomensDay",
+      "{http://schemas.android.com/apk/res/android}enabled": "false",
+      "{http://schemas.android.com/apk/res/android}exported": "true",
+      "{http://schemas.android.com/apk/res/android}targetActivity": "com.diskreid.vrcnextmobile.MainActivity"
+    },
+    {
+      "{http://schemas.android.com/apk/res/android}label": "@0x7f0d001c",
+      "{http://schemas.android.com/apk/res/android}icon": "@0x7f0c0006",
+      "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.launcher.Valentine",
+      "{http://schemas.android.com/apk/res/android}enabled": "false",
+      "{http://schemas.android.com/apk/res/android}exported": "true",
+      "{http://schemas.android.com/apk/res/android}targetActivity": "com.diskreid.vrcnextmobile.MainActivity"
+    },
+    {
+      "{http://schemas.android.com/apk/res/android}label": "@0x7f0d001c",
+      "{http://schemas.android.com/apk/res/android}icon": "@0x7f0c0000",
+      "{http://schemas.android.com/apk/res/android}name": "com.diskreid.vrcnextmobile.launcher.Standard",
+      "{http://schemas.android.com/apk/res/android}enabled": "true",
+      "{http://schemas.android.com/apk/res/android}exported": "true",
+      "{http://schemas.android.com/apk/res/android}targetActivity": "com.diskreid.vrcnextmobile.MainActivity"
+    }
+  ],
+  "permissionsMatch0440": true,
+  "artwork": [
+    {
+      "id": "standard",
+      "bytes": 1625367,
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "eef59bb9bc2afb87350852cb2d7a1e6337e896d5c3ebce0478729fcd35e9b3ba",
+      "packagedNativePath": "res/drawable-nodpi-v4/launcher_standard.png",
+      "webAndNativeSourcesAndPackagedBytesIdentical": true
+    },
+    {
+      "id": "valentine",
+      "bytes": 1684627,
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "bfd6afb49990292e5b4b245db7699ef94cf27ffbae1ee2cf9c855e469d11fb67",
+      "packagedNativePath": "res/drawable-nodpi-v4/launcher_valentine.png",
+      "webAndNativeSourcesAndPackagedBytesIdentical": true
+    },
+    {
+      "id": "womens-day",
+      "bytes": 1516627,
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "a59b94398fcdf298ec5939932c471f041d4da873260eb432a4540f07c10500ea",
+      "packagedNativePath": "res/drawable-nodpi-v4/launcher_womens_day.png",
+      "webAndNativeSourcesAndPackagedBytesIdentical": true
+    },
+    {
+      "id": "st-patrick",
+      "bytes": 1942651,
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "14a6e0c7265b2e4acbb9c7e2284c02a09915e2eacd18057138d8d170bdf2f211",
+      "packagedNativePath": "res/drawable-nodpi-v4/launcher_st_patrick.png",
+      "webAndNativeSourcesAndPackagedBytesIdentical": true
+    },
+    {
+      "id": "easter",
+      "bytes": 2064542,
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "687cd68583139f9aa90e93af6fdae8cc65e7b9c266bac6dbd607ac25e28993ab",
+      "packagedNativePath": "res/drawable-nodpi-v4/launcher_easter.png",
+      "webAndNativeSourcesAndPackagedBytesIdentical": true
+    },
+    {
+      "id": "earth-day",
+      "bytes": 2045759,
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "d56508dc1758af737279bd1e36bca84593183b5ce9e5fd82801ce746dd424c54",
+      "packagedNativePath": "res/drawable-nodpi-v4/launcher_earth_day.png",
+      "webAndNativeSourcesAndPackagedBytesIdentical": true
+    },
+    {
+      "id": "halloween",
+      "bytes": 2025783,
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "5fe085cd4b86143f609e38c843cf1b54b8af1a44031217ae9f39884cadfaf9fd",
+      "packagedNativePath": "res/drawable-nodpi-v4/launcher_halloween.png",
+      "webAndNativeSourcesAndPackagedBytesIdentical": true
+    },
+    {
+      "id": "christmas",
+      "bytes": 2048082,
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "3a901dfe4e774bc6d64ef08457f4d560e3bea3bb25cc8f339022de2f9347b6f3",
+      "packagedNativePath": "res/drawable-nodpi-v4/launcher_christmas.png",
+      "webAndNativeSourcesAndPackagedBytesIdentical": true
+    }
+  ]
+}
